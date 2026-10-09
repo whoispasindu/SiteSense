@@ -1,7 +1,8 @@
+import { useAuth } from "../../auth/context";
 import { Sheet } from "../../components/ui/Sheet";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { CURRENT_PHASE, PHASES } from "../../lib/programme";
-import { formatSiteDate } from "../../lib/time";
+import { formatSiteDate, greeting } from "../../lib/time";
 import { BuildProgramme } from "./BuildProgramme";
 import { SystemReadings } from "./SystemReadings";
 
@@ -34,6 +35,9 @@ function TitleBlock() {
 }
 
 export function DashboardPage() {
+  const { user } = useAuth();
+  const firstName = user?.full_name.split(" ")[0] ?? "";
+
   return (
     <div className="mx-auto max-w-6xl space-y-14">
       <div className="animate-rise grid gap-8 lg:grid-cols-[1fr_22rem]">
@@ -41,17 +45,16 @@ export function DashboardPage() {
           <p className="font-mono text-xs tracking-[0.2em] text-ink-faint uppercase">
             Sheet S-00 · Phase {CURRENT_PHASE} of {PHASES.length - 1}
           </p>
-          <h1 className="font-wide mt-4 text-5xl leading-[0.95] font-extrabold tracking-tight text-balance sm:text-7xl">
-            Ground{" "}
+          <h1 className="font-wide mt-4 text-5xl leading-[0.95] font-extrabold tracking-tight text-balance sm:text-6xl">
+            {greeting(new Date())},{" "}
             <span className="relative inline-block">
-              <span className="relative z-10">broken.</span>
+              <span className="relative z-10">{firstName}.</span>
               <span aria-hidden="true" className="absolute inset-x-0 bottom-[0.08em] z-0 h-[0.32em] bg-hivis" />
             </span>
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-ink-soft">
             SiteSense will tell a construction company which site will slip before it does, and what to do about it.
-            This phase pours the foundations: the API, database, checks and this shell. Every module from here plugs
-            into it.
+            The gate is up: sign-in, six roles and site access are in place. Projects, BOQ and budgets arrive next.
           </p>
         </div>
         <TitleBlock />

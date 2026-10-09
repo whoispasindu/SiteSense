@@ -4,6 +4,7 @@ import { createBrowserRouter } from "react-router";
 import { RouterProvider } from "react-router/dom";
 
 import { createQueryClient } from "./api/queryClient";
+import { AuthProvider } from "./auth/AuthProvider";
 import { routes } from "./routes";
 
 const router = createBrowserRouter(routes);
@@ -13,7 +14,9 @@ export function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

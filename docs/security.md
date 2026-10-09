@@ -19,7 +19,73 @@ here, newest first. The baseline design is in [ADR 0003](adr/0003-security-basel
 | API docs | `/api/docs` and OpenAPI disabled in production | `main.py` | `test_api_docs_are_disabled_in_production` |
 | Frontend | `dangerouslySetInnerHTML`, `innerHTML`, `eval` banned by lint; every response Zod-validated; same-origin paths only; `redirect: "error"`; crash page shows no details | `eslint.config.js`, `api/client.ts`, `RouteErrorPage.tsx` | ESLint in CI, `client.test.ts`, `RouteErrorPage.test.tsx` |
 | Containers | Non-root users (API uid 10001, node, nginx-unprivileged); dev ports bound to 127.0.0.1 | Dockerfiles, `docker-compose.yml` | review |
+| Passwords | argon2id, 12–128 chars, deny-list, no email name; admin-issued one-time passwords must be changed | `core/security.py` | `test_security_unit.py`, `test_temporary_password_must_be_changed_before_anything_else` |
+| Sessions | 15-min JWT in memory; rotating refresh token (hashed, httpOnly, Secure, SameSite=Strict, path-scoped); reuse detection; 30-day cap; `session_version` revocation | `services/auth_service.py`, `api/v1/auth.py` | `test_auth_api.py`, browser check: tokens invisible to scripts, nothing in web storage |
+| Brute force | Lockout after 5 failures (15 min), per-IP rate limits on sign-in, refresh and password change, uniform error and timing | `auth_service.login`, `core/rate_limit.py` | TC-09 test, rate-limit tests |
+| Authorisation | Permission table; `require_permission` on every endpoint; site scoping returns 404 | `core/permissions.py`, `api/deps.py` | `test_role_matrix.py` (every endpoint × every role), `test_site_scoping.py` |
+| CSRF | SameSite=Strict cookie read only by auth endpoints, plus Origin / Sec-Fetch-Site checks | `require_trusted_origin` | `test_cross_site_login_is_blocked` |
+| Audit | Sign-ins, failures, lockouts, logouts, password changes, admin actions; append-only by grants | `services/audit.py`, migration 0002 | `test_database_guards.py` |
+| Open redirect | Post-sign-in `next` must be a same-origin path | `safeNextPath` | `auth.test.tsx` |
 | Supply chain | Pinned deps, Dependabot (pip, npm, actions, docker), pip-audit, npm audit, dependency review, CodeQL `security-extended`, actions pinned to SHAs, `permissions: contents: read`, `persist-credentials: false` | `.github/` | CI |
+
+## Phase 1 review: 2026-10-09
+
+**Scope:** the whole repository at the end of Phase 1 (authentication, roles, users, sites,
+audit log, and the web screens for them).
+
+### OWASP Top 10 (2021) walk-through
+
+| Risk | Phase 1 status |
+| --- | --- |
+| A01 Broken access control | Every endpoint declares its permission; the role-matrix test calls all 12 protected endpoints as all 6 roles and unauthenticated. Refused calls are proven side-effect free. Site scoping hides unassigned sites with 404. The web menu and route guards mirror the API but are not relied on. |
+| A02 Cryptographic failures | argon2id passwords; refresh tokens stored as SHA-256 hashes; JWT algorithm pinned to HS256 with a 32+ character secret that production refuses to start without. Cookie is Secure and httpOnly. |
+| A03 Injection | ORM only; all inputs are Pydantic models with `extra="forbid"`; the audit filter is pattern-validated. Emails validated and lower-cased, with a database check constraint. |
+| A04 Insecure design | Admins never choose passwords; last-admin and self-lockout rules; role change and deactivation revoke sessions instantly; refresh-token reuse burns the whole session family. |
+| A05 Security misconfiguration | Production additionally refuses the default JWT secret and an insecure cookie. |
+| A06 Vulnerable components | pip-audit: **0**; npm audit: **0** (new: argon2-cffi, PyJWT, email-validator). |
+| A07 Identification and authentication failures | Lockout (TC-09), rate limits, uniform failure answers with a dummy hash for unknown emails, forced change of temporary passwords, password policy mirrored in the UI. |
+| A08 Software and data integrity failures | Audit log is append-only for the app role (UPDATE/DELETE revoked), verified by tests; roles table is read-only for the app. |
+| A09 Logging and monitoring failures | Security events go to the audit log with actor, IP and user agent, and are visible to admins in the UI. Passwords and tokens never reach logs or audit details. |
+| A10 SSRF | Still no outbound calls. |
+
+### Verification beyond unit tests
+
+- **Mutation checks:** the lockout, permission check, refresh-family revocation, site scoping and
+  session-version check were each removed in turn; every removal made a test fail.
+- **Browser walk-through** (local API + Vite against the Docker database): sign-in redirect with
+  `next`, admin menu, user creation with one-time password, audit log, session restore on reload,
+  tokens unreadable by page scripts, sign-out, engineer menu, 403 page, phone layout.
+
+### Findings fixed during the review
+
+1. **Demo and test accounts used a reserved `.test` domain** that the email validator rejects,
+   so the seeded users could never have signed in. Switched to the RFC 2606 `.example` domain.
+2. **Site codes typed in lower case were rejected** because the format check ran before
+   upper-casing. Normalisation now runs first.
+3. **Audit entries in one transaction shared a timestamp** (database `now()`), making order
+   ambiguous. Entries now take the application clock.
+4. **After sign-in, the user lost the page they asked for**: the signed-out guard redirected to
+   `/` before the `next` path was followed. The guard now follows a safe `next` itself.
+5. **Explicit sign-out kept `?next=`**, so the next person signing in on a shared device was
+   sent to the previous user's page. A deliberate sign-out now starts clean.
+6. **The top bar named pages the user could not open** (on the 403 page). It now checks
+   permissions.
+7. **Password change had no rate limit**, letting a stolen access token be used to guess the
+   current password. Now rate-limited.
+8. **Sign-in from `127.0.0.1:5173` would be refused** by the origin check in development. Added to
+   the development origin list.
+9. **Temporary passwords contained look-alike characters** (0/O, 1/l/I), error-prone when read
+   out by phone. The alphabet now excludes them.
+
+### Open items
+
+| Item | Phase |
+| --- | --- |
+| Shared rate-limit store (Redis) when running more than one API instance; set `FORWARDED_ALLOW_IPS` behind a proxy so limits apply per real client IP | 13 |
+| TOTP two-step verification for admin, PM and procurement (`mfa_enabled` and `MFA_ROLES` ready) | 13 |
+| Self-service password reset by email (needs the email service) | 11 |
+| Users screen loads the first 100 users; add server-side paging when a company exceeds that | when needed |
+| Accepted risk: the "account locked" message reveals that an account exists after 5 failed, rate-limited, audited attempts (see ADR 0005) | — |
 
 ## Phase 0 review: 2026-10-09
 

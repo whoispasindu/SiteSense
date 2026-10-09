@@ -15,6 +15,7 @@ from app.core.middleware import (
     RequestContextMiddleware,
     SecurityHeadersMiddleware,
 )
+from app.core.rate_limit import RateLimiter
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -38,6 +39,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.state.settings = settings
     app.state.database = Database(settings)
+    app.state.rate_limiter = RateLimiter()
 
     register_error_handlers(app)
     app.include_router(api_router)

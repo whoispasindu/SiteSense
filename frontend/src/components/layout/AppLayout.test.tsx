@@ -2,11 +2,11 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { healthyApi, mockApi, renderRoute } from "../../test/utils";
+import { makeMe, mockApi, renderRoute, sessionApi } from "../../test/utils";
 
 describe("AppLayout", () => {
   beforeEach(() => {
-    mockApi(healthyApi);
+    mockApi(sessionApi(makeMe("project_manager")));
   });
 
   it("renders landmarks and a skip link to the main content", async () => {

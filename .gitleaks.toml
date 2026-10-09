@@ -1,0 +1,21 @@
+# Gitleaks configuration: the default rules, plus an allowlist for the documented
+# development and test placeholders. Only these exact non-secret values are exempt;
+# anything else that looks like a credential still fails CI.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documented development/test placeholder values (not real secrets)"
+regexes = [
+  '''change-me-[a-z]+''',
+  '''dev-only-insecure-jwt-secret-change-me-0+''',
+  '''test-jwt-secret-that-is-long-enough-0123456789''',
+  '''a-completely-different-secret-0123456789abcdef''',
+  '''a-real-production-secret-value-0123456789abcd''',
+  '''SiteSense-Demo-2026!''',
+  '''Correct-Horse-Battery-9''',
+  '''Demo-Password-For-Tests-1''',
+  # Fake one-time passwords used as fixtures in the frontend tests
+  '''kQ7rd-2xPmA-9fT3c-Lw8nB''',
+  '''Zz9yy-Xx8ww-Vv7uu-Tt6ss''',
+]

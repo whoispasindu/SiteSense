@@ -35,7 +35,8 @@ jobs:
       SITESENSE_ENVIRONMENT: test
       SITESENSE_DATABASE_URL: postgresql+psycopg://sitesense_app:ci-app@localhost:5432/sitesense
       SITESENSE_MIGRATION_DATABASE_URL: postgresql+psycopg://sitesense_owner:ci-owner@localhost:5432/sitesense
-      SITESENSE_TEST_DATABASE_URL: postgresql+psycopg://sitesense_app:ci-app@localhost:5432/sitesense
+      SITESENSE_TEST_DATABASE_URL: postgresql+psycopg://sitesense_app:ci-app@localhost:5432/sitesense_test
+      SITESENSE_TEST_MIGRATION_DATABASE_URL: postgresql+psycopg://sitesense_owner:ci-owner@localhost:5432/sitesense_test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -130,6 +131,8 @@ jobs:
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Findings go to the job summary; PR comments would need write access.
+          GITLEAKS_ENABLE_COMMENTS: "false"
 
   dependency-review:
     name: Security · dependency review

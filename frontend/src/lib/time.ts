@@ -21,3 +21,12 @@ export function formatSiteClock(date: Date): string {
 export function formatSiteDate(date: Date): string {
   return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: SITE_TIME_ZONE }).format(date);
 }
+
+export function greeting(date: Date): string {
+  const hour = Number(
+    new Intl.DateTimeFormat("en-GB", { hour: "numeric", hourCycle: "h23", timeZone: SITE_TIME_ZONE }).format(date),
+  );
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}

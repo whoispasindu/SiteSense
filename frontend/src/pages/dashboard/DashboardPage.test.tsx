@@ -2,11 +2,18 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { healthyApi, jsonResponse, mockApi, renderRoute } from "../../test/utils";
+import { jsonResponse, makeMe, mockApi, renderRoute, sessionApi } from "../../test/utils";
 
 describe("DashboardPage", () => {
+  it("greets the signed-in user by first name", async () => {
+    mockApi(sessionApi(makeMe("project_manager", { full_name: "Ruwan Silva" })));
+    renderRoute("/");
+
+    expect(await screen.findByRole("heading", { level: 1, name: /Ruwan\./ })).toBeInTheDocument();
+  });
+
   it("shows live readings when the API and database are up", async () => {
-    mockApi(healthyApi);
+    mockApi(sessionApi(makeMe("project_manager")));
     renderRoute("/");
 
     const api = await screen.findByRole("article", { name: "API · liveness" });
@@ -19,7 +26,7 @@ describe("DashboardPage", () => {
 
   it("reports a degraded database with a text label, not only colour", async () => {
     mockApi({
-      ...healthyApi,
+      ...sessionApi(makeMe("project_manager")),
       "/api/v1/health/ready": () => jsonResponse({ status: "degraded", checks: { database: "unavailable" } }, 503),
     });
     renderRoute("/");
@@ -30,7 +37,10 @@ describe("DashboardPage", () => {
   });
 
   it("explains what to do when the API is unreachable", async () => {
-    mockApi({});
+    const authOnly = Object.fromEntries(
+      Object.entries(sessionApi(makeMe("project_manager"))).filter(([path]) => !path.startsWith("/api/v1/health")),
+    );
+    mockApi(authOnly);
     renderRoute("/");
 
     const api = await screen.findByRole("article", { name: "API · liveness" });
@@ -40,7 +50,7 @@ describe("DashboardPage", () => {
 
   it("re-checks on demand", async () => {
     const user = userEvent.setup();
-    const fetchMock = mockApi(healthyApi);
+    const fetchMock = mockApi(sessionApi(makeMe("project_manager")));
     renderRoute("/");
     await screen.findAllByText("Online");
     const before = fetchMock.mock.calls.length;
@@ -52,13 +62,16 @@ describe("DashboardPage", () => {
   });
 
   it("lists every build phase with its status as text", async () => {
-    mockApi(healthyApi);
+    mockApi(sessionApi(makeMe("project_manager")));
     renderRoute("/");
 
     const programme = await screen.findByRole("list", { name: "Build phases and releases" });
     const items = within(programme).getAllByRole("listitem");
     expect(items).toHaveLength(15 + 2); // 15 phases plus the v0.1 and v1.0 releases
-    expect(within(programme).getByText("Setup and foundations").closest("li")).toHaveTextContent("In progress");
+    expect(within(programme).getByText("Setup and foundations").closest("li")).toHaveTextContent("Complete");
+    expect(within(programme).getByText("Authentication, roles and users").closest("li")).toHaveTextContent(
+      "In progress",
+    );
     expect(within(programme).getByText("Client portal").closest("li")).toHaveTextContent("Planned");
     expect(within(programme).getByText(/Release v0.1 MVP/)).toBeInTheDocument();
   });

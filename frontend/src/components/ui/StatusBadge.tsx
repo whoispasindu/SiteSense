@@ -17,7 +17,7 @@ interface StatusBadgeProps {
 export function StatusBadge({ tone, label, pulse = false }: StatusBadgeProps) {
   return (
     <span
-      className={`font-wide inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.68rem] font-bold tracking-[0.14em] uppercase ${TONES[tone]}`}
+      className={`font-wide inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[0.68rem] font-bold tracking-[0.14em] uppercase ${TONES[tone]}`}
     >
       <span
         aria-hidden="true"

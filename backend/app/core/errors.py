@@ -29,6 +29,7 @@ class AppError(Exception):
     status_code: int = HTTPStatus.BAD_REQUEST
     code: str = "bad_request"
     message: str = "The request could not be processed."
+    headers: dict[str, str] | None = None
 
     def __init__(
         self,
@@ -51,6 +52,7 @@ class UnauthorizedError(AppError):
     status_code = HTTPStatus.UNAUTHORIZED
     code = "unauthorized"
     message = "Authentication is required."
+    headers = {"WWW-Authenticate": "Bearer"}  # noqa: RUF012 - read-only class default
 
 
 class ForbiddenError(AppError):
@@ -118,7 +120,9 @@ def _safe_validation_details(exc: RequestValidationError) -> list[dict[str, Any]
 
 async def _app_error_handler(_request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, AppError)
-    return JSONResponse(error_body(exc.code, exc.message, exc.details), status_code=exc.status_code)
+    return JSONResponse(
+        error_body(exc.code, exc.message, exc.details), status_code=exc.status_code, headers=exc.headers
+    )
 
 
 async def _validation_error_handler(_request: Request, exc: Exception) -> JSONResponse:
