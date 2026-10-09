@@ -10,3 +10,7 @@ structlog==26.1.0
 argon2-cffi==25.1.0
 PyJWT==2.15.1
 email-validator==2.3.0
+openpyxl==3.1.5
+# openpyxl parses workbook XML through defusedxml when it is installed (XXE / entity bombs).
+defusedxml==0.7.1
+python-multipart==0.0.32

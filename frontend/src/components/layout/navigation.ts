@@ -49,8 +49,13 @@ export function isAvailable(item: NavItem, currentPhase: number = CURRENT_PHASE)
   return item.phase <= currentPhase;
 }
 
+/** The menu item for a path, including nested pages such as /projects/:id/boq. */
 export function findNavItem(pathname: string): NavItem | undefined {
-  return NAV_GROUPS.flatMap((group) => group.items).find((item) => item.path === pathname);
+  const items = NAV_GROUPS.flatMap((group) => group.items);
+  return (
+    items.find((item) => item.path === pathname) ??
+    items.find((item) => item.path !== "/" && pathname.startsWith(`${item.path}/`))
+  );
 }
 
 /** The menu a user sees: only groups and items their permissions allow. */

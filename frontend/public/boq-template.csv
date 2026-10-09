@@ -1,0 +1,4 @@
+Section Code,Section Name,Item Code,Description,Unit,Quantity,Rate,Budget Rate
+A,Preliminaries,A.01,"Site establishment, hoarding and site offices",item,1,4850000.00,4200000.00
+B,Substructure,B.01,Excavation in earth for pile caps not exceeding 3 m deep,m3,2850,1450.00,1250.00
+B,Substructure,B.02,"Grade 30 concrete in pile caps and ground beams",m3,640,38500.00,33800.00

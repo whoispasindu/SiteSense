@@ -12,7 +12,7 @@ SiteSense tells a construction company which site will slip before it does, and 
 
 </div>
 
-> **Status: Phase 1 of 14 (sign-in, roles and users).** Product features arrive phase by phase
+> **Status: Phase 2 of 14 (projects, BOQ and budget).** Product features arrive phase by phase
 > (see [Roadmap](#roadmap)). Nothing here is production-ready yet.
 
 ## What it will do
@@ -69,6 +69,8 @@ docker compose exec backend python -m app.cli seed-dev
 | Procurement Officer | `procurement@sitesense.example` |
 | Client | `client@sitesense.example` |
 
+`seed-dev` also creates three demo projects; Havelock Residences comes with a full BOQ
+(`backend/app/seed_data/boq-havelock-residences.csv`, also a good file to try the import with).
 The password is the value of `SITESENSE_DEMO_PASSWORD` (see `.env.example`). For a real
 company, create the first admin instead; it prints a one-time password:
 
@@ -173,8 +175,8 @@ docs/           architecture, decision records, security reviews, model cards
 | Phase | Name | Status |
 | --- | --- | --- |
 | 0 | Setup and foundations | Done |
-| 1 | Authentication, roles and users | In progress |
-| 2 | Projects, BOQ and budget | Planned |
+| 1 | Authentication, roles and users | Done |
+| 2 | Projects, BOQ and budget | In progress |
 | 3 | Schedule basics | Planned |
 | 4 | Daily site reports | Planned |
 | 5 | Materials, approvals and rules engine | Planned |

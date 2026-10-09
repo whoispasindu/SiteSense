@@ -1,3 +1,4 @@
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -16,6 +17,9 @@ from app.core.middleware import (
     SecurityHeadersMiddleware,
 )
 from app.core.rate_limit import RateLimiter
+
+# Routes that accept file uploads get a larger body limit; everything else keeps the default.
+UPLOAD_PATHS = re.compile(r"/api/v1/projects/[0-9a-fA-F-]{36}/boq/import")
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -55,7 +59,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         max_age=600,
     )
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
-    app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_request_body_bytes)
+    app.add_middleware(
+        BodySizeLimitMiddleware,
+        max_bytes=settings.max_request_body_bytes,
+        overrides=[(UPLOAD_PATHS, settings.max_upload_body_bytes)],
+    )
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(SecurityHeadersMiddleware, hsts=settings.is_production)
 

@@ -6,6 +6,7 @@ generic 500 produced when something unexpected fails.
 """
 
 import json
+import re
 import time
 
 import structlog
@@ -115,21 +116,34 @@ class RequestContextMiddleware:
 
 
 class BodySizeLimitMiddleware:
-    """Rejects bodies over ``max_bytes``, whether or not the client sent Content-Length."""
+    """Rejects bodies over the limit, whether or not the client sent Content-Length.
 
-    def __init__(self, app: ASGIApp, *, max_bytes: int) -> None:
+    ``overrides`` raises the limit for specific paths (file uploads) and nowhere else.
+    """
+
+    def __init__(
+        self, app: ASGIApp, *, max_bytes: int, overrides: list[tuple[re.Pattern[str], int]] | None = None
+    ) -> None:
         self.app = app
-        self.max_bytes = max_bytes
+        self.default_max_bytes = max_bytes
+        self.overrides = overrides or []
+
+    def _limit_for(self, path: str) -> int:
+        for pattern, limit in self.overrides:
+            if pattern.fullmatch(path):
+                return limit
+        return self.default_max_bytes
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
+        max_bytes = self._limit_for(scope["path"])
 
         declared = Headers(scope=scope).get("content-length")
         if declared is not None:
             try:
-                too_big = int(declared) > self.max_bytes
+                too_big = int(declared) > max_bytes
             except ValueError:
                 too_big = True  # malformed header: refuse rather than guess
             if too_big:
@@ -143,7 +157,7 @@ class BodySizeLimitMiddleware:
             message = await receive()
             if message["type"] == "http.request":
                 received += len(message.get("body", b""))
-                if received > self.max_bytes:
+                if received > max_bytes:
                     raise PayloadTooLargeError()
             return message
 

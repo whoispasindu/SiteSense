@@ -70,8 +70,9 @@ describe("DashboardPage", () => {
     expect(items).toHaveLength(15 + 2); // 15 phases plus the v0.1 and v1.0 releases
     expect(within(programme).getByText("Setup and foundations").closest("li")).toHaveTextContent("Complete");
     expect(within(programme).getByText("Authentication, roles and users").closest("li")).toHaveTextContent(
-      "In progress",
+      "Complete",
     );
+    expect(within(programme).getByText("Projects, BOQ and budget").closest("li")).toHaveTextContent("In progress");
     expect(within(programme).getByText("Client portal").closest("li")).toHaveTextContent("Planned");
     expect(within(programme).getByText(/Release v0.1 MVP/)).toBeInTheDocument();
   });

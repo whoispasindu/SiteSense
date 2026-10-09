@@ -7,6 +7,16 @@ uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Phase 2: projects, BOQ and budget.**
+  - Projects with client, contract value, type, status and contract period, scoped to the
+    user's sites; project managers create and edit them.
+  - BOQ import from Excel (.xlsx) or CSV with a row-by-row validation report, dry run first,
+    all-or-nothing import, flexible header names, and protection against hostile files.
+  - BOQ sections and items with exact decimal totals; a cost budget line per section, editable
+    by the quantity surveyor (seeded from an optional "Budget rate" column).
+  - Web: Projects register, project overview (title block, KPIs, cost by section, team), BOQ
+    browser with inline budget editing, and a three-step import screen.
+  - Realistic demo BOQ (72-apartment block in Colombo, LKR 1.11 bn) loaded by `seed-dev`.
 - **Phase 1: authentication, roles and users.**
   - Sign-in with argon2id passwords, 15-minute access tokens kept in memory, and rotating
     refresh tokens in an httpOnly cookie with reuse detection.

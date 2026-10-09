@@ -26,7 +26,51 @@ here, newest first. The baseline design is in [ADR 0003](adr/0003-security-basel
 | CSRF | SameSite=Strict cookie read only by auth endpoints, plus Origin / Sec-Fetch-Site checks | `require_trusted_origin` | `test_cross_site_login_is_blocked` |
 | Audit | Sign-ins, failures, lockouts, logouts, password changes, admin actions; append-only by grants | `services/audit.py`, migration 0002 | `test_database_guards.py` |
 | Open redirect | Post-sign-in `next` must be a same-origin path | `safeNextPath` | `auth.test.tsx` |
+| File uploads | BOQ import: .xlsx/CSV checked by content; 5 MB, 5,000 rows, 30 columns; zip-bomb and macro checks before opening; XML via defusedxml; formulas never evaluated; larger body limit on the upload route only; file never written to disk | `services/boq_import.py`, `BodySizeLimitMiddleware` overrides | `test_boq_import.py`, `test_projects_api.py` |
+| Money | NUMERIC columns with check constraints; Decimal end to end; decimal strings in JSON | `models/project.py`, `schemas/project.py` | `test_projects_api.py` |
 | Supply chain | Pinned deps, Dependabot (pip, npm, actions, docker), pip-audit, npm audit, dependency review, CodeQL `security-extended`, actions pinned to SHAs, `permissions: contents: read`, `persist-credentials: false` | `.github/` | CI |
+
+## Phase 2 review: 2026-10-09
+
+**Scope:** the whole repository at the end of Phase 2 (projects, BOQ import, budget lines, and
+their screens), plus a re-check of everything from Phases 0 and 1.
+
+### OWASP Top 10 (2021) walk-through
+
+| Risk | Phase 2 status |
+| --- | --- |
+| A01 Broken access control | All 7 new endpoints are in the role matrix (every role, plus unauthenticated). Project lists and single projects are filtered by site; another site's project answers 404. A PM cannot open a project on a site they are not assigned to. A budget line is only reachable through its own project. Clients have no project access (their cost-free portal is Phase 12). |
+| A03 Injection | ORM only. Search escapes LIKE wildcards (`%`, `_`, `\`), which a test proves. Uploaded text is length-checked and stored as data, never interpreted. |
+| A04 Insecure design | BOQ import is validate-first (dry run), all-or-nothing, and audited. A project's code and site cannot be changed after creation, because the site decides who can see it. |
+| A05 Security misconfiguration | The larger body limit applies only to the upload route; every other route keeps the 1 MB cap (tested). |
+| A06 Vulnerable components | pip-audit **0**, npm audit **0** (new: openpyxl, defusedxml, python-multipart). |
+| A08 Software and data integrity failures | Hostile spreadsheets: zip bombs, too many parts, macro workbooks, old binary .xls, fake .xlsx, XML entity expansion and formula cells are all refused or neutralised, each with a test. |
+| A09 Logging and monitoring failures | `project.created`, `project.updated`, `boq.imported` (file, counts, total) and `budget_line.updated` (from/to) are audited. |
+
+### Verification beyond unit tests
+
+- **Load:** a 5,000-row workbook parses in 0.5 s and imports in 0.7 s; imports are rate-limited
+  to 20 per minute per client.
+- **Browser:** signed in as the QS, the project list showed only the QS's sites. Checked the
+  overview KPIs and section bars, BOQ expansion, and a real multipart upload through the dev
+  proxy, whose dry run reported the bad row and imported nothing.
+
+### Findings fixed during the review
+
+1. **Layering:** site-scoping helpers lived in the API layer, so services had to import from it.
+   Moved to `app.core.scoping`.
+2. **A loop-variable closure** in the parser (Ruff B023) could have read the wrong header if
+   reused. Rewritten as an explicit helper.
+3. **Wording:** "1 rows need fixing" and "Import 1 items" corrected.
+4. **Flaky tests under load:** asynchronous waits raised for slower CI machines.
+
+### Open items
+
+| Item | Phase |
+| --- | --- |
+| Refuse or reconcile a BOQ re-import once material requests reference its items | 5 |
+| Neutralise cells that start with `= + - @` in any CSV/Excel export (formula injection) | when exports arrive (11) |
+| Users and projects lists are not paginated server-side yet | 13 |
 
 ## Phase 1 review: 2026-10-09
 

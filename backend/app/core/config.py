@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     allowed_hosts: Annotated[list[str], NoDecode] = ["localhost", "127.0.0.1", "backend", "testserver"]
 
     max_request_body_bytes: int = Field(default=1_048_576, ge=1024)
+    # File upload routes only (BOQ import): the 5 MB file plus multipart overhead.
+    max_upload_body_bytes: int = Field(default=6 * 1_048_576, ge=1024)
 
     # --- Authentication -------------------------------------------------------------------
     # HS256 signing key for access tokens. Generate one with:
@@ -59,6 +61,8 @@ class Settings(BaseSettings):
     # Per-client-IP request budgets for the auth endpoints (per minute).
     login_rate_per_minute: int = Field(default=10, ge=1)
     refresh_rate_per_minute: int = Field(default=30, ge=1)
+    # BOQ imports parse spreadsheets (CPU-heavy): a small per-IP budget.
+    boq_import_rate_per_minute: int = Field(default=20, ge=1)
 
     @field_validator("cors_origins", "allowed_hosts", mode="before")
     @classmethod

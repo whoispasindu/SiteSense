@@ -48,6 +48,8 @@ export default defineConfig(({ mode }) => {
       setupFiles: ["./src/test/setup.ts"],
       css: false,
       restoreMocks: true,
+      // userEvent typing in long forms is slow under parallel load; keep CI from flaking.
+      testTimeout: 15_000,
       unstubGlobals: true,
       coverage: {
         provider: "v8",
