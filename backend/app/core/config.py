@@ -64,6 +64,22 @@ class Settings(BaseSettings):
     # BOQ imports parse spreadsheets (CPU-heavy): a small per-IP budget.
     boq_import_rate_per_minute: int = Field(default=20, ge=1)
 
+    # --- Site reports (Phase 4) -------------------------------------------------------------
+    # Where photo files live (local folder). Never inside a web-served directory.
+    media_root: str = "var/media"
+    max_photo_bytes: int = Field(default=10 * 1_048_576, ge=1024, le=50 * 1_048_576)
+    max_photos_per_report: int = Field(default=12, ge=1, le=50)
+    # Photo decoding is CPU-heavy: a per-IP budget.
+    photo_upload_rate_per_minute: int = Field(default=60, ge=1)
+    # Open-Meteo forecast (free, no key). Off: the app uses cached forecasts only.
+    weather_enabled: bool = True
+    weather_cache_hours: int = Field(default=3, ge=1, le=48)
+    weather_timeout_seconds: float = Field(default=5.0, gt=0, le=30)
+    # In-process scheduler for reminders and weather refresh. Off in tests and one-off tools.
+    scheduler_enabled: bool = True
+    # BR-11: every active site submits its daily report by this hour (site time).
+    report_deadline_hour: int = Field(default=18, ge=0, le=23)
+
     @field_validator("cors_origins", "allowed_hosts", mode="before")
     @classmethod
     def _split_csv(cls, value: object) -> object:

@@ -70,7 +70,18 @@ docker compose exec backend python -m app.cli seed-dev
 | Client | `client@sitesense.example` |
 
 `seed-dev` also creates three demo projects; Havelock Residences comes with a full BOQ
-(`backend/app/seed_data/boq-havelock-residences.csv`, also a good file to try the import with).
+(`backend/app/seed_data/boq-havelock-residences.csv`, also a good file to try the import with),
+a programme and a week of daily reports. Sign in as the site engineer to file today's report.
+
+Two operator commands run the scheduled jobs on demand:
+
+```bash
+docker compose exec backend python -m app.cli send-reminders
+```
+
+```bash
+docker compose exec backend python -m app.cli refresh-weather
+```
 The password is the value of `SITESENSE_DEMO_PASSWORD` (see `.env.example`). For a real
 company, create the first admin instead; it prints a one-time password:
 
@@ -150,6 +161,11 @@ Backend settings are environment variables prefixed with `SITESENSE_`
 | `SITESENSE_LOGIN_MAX_FAILURES` / `SITESENSE_LOCKOUT_MINUTES` | Account lockout | `5` / `15` |
 | `SITESENSE_LOGIN_RATE_PER_MINUTE` | Sign-in attempts per IP per minute | `10` |
 | `SITESENSE_COOKIE_SECURE` | Secure flag on the refresh cookie | `true` |
+| `SITESENSE_MEDIA_ROOT` | Folder for site photos (mount a persistent volume in production) | `var/media` |
+| `SITESENSE_MAX_PHOTO_BYTES` / `SITESENSE_MAX_PHOTOS_PER_REPORT` | Photo limits | `10485760` / `12` |
+| `SITESENSE_WEATHER_ENABLED` | Live forecast from Open-Meteo (off: cached forecasts only) | `true` |
+| `SITESENSE_SCHEDULER_ENABLED` | Run the 18:00 reminder and 05:30 weather jobs in the API process | `true` |
+| `SITESENSE_REPORT_DEADLINE_HOUR` | BR-11 daily report deadline, site time | `18` |
 
 In production the API refuses to start with debug on, wildcard or plain-HTTP origins, or the
 example database password.
@@ -184,8 +200,8 @@ docs/           architecture, decision records, security reviews, model cards
 | 0 | Setup and foundations | Done |
 | 1 | Authentication, roles and users | Done |
 | 2 | Projects, BOQ and budget | Done |
-| 3 | Schedule basics | In progress |
-| 4 | Daily site reports | Planned |
+| 3 | Schedule basics | Done |
+| 4 | Daily site reports | In progress |
 | 5 | Materials, approvals and rules engine | Planned |
 | 6 | Demo data and risk model v1 → **v0.1 MVP** | Planned |
 | 7 | Report NLP classifier | Planned |

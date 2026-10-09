@@ -27,6 +27,9 @@ FROM base AS prod
 COPY --chown=root:root app ./app
 COPY --chown=root:root alembic ./alembic
 COPY --chown=root:root alembic.ini .
+# Site photos: the only writable path. Mount a persistent volume here in production.
+RUN mkdir -p /data/media && chown app:app /data/media
+ENV SITESENSE_MEDIA_ROOT=/data/media
 USER app
 EXPOSE 8000
 # Behind a proxy, set FORWARDED_ALLOW_IPS to the proxy address (uvicorn reads it from the env).

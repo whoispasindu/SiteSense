@@ -6,9 +6,11 @@ from sqlalchemy import Connection, select
 from sqlalchemy.orm import Session
 
 from app import cli
+from app.core import clock
 from app.core.security import verify_password
-from app.models import AuditLog, ProgressSnapshot, Project, Site, Task, User
+from app.models import AuditLog, DailyReport, ProgressSnapshot, Project, Site, Task, User
 from tests.conftest import make_settings
+from tests.report_fixtures import FakeWeather
 
 DEMO_PASSWORD = "Demo-Password-For-Tests-1"
 
@@ -74,6 +76,26 @@ def test_seed_dev_creates_sites_and_one_user_per_role(
     assert (
         cli_db.scalar(select(ProgressSnapshot).where(ProgressSnapshot.project_id == havelock.id)) is not None
     )
+    reports = cli_db.scalars(select(DailyReport).where(DailyReport.project_id == havelock.id)).all()
+    assert len(reports) == 5
+    # Today's report is left for the demo engineer to file.
+    assert clock.site_today() not in {r.report_date for r in reports}
+
+
+def test_send_reminders_command(cli_db: Session, capsys: pytest.CaptureFixture[str]) -> None:
+    assert cli.main(["send-reminders"]) == 0
+
+    assert "reminder notifications" in capsys.readouterr().out
+
+
+def test_refresh_weather_command(
+    cli_db: Session, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(cli, "OpenMeteoClient", lambda _timeout: FakeWeather(fail=True))
+
+    assert cli.main(["refresh-weather"]) == 0
+
+    assert "Refreshed the forecast for 0 sites" in capsys.readouterr().out
 
 
 def test_seed_dev_needs_a_valid_password(cli_db: Session, monkeypatch: pytest.MonkeyPatch) -> None:

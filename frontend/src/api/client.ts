@@ -214,3 +214,33 @@ async function send<TSchema extends z.ZodType, TBody>(
 
   return { data: parsed.data, status: response.status, requestId };
 }
+
+/**
+ * Binary download (site photos) with the same auth and refresh rules as ``apiRequest``.
+ * Photos are never public URLs: the page fetches them and shows a blob: URL.
+ */
+export async function apiBlob(path: string, options: { signal?: AbortSignal } = {}): Promise<Blob> {
+  if (!path.startsWith("/") || path.startsWith("//")) {
+    throw new Error(`API paths must be absolute and same-origin, got "${path}"`);
+  }
+  const attempt = async (): Promise<Response> => {
+    const headers: Record<string, string> = {};
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+    try {
+      return await fetch(`${API_BASE_URL}${path}`, {
+        headers,
+        credentials: "same-origin",
+        redirect: "error",
+        signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(DEFAULT_TIMEOUT_MS)]) : AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+      });
+    } catch {
+      throw new ApiError({ status: 0, code: "network_error", message: "Could not load the photo." });
+    }
+  };
+  let response = await attempt();
+  if (response.status === 401 && (await refreshSession())) response = await attempt();
+  if (!response.ok) {
+    throw new ApiError({ status: response.status, code: "http_error", message: "Could not load the photo." });
+  }
+  return response.blob();
+}

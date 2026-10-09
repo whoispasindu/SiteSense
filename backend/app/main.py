@@ -17,9 +17,14 @@ from app.core.middleware import (
     SecurityHeadersMiddleware,
 )
 from app.core.rate_limit import RateLimiter
+from app.core.scheduler import build_scheduler
+from app.integrations.storage import LocalStorage
+from app.integrations.weather import DisabledWeatherClient, OpenMeteoClient, WeatherClient
 
 # Routes that accept file uploads get a larger body limit; everything else keeps the default.
 UPLOAD_PATHS = re.compile(r"/api/v1/projects/[0-9a-fA-F-]{36}/boq/import")
+PHOTO_PATHS = re.compile(r"/api/v1/reports/[0-9a-fA-F-]{36}/photos")
+MULTIPART_OVERHEAD = 256 * 1024
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -28,7 +33,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        scheduler = None
+        if settings.scheduler_enabled:
+            scheduler = build_scheduler(settings, app.state.database, app.state.weather_client)
+            scheduler.start()
         yield
+        if scheduler is not None:
+            scheduler.shutdown(wait=False)
         app.state.database.dispose()
 
     app = FastAPI(
@@ -44,6 +55,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.database = Database(settings)
     app.state.rate_limiter = RateLimiter()
+    app.state.storage = LocalStorage(settings.media_root)
+    weather_client: WeatherClient = DisabledWeatherClient()
+    if settings.weather_enabled:
+        weather_client = OpenMeteoClient(settings.weather_timeout_seconds)
+    app.state.weather_client = weather_client
 
     register_error_handlers(app)
     app.include_router(api_router)
@@ -62,7 +78,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(
         BodySizeLimitMiddleware,
         max_bytes=settings.max_request_body_bytes,
-        overrides=[(UPLOAD_PATHS, settings.max_upload_body_bytes)],
+        overrides=[
+            (UPLOAD_PATHS, settings.max_upload_body_bytes),
+            (PHOTO_PATHS, settings.max_photo_bytes + MULTIPART_OVERHEAD),
+        ],
     )
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(SecurityHeadersMiddleware, hsts=settings.is_production)

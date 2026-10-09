@@ -3,18 +3,21 @@
 When a new endpoint is added, add it to ENDPOINTS with the roles allowed to call it.
 """
 
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.core import clock
 from app.core.permissions import Role
-from app.models import BoqSection, BudgetLine, Project, Site, Task, User
+from app.models import BoqSection, BudgetLine, DailyReport, Project, ReportPhoto, Site, Task, User
 from tests.conftest import bearer, login
+from tests.report_fixtures import image_bytes
 
 ALL_ROLES = frozenset(Role)
 ADMIN_ONLY = frozenset({Role.ADMIN})
@@ -25,6 +28,8 @@ PM_ONLY = frozenset({Role.PROJECT_MANAGER})
 SCHEDULE_READERS = frozenset({Role.PROJECT_MANAGER, Role.QUANTITY_SURVEYOR, Role.SITE_ENGINEER})
 PROGRESS_EDITORS = frozenset({Role.PROJECT_MANAGER, Role.SITE_ENGINEER})
 QS_ONLY = frozenset({Role.QUANTITY_SURVEYOR})
+REPORT_READERS = frozenset({Role.PROJECT_MANAGER, Role.QUANTITY_SURVEYOR, Role.SITE_ENGINEER})
+SE_ONLY = frozenset({Role.SITE_ENGINEER})
 BOQ_CSV = (
     b"Section Code,Section Name,Item Code,Description,Unit,Quantity,Rate\nA,Prelims,A.1,Setup,item,1,100\n"
 )
@@ -37,6 +42,7 @@ class Endpoint:
     allowed: frozenset[Role]
     body: dict[str, object] | None = None
     upload: bool = False
+    photo: bool = False
 
 
 ENDPOINTS = [
@@ -73,6 +79,19 @@ ENDPOINTS = [
     Endpoint("PATCH", "/api/v1/tasks/{task_id}", PROGRESS_EDITORS, {"percent_complete": "10"}),
     Endpoint("DELETE", "/api/v1/tasks/{task_id}", PM_ONLY),
     Endpoint("GET", "/api/v1/projects/{project_id}/progress", SCHEDULE_READERS),
+    Endpoint("GET", "/api/v1/reports/today", REPORT_READERS),
+    Endpoint("GET", "/api/v1/projects/{project_id}/reports", REPORT_READERS),
+    Endpoint("POST", "/api/v1/projects/{project_id}/reports", SE_ONLY,
+             {"report_date": "{today}", "crew_count": 3, "work_done": "Matrix work done today."}),
+    Endpoint("GET", "/api/v1/reports/{report_id}", REPORT_READERS),
+    Endpoint("PATCH", "/api/v1/reports/{report_id}", SE_ONLY, {"crew_count": 4}),
+    Endpoint("POST", "/api/v1/reports/{report_id}/photos", SE_ONLY, photo=True),
+    Endpoint("GET", "/api/v1/photos/{photo_id}", REPORT_READERS),
+    Endpoint("DELETE", "/api/v1/photos/{photo_id}", SE_ONLY),
+    Endpoint("GET", "/api/v1/projects/{project_id}/weather", PROJECT_READERS),
+    Endpoint("GET", "/api/v1/notifications", ALL_ROLES),
+    Endpoint("POST", "/api/v1/notifications/{notification_id}/read", ALL_ROLES),
+    Endpoint("POST", "/api/v1/notifications/read-all", ALL_ROLES),
 ]  # fmt: skip
 
 
@@ -90,6 +109,8 @@ def _call(api: TestClient, endpoint: Endpoint, ids: dict[str, str], headers: dic
     path = endpoint.path.format(**ids)
     if endpoint.upload:
         return api.request(endpoint.method, path, files={"file": ("boq.csv", BOQ_CSV)}, headers=headers)
+    if endpoint.photo:
+        return api.request(endpoint.method, path, files={"file": ("p.jpg", image_bytes())}, headers=headers)
     return api.request(endpoint.method, path, json=_fill(endpoint.body, ids), headers=headers)
 
 
@@ -113,6 +134,28 @@ def ids(make_user: Callable[..., User], make_site: Callable[..., Site], db: Sess
     section = BoqSection(project_id=project.id, code="A", name="Prelims", position=1)
     section.budget_line = BudgetLine(project_id=project.id, budget_amount=Decimal("100.00"))
     db.add(section)
+    report = DailyReport(
+        project_id=project.id,
+        author_id=target.id,
+        report_date=clock.site_today() - timedelta(days=1),
+        crew_count=5,
+        work_done="Matrix base report text.",
+        submitted_at=clock.utcnow(),
+    )
+    db.add(report)
+    db.flush()
+    photo = ReportPhoto(
+        report_id=report.id,
+        uploaded_by=target.id,
+        storage_key=f"{uuid.uuid4().hex}.jpg",
+        content_type="image/jpeg",
+        size_bytes=10,
+        width=1,
+        height=1,
+        position=1,
+        created_at=clock.utcnow(),
+    )
+    db.add(photo)
     task = Task(
         project_id=project.id,
         name="Matrix base task",
@@ -129,6 +172,10 @@ def ids(make_user: Callable[..., User], make_site: Callable[..., Site], db: Sess
         "site_id": str(site.id),
         "project_id": str(project.id),
         "budget_line_id": str(section.budget_line.id),
+        "report_id": str(report.id),
+        "photo_id": str(photo.id),
+        "notification_id": str(uuid.uuid4()),
+        "today": clock.site_today().isoformat(),
     }
 
 

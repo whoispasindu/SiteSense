@@ -28,7 +28,57 @@ here, newest first. The baseline design is in [ADR 0003](adr/0003-security-basel
 | Open redirect | Post-sign-in `next` must be a same-origin path | `safeNextPath` | `auth.test.tsx` |
 | File uploads | BOQ import: .xlsx/CSV checked by content; 5 MB, 5,000 rows, 30 columns; zip-bomb and macro checks before opening; XML via defusedxml; formulas never evaluated; larger body limit on the upload route only; file never written to disk | `services/boq_import.py`, `BodySizeLimitMiddleware` overrides | `test_boq_import.py`, `test_projects_api.py` |
 | Money | NUMERIC columns with check constraints; Decimal end to end; decimal strings in JSON | `models/project.py`, `schemas/project.py` | `test_projects_api.py` |
+| Photo uploads | Magic-byte check (JPEG/PNG/WebP), full decode under a 50 MP budget, re-encode to a fresh JPEG with no metadata (GPS removed); random server-generated storage keys checked against a pattern; 10 MB, 12 per report, per-IP rate limit; files outside any served folder; served only through an authenticated, site-scoped endpoint | `services/photos.py`, `integrations/storage.py`, `api/v1/reports.py` | `test_report_photos.py` |
+| Outbound calls (SSRF) | Weather: fixed https host, query built from stored coordinates only, redirects refused, 64 KB cap, response schema-validated, 5 s timeout; failures fall back to the cache | `integrations/weather.py`, `services/weather.py` | `test_weather.py` |
+| Notifications | Per-user only (others answer 404); links restricted to in-app paths by service and database constraint; de-duplicated reminders | `services/notification_service.py`, migration 0005 | `test_reminders_notifications.py`, `reports.test.tsx` |
 | Supply chain | Pinned deps, Dependabot (pip, npm, actions, docker), pip-audit, npm audit, dependency review, CodeQL `security-extended`, actions pinned to SHAs, `permissions: contents: read`, `persist-credentials: false` | `.github/` | CI |
+
+## Phase 4 review: 2026-10-10
+
+**Scope:** the whole repository at the end of Phase 4 (daily reports, photo uploads, weather,
+scheduled reminders, notifications, and their screens). Design decisions are in
+[ADR 0007](adr/0007-daily-reports-photos-weather.md).
+
+### OWASP Top 10 (2021) walk-through
+
+| Risk | Phase 4 status |
+| --- | --- |
+| A01 Broken access control | All 12 new endpoints are in the role matrix, which runs every endpoint as every role. Reports, photos and weather are reached only through the project's site scope (404 outside it). Editing, adding or removing photos is limited to the author on the day of submission. Notifications belong to one user; anyone else gets 404. **Fixed:** task progress inside a report did not check the progress permission itself, so it relied on only engineers filing reports. It now requires `schedule:progress` like a direct update, with a regression test. |
+| A03 Injection | Report text is stored as text and rendered by React (escaped). Notification links can only be in-app paths, enforced by the service and by a `CHECK` constraint. Photo storage keys never come from the client and are pattern-checked, so path traversal is impossible. |
+| A04 Insecure design | One report per project per day is enforced by a unique constraint, so a race between two submits ends in a clean 409. Reports lock at midnight after submission, and every create, correction and photo change is audited. Reminders are idempotent (unique `dedupe_key`), so several workers or a manual run never double-send. |
+| A05 / DoS | Photos are capped at 10 MB, 50 megapixels and 12 per report, with a per-IP upload limit of 60/min. The larger body limit applies only to the photo route. A worst-case 12 MP noise image processes in 0.5 s. Report text fields are capped at 5,000 characters, the list at 100 per page and notifications at 30 per request. |
+| A06 Vulnerable components | pip-audit **0** (new: Pillow 12.3.0, APScheduler 3.11.3), npm audit **0**. |
+| A08 Software and data integrity | Uploaded files are never trusted: they are decoded, verified and re-encoded. The weather response is size-capped and schema-validated, and values outside physical ranges are dropped. |
+| A09 Logging and monitoring failures | New audit events: `report.created` (with tasks updated), `report.updated` (fields), `report.photo_added`, `report.photo_deleted`. Weather outages, reminder runs and failed jobs are logged. |
+| A10 SSRF | The only outbound call (Open-Meteo) uses a fixed host and refuses redirects; coordinates come from validated site records. |
+
+### Privacy (PDPA)
+
+- EXIF is removed on upload (by the browser, then always by the server), so photos do not carry
+  the phone's GPS position or device details.
+- Photos are visible only to signed-in staff assigned to the site, and the form asks engineers
+  to photograph the work, not people.
+- Client access to photos is a Phase 12 decision (approved photos only).
+
+### Verification beyond unit tests
+
+- **Mutation checks:** removing the author rule, the site scope on reports, the future-date
+  rule, the "report already filed" condition in reminders, the owner check on notifications, or
+  the stale-cache fallback each makes a test fail. Disabling the magic-byte check alone does not:
+  the decoded format must still match a supported signature, so non-images are still rejected.
+  That second layer is intended.
+- **Browser, as the site engineer:** filed today's report with the weather pre-filled from the
+  live forecast, a progress update and a photo, then saw it in the history. **As the PM:** saw
+  the "report filed" notification and the 18:00 reminder for the site without a report.
+- **Live weather:** `refresh-weather` fetched real forecasts for all three demo sites.
+
+### Findings fixed during the review
+
+1. **Progress permission not checked inside reports**, described above.
+2. **The report page showed 0 photos right after submitting** (the cached report predated the
+   uploads). The page now refetches after uploads.
+3. **Reminder text said "the site engineer has been reminded"** when no engineer was assigned.
+   It now says so plainly.
 
 ## UI redesign review: 2026-10-09
 

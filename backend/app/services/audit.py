@@ -45,6 +45,10 @@ class AuditAction:
     TASK_UPDATED = "task.updated"
     TASK_PROGRESS_UPDATED = "task.progress_updated"
     TASK_DELETED = "task.deleted"
+    REPORT_CREATED = "report.created"
+    REPORT_UPDATED = "report.updated"
+    REPORT_PHOTO_ADDED = "report.photo_added"
+    REPORT_PHOTO_DELETED = "report.photo_deleted"
 
 
 def record(
