@@ -11,6 +11,9 @@ refuses to run in production.
 import argparse
 import os
 import sys
+from datetime import date
+from decimal import Decimal
+from pathlib import Path
 
 from sqlalchemy import select
 
@@ -23,15 +26,30 @@ from app.core.security import (
     hash_password,
     validate_password,
 )
-from app.models import Site, User
+from app.models import Project, Site, User
 from app.services import audit
+from app.services.audit import RequestMeta
 from app.services.auth_service import normalize_email
+from app.services.boq_import import parse_boq
+from app.services.project_service import import_boq
 
 DEMO_SITES = [
     ("COL-07", "Havelock Residences", "Colombo 05", 6.8836, 79.8650),
     ("KDY-02", "Peradeniya Road Offices", "Kandy", 7.2735, 80.6127),
     ("GAL-11", "Fort View Apartments", "Galle", 6.0329, 80.2168),
 ]
+
+SEED_DATA = Path(__file__).parent / "seed_data"
+
+# (code, name, site, client, type, status, contract value, start, planned end, BOQ file)
+DEMO_PROJECTS = [
+    ("HR-2026-01", "Havelock Residences", "COL-07", "Havelock Developers (Pvt) Ltd", "residential", "active",
+     Decimal("1114000000.00"), date(2026, 3, 2), date(2027, 9, 30), "boq-havelock-residences.csv"),
+    ("PRO-2026-02", "Peradeniya Road Offices", "KDY-02", "Hill Country Holdings PLC", "commercial", "active",
+     Decimal("685000000.00"), date(2026, 5, 4), date(2027, 6, 30), None),
+    ("FVA-2026-03", "Fort View Apartments", "GAL-11", "Southern Coast Homes", "residential", "planning",
+     Decimal("742500000.00"), date(2026, 11, 2), date(2028, 3, 31), None),
+]  # fmt: skip
 
 DEMO_USERS = [
     ("admin@sitesense.example", "Dilani Admin", Role.ADMIN, []),
@@ -108,8 +126,42 @@ def seed_dev() -> int:
             )
             created += 1
         db.commit()
+
+        qs = db.scalar(select(User).where(User.email == "qs@sitesense.example"))
+        new_projects = 0
+        for code, name, site_code, client, kind, status, value, start, end, boq_file in DEMO_PROJECTS:
+            if db.scalar(select(Project).where(Project.code == code)):
+                continue
+            project = Project(
+                code=code,
+                name=name,
+                site_id=sites[site_code].id,
+                client_name=client,
+                project_type=kind,
+                status=status,
+                contract_value=value,
+                start_date=start,
+                planned_end=end,
+            )
+            db.add(project)
+            db.commit()
+            new_projects += 1
+            if boq_file and qs is not None:
+                parsed = parse_boq(boq_file, (SEED_DATA / boq_file).read_bytes())
+                import_boq(
+                    db,
+                    project,
+                    parsed,
+                    file_name=boq_file,
+                    dry_run=False,
+                    actor=qs,
+                    meta=RequestMeta(ip_address=None, user_agent="seed-dev"),
+                )
     database.dispose()
-    print(f"Seeded {len(DEMO_SITES)} sites and {created} new demo users (password: SITESENSE_DEMO_PASSWORD).")
+    print(
+        f"Seeded {len(DEMO_SITES)} sites, {created} new demo users and {new_projects} new projects "
+        "(password: SITESENSE_DEMO_PASSWORD)."
+    )
     return 0
 
 

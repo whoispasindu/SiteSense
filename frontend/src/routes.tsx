@@ -9,6 +9,11 @@ import { ChangePasswordPage } from "./pages/auth/ChangePasswordPage";
 import { SignInPage } from "./pages/auth/SignInPage";
 import { HomePage } from "./pages/HomePage";
 import { NotFoundPage } from "./pages/NotFoundPage";
+import { BoqImportPage } from "./pages/projects/BoqImportPage";
+import { BoqPage } from "./pages/projects/BoqPage";
+import { ProjectLayout } from "./pages/projects/ProjectLayout";
+import { ProjectOverview } from "./pages/projects/ProjectOverview";
+import { ProjectsPage } from "./pages/projects/ProjectsPage";
 import { RouteErrorPage } from "./pages/RouteErrorPage";
 
 export const routes: RouteObject[] = [
@@ -40,6 +45,34 @@ export const routes: RouteObject[] = [
     errorElement: <RouteErrorPage />,
     children: [
       { index: true, element: <HomePage /> },
+      {
+        path: "projects",
+        element: (
+          <RequirePermission permission="projects:read">
+            <ProjectsPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: "projects/:projectId",
+        element: (
+          <RequirePermission permission="projects:read">
+            <ProjectLayout />
+          </RequirePermission>
+        ),
+        children: [
+          { index: true, element: <ProjectOverview /> },
+          { path: "boq", element: <BoqPage /> },
+          {
+            path: "boq/import",
+            element: (
+              <RequirePermission permission="boq:manage">
+                <BoqImportPage />
+              </RequirePermission>
+            ),
+          },
+        ],
+      },
       {
         path: "admin/users",
         element: (

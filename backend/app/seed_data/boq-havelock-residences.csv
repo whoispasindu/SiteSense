@@ -1,0 +1,49 @@
+Section Code,Section Name,Item Code,Description,Unit,Quantity,Rate,Budget Rate
+A,Preliminaries,,PRELIMINARIES AND GENERAL ITEMS,,,,
+A,Preliminaries,A.01,"Site establishment, hoarding and site offices",item,1,4850000.00,4200000.00
+A,Preliminaries,A.02,Tower crane hire including operator (14 months),month,14,1150000.00,1020000.00
+A,Preliminaries,A.03,Site security and watchmen,month,18,310000.00,280000.00
+A,Preliminaries,A.04,"Temporary water and electricity, including bills",month,18,185000.00,165000.00
+A,Preliminaries,A.05,Insurances and performance bond,item,1,2650000.00,2500000.00
+B,Substructure,,SUBSTRUCTURE,,,,
+B,Substructure,B.01,Excavation in earth for pile caps and basement not exceeding 3 m deep,m3,2850,1450.00,1250.00
+B,Substructure,B.02,"Bored cast-in-situ piles, 600 mm diameter, grade 30 concrete",m,1920,18500.00,16300.00
+B,Substructure,B.03,Grade 30 concrete in pile caps and ground beams,m3,640,38500.00,33800.00
+B,Substructure,B.04,High-yield steel reinforcement in substructure,kg,58000,385.00,342.00
+B,Substructure,B.05,"Bituminous waterproofing membrane to basement walls and slab, 4 mm",m2,1650,2950.00,2580.00
+C,Superstructure frame,,SUPERSTRUCTURE - REINFORCED CONCRETE FRAME,,,,
+C,Superstructure frame,C.01,Grade 30 concrete in columns and shear walls,m3,1180,41000.00,36200.00
+C,Superstructure frame,C.02,"Grade 30 concrete in suspended slabs and beams, 150 mm average",m3,2460,39500.00,34900.00
+C,Superstructure frame,C.03,High-yield steel reinforcement in frame,kg,412000,385.00,342.00
+C,Superstructure frame,C.04,Formwork to soffits of slabs and beams,m2,15800,2350.00,2050.00
+C,Superstructure frame,C.05,Formwork to columns and walls,m2,9600,2650.00,2320.00
+C,Superstructure frame,C.06,"Staircases, in-situ concrete including finishes",nr,22,640000.00,565000.00
+D,Masonry,,MASONRY,,,,
+D,Masonry,D.01,"Cement block walls, 150 mm, in 1:5 cement mortar",m2,14200,3150.00,2780.00
+D,Masonry,D.02,"Cement block walls, 100 mm partitions",m2,8800,2650.00,2330.00
+D,Masonry,D.03,"Cement:sand plaster 1:5, 16 mm, internal walls",m2,41500,1180.00,1020.00
+D,Masonry,D.04,"External render with waterproof additive, 20 mm",m2,9800,1650.00,1440.00
+E,Roofing and waterproofing,,ROOFING AND WATERPROOFING,,,,
+E,Roofing and waterproofing,E.01,"Torch-on membrane to roof slab, two layers with insulation",m2,820,6850.00,6020.00
+E,Roofing and waterproofing,E.02,Liquid waterproofing to wet areas,m2,2950,2450.00,2140.00
+E,Roofing and waterproofing,E.03,"Rainwater gutters and downpipes, uPVC 110 mm",m,640,3850.00,3380.00
+F,Finishes,,FINISHES,,,,
+F,Finishes,F.01,"Homogeneous floor tiles 600 x 600 mm, laid on screed",m2,11800,6450.00,5650.00
+F,Finishes,F.02,"Ceramic wall tiles to bathrooms and kitchens, full height",m2,7400,5200.00,4550.00
+F,Finishes,F.03,"Gypsum board ceilings on galvanised frame, painted",m2,10600,3650.00,3200.00
+F,Finishes,F.04,"Emulsion paint, three coats, internal walls and ceilings",m2,52000,420.00,365.00
+F,Finishes,F.05,"Weatherproof paint, external, three coats",m2,9800,640.00,560.00
+F,Finishes,F.06,"Aluminium windows and sliding doors, powder coated, 6 mm glass",m2,2850,28500.00,25100.00
+F,Finishes,F.07,"Timber flush doors with frames and ironmongery",nr,368,64500.00,56800.00
+G,MEP services,,MECHANICAL ELECTRICAL AND PLUMBING,,,,
+G,MEP services,G.01,"Electrical installation per apartment, wiring and fittings",nr,72,485000.00,428000.00
+G,MEP services,G.02,"Main LV panel, rising mains and earthing",item,1,9850000.00,8700000.00
+G,MEP services,G.03,"Plumbing per apartment, hot and cold water, sanitary ware",nr,72,612000.00,540000.00
+G,MEP services,G.04,"Passenger lifts, 13-person, 12 stops",nr,2,21500000.00,19400000.00
+G,MEP services,G.05,"Fire detection, alarm and sprinkler system",item,1,14800000.00,13100000.00
+G,MEP services,G.06,"Sump, pumps and overhead water tanks",item,1,6250000.00,5520000.00
+H,External works,,EXTERNAL WORKS,,,,
+H,External works,H.01,"Interlocking paving to driveways, 80 mm on base",m2,1350,4850.00,4250.00
+H,External works,H.02,"Boundary wall with gate, 2.1 m high",m,240,38500.00,33900.00
+H,External works,H.03,"Storm water drains, precast covers",m,310,12500.00,10950.00
+H,External works,H.04,Landscaping and turfing,m2,620,2850.00,2450.00

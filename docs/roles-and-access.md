@@ -42,6 +42,18 @@ assigned to. Every site-data endpoint uses the helpers in
 | `GET/POST /api/v1/admin/sites`, `PATCH /admin/sites/{id}` | Admin | |
 | `GET /api/v1/admin/audit-logs` | Admin | Paginated, filterable by event |
 
+## Phase 2 endpoints
+
+| Method and path | Who | Notes |
+| --- | --- | --- |
+| `GET /api/v1/projects` | PM, QS, Site Engineer, Procurement | Filtered to the user's sites; `status` and `q` filters |
+| `POST /api/v1/projects` | Project Manager | Only on a site the PM is assigned to |
+| `GET /api/v1/projects/{id}` | PM, QS, Site Engineer, Procurement | 404 for projects on other sites |
+| `PATCH /api/v1/projects/{id}` | Project Manager | Code and site are fixed |
+| `GET /api/v1/projects/{id}/boq` | PM, QS, Site Engineer, Procurement | Sections, items, totals |
+| `POST /api/v1/projects/{id}/boq/import?dry_run=` | Quantity Surveyor | Multipart file; dry run by default |
+| `PATCH /api/v1/projects/{id}/budget-lines/{line_id}` | Quantity Surveyor | Adjust a section's cost budget |
+
 `backend/tests/test_role_matrix.py` calls every endpoint as every role. New endpoints must be added there.
 
 ## The menu

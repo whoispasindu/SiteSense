@@ -5,16 +5,27 @@ When a new endpoint is added, add it to ENDPOINTS with the roles allowed to call
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import date
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 from app.core.permissions import Role
-from app.models import Site, User
+from app.models import BoqSection, BudgetLine, Project, Site, User
 from tests.conftest import bearer, login
 
 ALL_ROLES = frozenset(Role)
 ADMIN_ONLY = frozenset({Role.ADMIN})
+PROJECT_READERS = frozenset(
+    {Role.PROJECT_MANAGER, Role.QUANTITY_SURVEYOR, Role.SITE_ENGINEER, Role.PROCUREMENT_OFFICER}
+)
+PM_ONLY = frozenset({Role.PROJECT_MANAGER})
+QS_ONLY = frozenset({Role.QUANTITY_SURVEYOR})
+BOQ_CSV = (
+    b"Section Code,Section Name,Item Code,Description,Unit,Quantity,Rate\nA,Prelims,A.1,Setup,item,1,100\n"
+)
 
 
 @dataclass(frozen=True)
@@ -23,6 +34,7 @@ class Endpoint:
     path: str
     allowed: frozenset[Role]
     body: dict[str, object] | None = None
+    upload: bool = False
 
 
 ENDPOINTS = [
@@ -40,6 +52,17 @@ ENDPOINTS = [
              {"code": "MTX-1", "name": "Matrix", "location": "Galle"}),
     Endpoint("PATCH", "/api/v1/admin/sites/{site_id}", ADMIN_ONLY, {"name": "Renamed Site"}),
     Endpoint("GET", "/api/v1/admin/audit-logs", ADMIN_ONLY),
+    Endpoint("GET", "/api/v1/projects", PROJECT_READERS),
+    Endpoint("POST", "/api/v1/projects", PM_ONLY,
+             {"code": "MTX-P", "name": "Matrix Project", "site_id": "{site_id}", "client_name": "Client Co",
+              "project_type": "commercial", "contract_value": "1000.00", "start_date": "2026-01-01",
+              "planned_end": "2026-12-31"}),
+    Endpoint("GET", "/api/v1/projects/{project_id}", PROJECT_READERS),
+    Endpoint("PATCH", "/api/v1/projects/{project_id}", PM_ONLY, {"name": "Renamed Project"}),
+    Endpoint("GET", "/api/v1/projects/{project_id}/boq", PROJECT_READERS),
+    Endpoint("POST", "/api/v1/projects/{project_id}/boq/import", QS_ONLY, upload=True),
+    Endpoint("PATCH", "/api/v1/projects/{project_id}/budget-lines/{budget_line_id}", QS_ONLY,
+             {"budget_amount": "50.00"}),
 ]  # fmt: skip
 
 
@@ -54,16 +77,39 @@ def _fill(value: object, ids: dict[str, str]) -> object:
 
 
 def _call(api: TestClient, endpoint: Endpoint, ids: dict[str, str], headers: dict[str, str]):  # type: ignore[no-untyped-def]
-    return api.request(
-        endpoint.method, endpoint.path.format(**ids), json=_fill(endpoint.body, ids), headers=headers
-    )
+    path = endpoint.path.format(**ids)
+    if endpoint.upload:
+        return api.request(endpoint.method, path, files={"file": ("boq.csv", BOQ_CSV)}, headers=headers)
+    return api.request(endpoint.method, path, json=_fill(endpoint.body, ids), headers=headers)
 
 
 @pytest.fixture
-def ids(make_user: Callable[..., User], make_site: Callable[..., Site]) -> dict[str, str]:
+def ids(make_user: Callable[..., User], make_site: Callable[..., Site], db: Session) -> dict[str, str]:
     site = make_site()
     target = make_user(Role.SITE_ENGINEER, sites=[site])
-    return {"user_id": str(target.id), "site_id": str(site.id)}
+    project = Project(
+        code="MTX-BASE",
+        name="Matrix Base",
+        site_id=site.id,
+        client_name="Client Co",
+        project_type="residential",
+        status="active",
+        contract_value=Decimal("1000.00"),
+        start_date=date(2026, 1, 1),
+        planned_end=date(2026, 12, 31),
+    )
+    db.add(project)
+    db.flush()
+    section = BoqSection(project_id=project.id, code="A", name="Prelims", position=1)
+    section.budget_line = BudgetLine(project_id=project.id, budget_amount=Decimal("100.00"))
+    db.add(section)
+    db.commit()
+    return {
+        "user_id": str(target.id),
+        "site_id": str(site.id),
+        "project_id": str(project.id),
+        "budget_line_id": str(section.budget_line.id),
+    }
 
 
 @pytest.mark.parametrize("role", list(Role), ids=lambda r: r.value)

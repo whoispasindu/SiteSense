@@ -3,7 +3,7 @@ import type { HTMLAttributes, ReactNode } from "react";
 interface SheetProps extends HTMLAttributes<HTMLElement> {
   /** Drawing reference printed in the corner, e.g. "S-02". Decorative. */
   sheetCode?: string;
-  as?: "section" | "article" | "div";
+  as?: "section" | "article" | "div" | "aside";
   children: ReactNode;
 }
 

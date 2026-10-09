@@ -37,6 +37,10 @@ class AuditAction:
     USER_SITES_ASSIGNED = "user.sites_assigned"
     SITE_CREATED = "site.created"
     SITE_UPDATED = "site.updated"
+    PROJECT_CREATED = "project.created"
+    PROJECT_UPDATED = "project.updated"
+    BOQ_IMPORTED = "boq.imported"
+    BUDGET_LINE_UPDATED = "budget_line.updated"
 
 
 def record(

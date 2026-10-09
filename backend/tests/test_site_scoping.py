@@ -7,9 +7,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import accessible_site_ids, ensure_site_access, scope_to_user_sites
 from app.core.errors import NotFoundError
 from app.core.permissions import Role
+from app.core.scoping import accessible_site_ids, ensure_site_access, scope_to_user_sites
 from app.models import Site, User
 from tests.conftest import bearer, login
 

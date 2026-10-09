@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
-from app.api.deps import CurrentUser, DbSession, accessible_site_ids
+from app.api.deps import CurrentUser, DbSession
+from app.core.scoping import accessible_site_ids
 from app.schemas.auth import SiteSummary
 from app.services import user_service
 

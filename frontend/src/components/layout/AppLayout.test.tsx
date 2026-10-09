@@ -28,10 +28,11 @@ describe("AppLayout", () => {
     renderRoute("/");
 
     const nav = await screen.findByRole("navigation", { name: "Main" });
-    expect(within(nav).queryByRole("link", { name: /Projects/ })).not.toBeInTheDocument();
-    const projects = within(nav).getByText("Projects").closest("[aria-disabled]");
-    expect(projects).toHaveAttribute("aria-disabled", "true");
-    expect(projects).toHaveTextContent(/Coming in phase\s*P?2/);
+    expect(within(nav).getByRole("link", { name: /Projects/ })).toHaveAttribute("href", "/projects");
+    expect(within(nav).queryByRole("link", { name: /Schedule/ })).not.toBeInTheDocument();
+    const schedule = within(nav).getByText("Schedule").closest("[aria-disabled]");
+    expect(schedule).toHaveAttribute("aria-disabled", "true");
+    expect(schedule).toHaveTextContent(/Coming in phase\s*P?3/);
   });
 
   it("opens and closes the mobile navigation", async () => {

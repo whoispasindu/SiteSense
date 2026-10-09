@@ -19,9 +19,9 @@ describe("NotFoundPage", () => {
 
   it("treats not-yet-built modules as unknown routes", async () => {
     mockApi(sessionApi(makeMe("project_manager")));
-    renderRoute("/projects");
+    renderRoute("/schedule");
 
     expect(await screen.findByRole("heading", { name: "Off the drawings." })).toBeInTheDocument();
-    expect(screen.getByRole("banner")).not.toHaveTextContent("Projects");
+    expect(screen.getByRole("banner")).not.toHaveTextContent("Schedule");
   });
 });

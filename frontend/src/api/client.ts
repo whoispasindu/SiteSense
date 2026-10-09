@@ -154,7 +154,9 @@ async function send<TSchema extends z.ZodType, TBody>(
   const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
 
   const headers: Record<string, string> = { Accept: "application/json" };
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  // FormData (file uploads) sets its own multipart boundary; everything else is JSON.
+  const isForm = body instanceof FormData;
+  if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
   if (useAuth && accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
   let response: Response;
@@ -162,7 +164,7 @@ async function send<TSchema extends z.ZodType, TBody>(
     response = await fetch(`${API_BASE_URL}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
       credentials: "same-origin",
       redirect: "error",
       signal,
