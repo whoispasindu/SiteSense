@@ -15,4 +15,7 @@ regexes = [
   '''SiteSense-Demo-2026!''',
   '''Correct-Horse-Battery-9''',
   '''Demo-Password-For-Tests-1''',
+  # Fake one-time passwords used as fixtures in the frontend tests
+  '''kQ7rd-2xPmA-9fT3c-Lw8nB''',
+  '''Zz9yy-Xx8ww-Vv7uu-Tt6ss''',
 ]
