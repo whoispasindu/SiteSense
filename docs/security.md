@@ -80,3 +80,9 @@ web shell, Docker, CI).
 | Upload type and size checks, photo access control | 4 |
 | TOTP for PM and procurement, full rate limiting, load test | 13 |
 | Enable branch protection, secret scanning and push protection on GitHub (`scripts/github-bootstrap.sh`) | now, by the repo owner |
+
+> **Private repository note.** While the repository is private on a free plan, GitHub does not
+> offer code scanning, dependency review, secret scanning or branch protection. The CodeQL and
+> dependency-review jobs skip themselves on private repositories; Gitleaks, pip-audit and npm
+> audit still run on every pull request. Making the repository public (as the product guide
+> recommends) turns all of them on at no cost.

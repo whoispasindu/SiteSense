@@ -13,9 +13,12 @@ permissions:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
+    # Uploading code scanning results is free on public repositories only.
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
+      actions: read # CodeQL reads its own workflow run
       contents: read
       security-events: write
     strategy:
