@@ -37,21 +37,20 @@ export function AuditLogPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <PageHeader
-        sheet="A-03"
         title="Audit log"
         description="Sign-ins, failed attempts and every administrative change, newest first. Entries cannot be edited or deleted, even by the application itself."
       />
 
       <div className="flex flex-wrap items-end gap-4">
         <label className="block">
-          <span className="block font-mono text-[0.7rem] tracking-[0.14em] text-ink-soft uppercase">Event</span>
+          <span className="block text-sm font-medium text-ink">Event</span>
           <select
             value={action}
             onChange={(e) => {
               setAction(e.target.value);
               setOffset(0);
             }}
-            className="mt-1.5 min-h-11 rounded-[var(--radius-sheet)] border-2 border-rule-strong bg-paper-raised px-3 focus:border-ink focus:outline-none"
+            className="mt-1.5 min-h-10 rounded-lg border border-rule-strong bg-paper-raised px-3 text-sm text-ink focus:border-survey focus:ring-2 focus:ring-survey/25 focus:outline-none"
           >
             <option value="">All events</option>
             {Object.entries(ACTION_LABELS).map(([value, { label }]) => (
@@ -61,7 +60,7 @@ export function AuditLogPage() {
             ))}
           </select>
         </label>
-        <p className="tabular ml-auto font-mono text-xs text-ink-faint" aria-live="polite">
+        <p className="tabular ml-auto text-sm text-ink-faint" aria-live="polite">
           {total === 0 ? "0 entries" : `${String(offset + 1)}–${String(Math.min(offset + AUDIT_PAGE_SIZE, total))} of ${String(total)}`}
         </p>
       </div>
@@ -77,18 +76,18 @@ export function AuditLogPage() {
             const summary = summarise(entry);
             return (
               <li key={entry.id} className="grid gap-1 px-5 py-3.5 sm:grid-cols-[11rem_1fr_auto] sm:items-center sm:gap-6">
-                <time dateTime={entry.occurred_at} className="tabular font-mono text-xs text-ink-faint">
+                <time dateTime={entry.occurred_at} className="tabular text-sm text-ink-faint">
                   {formatDateTime(entry.occurred_at)}
                 </time>
                 <div className="min-w-0">
-                  <p className="flex items-center gap-2 text-sm font-semibold">
+                  <p className="flex items-center gap-2 text-sm font-medium text-ink">
                     <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${DOT[meta.tone]}`} />
                     {meta.label}
                     <span className="truncate font-normal text-ink-soft">· {entry.actor_name ?? "Unknown user"}</span>
                   </p>
                   {summary ? <p className="mt-0.5 truncate pl-4 text-xs text-ink-faint">{summary}</p> : null}
                 </div>
-                <span className="font-mono text-xs text-ink-faint sm:text-right">{entry.ip_address ?? "—"}</span>
+                <span className="tabular text-xs text-ink-faint sm:text-right">{entry.ip_address ?? "—"}</span>
               </li>
             );
           })}

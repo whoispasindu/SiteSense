@@ -32,7 +32,6 @@ export function UsersPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <PageHeader
-        sheet="A-01"
         title="Users"
         description="Create accounts, set roles and decide which sites each person works on. Every change is written to the audit log."
         action={
@@ -57,7 +56,7 @@ export function UsersPage() {
             onChange={(e) => {
               setQuery(e.target.value);
             }}
-            className="min-h-11 w-full rounded-[var(--radius-sheet)] border-2 border-rule-strong bg-paper-raised px-3 focus:border-ink focus:outline-none"
+            className="min-h-10 w-full rounded-lg border border-rule-strong bg-paper-raised px-3 text-sm placeholder:text-ink-faint focus:border-survey focus:ring-2 focus:ring-survey/25 focus:outline-none"
           />
         </label>
         <div role="group" aria-label="Filter by role" className="flex flex-wrap gap-1.5">
@@ -69,7 +68,7 @@ export function UsersPage() {
               onClick={() => {
                 setRoleFilter(r);
               }}
-              className={`min-h-9 rounded-full border px-3 text-xs font-semibold ${
+              className={`min-h-9 rounded-full border px-3 text-sm font-medium ${
                 roleFilter === r ? "border-ink bg-ink text-paper" : "border-rule-strong text-ink-soft hover:border-ink"
               }`}
             >
@@ -81,27 +80,27 @@ export function UsersPage() {
 
       {users.isError ? <Alert tone="error">{errorText(users.error)}</Alert> : null}
 
-      <Sheet sheetCode={`${String(visible.length)} / ${String(users.data?.total ?? 0)}`} className="overflow-hidden">
+      <Sheet className="relative overflow-x-auto">
         <table className="w-full text-left text-sm">
           <caption className="sr-only">Company users</caption>
-          <thead className="border-b border-rule-strong bg-paper-sunk">
-            <tr className="font-mono text-[0.65rem] tracking-[0.14em] text-ink-soft uppercase">
-              <th scope="col" className="px-4 py-2.5 font-normal">
+          <thead className="border-b border-rule bg-paper-sunk/60">
+            <tr className="text-xs font-medium text-ink-faint">
+              <th scope="col" className="px-4 py-2.5 font-medium">
                 Person
               </th>
-              <th scope="col" className="hidden px-4 py-2.5 font-normal sm:table-cell">
+              <th scope="col" className="hidden px-4 py-2.5 font-medium sm:table-cell">
                 Role
               </th>
-              <th scope="col" className="hidden px-4 py-2.5 font-normal lg:table-cell">
+              <th scope="col" className="hidden px-4 py-2.5 font-medium lg:table-cell">
                 Sites
               </th>
-              <th scope="col" className="px-4 py-2.5 font-normal">
+              <th scope="col" className="px-4 py-2.5 font-medium">
                 Status
               </th>
-              <th scope="col" className="hidden px-4 py-2.5 font-normal md:table-cell">
+              <th scope="col" className="hidden px-4 py-2.5 font-medium md:table-cell">
                 Last sign-in
               </th>
-              <th scope="col" className="px-4 py-2.5 font-normal">
+              <th scope="col" className="px-4 py-2.5 font-medium">
                 <span className="sr-only">Actions</span>
               </th>
             </tr>
@@ -123,7 +122,7 @@ export function UsersPage() {
               visible.map((user) => (
                 <tr key={user.id} className={user.is_active ? "" : "text-ink-faint"}>
                   <td className="px-4 py-3">
-                    <p className="font-semibold">{user.full_name}</p>
+                    <p className="font-medium text-ink">{user.full_name}</p>
                     <p className="text-xs text-ink-faint">{user.email}</p>
                     <p className="mt-1 text-xs text-ink-soft sm:hidden">{user.role_label}</p>
                   </td>
@@ -133,7 +132,7 @@ export function UsersPage() {
                       user.sites.length ? (
                         <span className="flex flex-wrap gap-1">
                           {user.sites.map((s) => (
-                            <span key={s.id} className="rounded-[2px] bg-paper-sunk px-1.5 py-0.5 font-mono text-[0.68rem]">
+                            <span key={s.id} className="rounded-md bg-paper-sunk px-1.5 py-0.5 text-xs font-medium text-ink-soft">
                               {s.code}
                             </span>
                           ))}
@@ -148,7 +147,7 @@ export function UsersPage() {
                   <td className="px-4 py-3">
                     <UserStatus user={user} />
                   </td>
-                  <td className="tabular hidden px-4 py-3 font-mono text-xs md:table-cell">
+                  <td className="tabular hidden px-4 py-3 text-ink-soft md:table-cell">
                     {formatDateTime(user.last_login_at)}
                   </td>
                   <td className="px-4 py-3 text-right">

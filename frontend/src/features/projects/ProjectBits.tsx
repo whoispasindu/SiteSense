@@ -1,4 +1,5 @@
 import { STATUS_LABELS, type ProjectStatus } from "../../api/projects";
+import { Icon, type IconName } from "../../components/ui/icons";
 import { StatusBadge, type Tone } from "../../components/ui/StatusBadge";
 import { programmeProgress } from "./dates";
 
@@ -15,50 +16,64 @@ export function ProjectStatusBadge({ status }: { status: ProjectStatus }) {
 }
 
 /**
- * The contract period drawn as a programme bar with a "today" mark. Decorative: the dates are
- * always printed next to it as text.
+ * The contract period as a slim bar with a "today" mark. Decorative: the dates are always printed
+ * next to it as text.
  */
 export function ProgrammeBar({ start, end, today = new Date() }: { start: string; end: string; today?: Date }) {
   const { elapsed, state } = programmeProgress(start, end, today);
   return (
-    <div aria-hidden="true" className="relative h-2.5 w-full rounded-[2px] border border-rule-strong bg-paper-sunk">
+    <div aria-hidden="true" className="relative h-2 w-full rounded-full bg-paper-sunk">
       <div
-        className={`h-full ${state === "overdue" ? "bg-signal-high" : "bg-ink"}`}
+        className={`h-full rounded-full ${state === "overdue" ? "bg-signal-high" : "bg-ink-faint/70"}`}
         style={{ width: `${String(Math.min(100, elapsed))}%` }}
       />
       {state === "running" ? (
-        <span className="absolute -top-1 -bottom-1 w-0.5 bg-hivis" style={{ left: `${String(elapsed)}%` }} />
+        <span
+          className="absolute -top-1 -bottom-1 w-[3px] -translate-x-1/2 rounded-full bg-accent-line"
+          style={{ left: `${String(elapsed)}%` }}
+        />
       ) : null}
     </div>
   );
 }
 
+const TONE_TEXT: Record<Tone, string> = {
+  ok: "text-signal-low",
+  warn: "text-signal-medium",
+  down: "text-signal-high",
+  idle: "text-ink",
+};
+
 export function KpiTile({
   label,
   value,
   note,
-  sheetCode,
   title,
+  icon,
+  tone,
 }: {
   label: string;
   value: string;
   note?: string;
-  sheetCode: string;
   title?: string;
+  icon?: IconName;
+  /** Colours the value; the note must still say in words what the colour means. */
+  tone?: Tone;
 }) {
   return (
-    <div className="relative rounded-[var(--radius-sheet)] border border-rule bg-paper-raised p-5 shadow-[var(--shadow-sheet)]">
-      <span
-        aria-hidden="true"
-        className="absolute top-0 right-0 border-b border-l border-rule px-2 py-0.5 font-mono text-[0.65rem] text-ink-faint"
-      >
-        {sheetCode}
-      </span>
-      <p className="font-wide pr-10 text-[0.68rem] font-bold tracking-[0.18em] text-ink-soft uppercase">{label}</p>
-      <p className="tabular mt-4 font-mono text-2xl leading-none font-medium tracking-tight" title={title}>
+    <div role="group" aria-label={label} className="rounded-[var(--radius-sheet)] border border-rule bg-paper-raised p-5 shadow-[var(--shadow-sheet)]">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium text-ink-soft">{label}</p>
+        {icon ? (
+          <span className="grid size-8 place-items-center rounded-lg bg-paper-sunk text-ink-faint">
+            <Icon name={icon} className="size-4" />
+          </span>
+        ) : null}
+      </div>
+      <p className={`tabular mt-2 text-[1.75rem] leading-tight font-semibold tracking-tight ${TONE_TEXT[tone ?? "idle"]}`} title={title}>
         {value}
       </p>
-      {note ? <p className="mt-3 text-xs text-ink-faint">{note}</p> : null}
+      {note ? <p className="mt-1 text-sm text-ink-faint">{note}</p> : null}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 # ADR 0004: Visual language ("site office")
 
-- Status: accepted
+- Status: superseded by [ADR 0006](0006-clean-site-office-ui.md)
 - Date: 2026-10-09
 
 ## Context

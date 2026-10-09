@@ -11,7 +11,7 @@ import { ProjectStatusBadge } from "../../features/projects/ProjectBits";
 import { ProjectFormDialog } from "../../features/projects/ProjectFormDialog";
 import { NotFoundPage } from "../NotFoundPage";
 
-const TAB = "font-wide inline-flex min-h-11 items-center border-b-2 px-1 text-xs font-bold tracking-[0.14em] uppercase";
+const TAB = "-mb-px inline-flex min-h-11 items-center border-b-2 px-1 text-sm font-medium transition-colors";
 
 export function ProjectLayout() {
   const { projectId = "" } = useParams();
@@ -29,7 +29,7 @@ export function ProjectLayout() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <nav aria-label="Breadcrumb" className="font-mono text-xs text-ink-faint">
+      <nav aria-label="Breadcrumb" className="text-sm text-ink-faint">
         <Link to="/projects" className="hover:text-ink hover:underline">
           Projects
         </Link>{" "}
@@ -40,11 +40,11 @@ export function ProjectLayout() {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
             <ProjectStatusBadge status={p.status} />
-            <span className="font-mono text-xs text-ink-faint">
+            <span className="text-sm text-ink-faint">
               {p.site.code} · {TYPE_LABELS[p.project_type]}
             </span>
           </div>
-          <h1 className="font-wide mt-3 text-4xl leading-tight font-extrabold tracking-tight text-balance sm:text-5xl">
+          <h1 className="mt-2 text-2xl leading-tight font-semibold tracking-tight text-balance text-ink sm:text-3xl">
             {p.name}
           </h1>
           <p className="mt-2 text-ink-soft">{p.client_name}</p>
@@ -60,24 +60,24 @@ export function ProjectLayout() {
         ) : null}
       </header>
 
-      <nav aria-label="Project sections" className="mt-8 flex gap-8 border-b border-rule">
+      <nav aria-label="Project sections" className="mt-6 flex gap-6 border-b border-rule">
         <NavLink
           to={`/projects/${p.id}`}
           end
-          className={({ isActive }) => `${TAB} ${isActive ? "border-ink text-ink" : "border-transparent text-ink-faint hover:text-ink"}`}
+          className={({ isActive }) => `${TAB} ${isActive ? "border-accent-line text-ink" : "border-transparent text-ink-faint hover:border-rule-strong hover:text-ink"}`}
         >
           Overview
         </NavLink>
         <NavLink
           to={`/projects/${p.id}/boq`}
-          className={({ isActive }) => `${TAB} ${isActive ? "border-ink text-ink" : "border-transparent text-ink-faint hover:text-ink"}`}
+          className={({ isActive }) => `${TAB} ${isActive ? "border-accent-line text-ink" : "border-transparent text-ink-faint hover:border-rule-strong hover:text-ink"}`}
         >
           BOQ &amp; budget
         </NavLink>
         {can("schedule:read") ? (
           <NavLink
             to={`/projects/${p.id}/schedule`}
-            className={({ isActive }) => `${TAB} ${isActive ? "border-ink text-ink" : "border-transparent text-ink-faint hover:text-ink"}`}
+            className={({ isActive }) => `${TAB} ${isActive ? "border-accent-line text-ink" : "border-transparent text-ink-faint hover:border-rule-strong hover:text-ink"}`}
           >
             Schedule
           </NavLink>

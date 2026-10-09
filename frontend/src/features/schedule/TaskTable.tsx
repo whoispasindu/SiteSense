@@ -20,7 +20,7 @@ function ProgressCell({ task, projectId, editable }: { task: Task; projectId: st
   const valid = /^\d{1,3}(\.\d{1,2})?$/.test(value) && Number(value) <= 100;
 
   if (!editable) {
-    return <span className="tabular font-mono">{Number(task.percent_complete)} %</span>;
+    return <span className="tabular">{Number(task.percent_complete)}%</span>;
   }
 
   function onSubmit(event: SubmitEvent<HTMLFormElement>) {
@@ -44,7 +44,7 @@ function ProgressCell({ task, projectId, editable }: { task: Task; projectId: st
         onChange={(e) => {
           setValue(e.target.value);
         }}
-        className="tabular min-h-9 w-20 rounded-[2px] border-2 border-rule-strong bg-paper-raised px-2 text-right font-mono text-sm focus:border-ink focus:outline-none aria-[invalid=true]:border-signal-high"
+        className="tabular min-h-9 w-20 rounded-lg border border-rule-strong bg-paper-raised px-2 text-right text-sm text-ink focus:border-survey focus:ring-2 focus:ring-survey/25 focus:outline-none aria-[invalid=true]:border-signal-high"
       />
       <span className="text-xs text-ink-faint">%</span>
       {dirty ? (
@@ -73,16 +73,16 @@ export function TaskTable({ tasks, projectId, canManage, canReportProgress, onEd
     <div className="relative overflow-x-auto">
       <table className="w-full text-sm">
         <caption className="sr-only">Programme tasks</caption>
-        <thead className="border-b border-rule-strong bg-paper-sunk font-mono text-[0.62rem] tracking-[0.14em] text-ink-soft uppercase">
+        <thead className="border-b border-rule bg-paper-sunk/60 text-xs font-medium whitespace-nowrap text-ink-faint">
           <tr>
-            <th scope="col" className="px-4 py-2.5 text-left font-normal">Task</th>
-            <th scope="col" className="hidden px-4 py-2.5 text-left font-normal md:table-cell">Planned</th>
-            <th scope="col" className="px-4 py-2.5 text-right font-normal">Weight</th>
-            <th scope="col" className="hidden px-4 py-2.5 text-right font-normal sm:table-cell">Plan today</th>
-            <th scope="col" className="px-4 py-2.5 text-right font-normal">Done</th>
-            <th scope="col" className="px-4 py-2.5 text-left font-normal">Status</th>
+            <th scope="col" className="px-4 py-2.5 text-left font-medium">Task</th>
+            <th scope="col" className="hidden px-4 py-2.5 text-left font-medium md:table-cell">Planned</th>
+            <th scope="col" className="px-4 py-2.5 text-right font-medium">Weight</th>
+            <th scope="col" className="hidden px-4 py-2.5 text-right font-medium sm:table-cell">Plan today</th>
+            <th scope="col" className="px-4 py-2.5 text-right font-medium">Done</th>
+            <th scope="col" className="px-4 py-2.5 text-left font-medium">Status</th>
             {canManage ? (
-              <th scope="col" className="px-4 py-2.5 font-normal">
+              <th scope="col" className="px-4 py-2.5 font-medium">
                 <span className="sr-only">Actions</span>
               </th>
             ) : null}
@@ -94,20 +94,20 @@ export function TaskTable({ tasks, projectId, canManage, canReportProgress, onEd
               <th scope="row" className="px-4 py-3 text-left font-normal">
                 <span className="flex items-center gap-2">
                   {task.code ? <span className="font-mono text-xs text-ink-faint">{task.code}</span> : null}
-                  <span className="font-semibold">{task.name}</span>
+                  <span className="font-medium text-ink">{task.name}</span>
                   {task.is_critical ? (
-                    <span className="font-wide rounded-[2px] bg-signal-high-tint px-1.5 py-0.5 text-[0.6rem] font-bold tracking-wider text-signal-high uppercase">
+                    <span className="rounded-full bg-signal-high-tint px-2 py-0.5 text-xs font-medium text-signal-high">
                       Critical
                     </span>
                   ) : null}
                 </span>
                 {task.boq_section_code ? <span className="text-xs text-ink-faint">BOQ section {task.boq_section_code}</span> : null}
               </th>
-              <td className="tabular hidden px-4 py-3 font-mono text-xs whitespace-nowrap md:table-cell">
+              <td className="tabular hidden px-4 py-3 whitespace-nowrap text-ink-soft md:table-cell">
                 {formatDate(task.planned_start)} → {formatDate(task.planned_end)}
               </td>
-              <td className="tabular px-4 py-3 text-right font-mono">{Number(task.weight)} %</td>
-              <td className="tabular hidden px-4 py-3 text-right font-mono text-ink-soft sm:table-cell">{task.planned_percent_today} %</td>
+              <td className="tabular px-4 py-3 text-right">{Number(task.weight)}%</td>
+              <td className="tabular hidden px-4 py-3 text-right text-ink-soft sm:table-cell">{task.planned_percent_today}%</td>
               <td className="px-4 py-3 text-right">
                 <ProgressCell key={task.percent_complete} task={task} projectId={projectId} editable={canReportProgress} />
               </td>

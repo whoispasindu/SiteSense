@@ -1,19 +1,18 @@
 import { Link } from "react-router";
 
+import { primaryLinkClass } from "../components/ui/Button";
+
 export function ForbiddenPage() {
   return (
-    <div className="mx-auto flex max-w-2xl flex-col items-start py-16">
-      <p className="font-mono text-xs tracking-[0.2em] text-ink-faint uppercase">Error 403 · Restricted area</p>
-      <h1 className="font-wide mt-4 text-5xl font-extrabold tracking-tight sm:text-6xl">Authorised personnel only.</h1>
-      <p className="mt-5 text-lg text-ink-soft">
+    <div className="mx-auto flex max-w-xl flex-col items-start py-16">
+      <span className="rounded-full bg-signal-high-tint px-3 py-1 text-sm font-medium text-signal-high">Error 403</span>
+      <h1 className="mt-5 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">Authorised personnel only.</h1>
+      <p className="mt-3 text-ink-soft">
         Your role does not include this part of SiteSense. If you need it for your work, ask your company admin to
         review your access.
       </p>
-      <div aria-hidden="true" className="hazard-band mt-10 h-2 w-full max-w-sm rounded-[2px]" />
-      <Link
-        to="/"
-        className="font-wide mt-10 inline-flex min-h-11 items-center rounded-[var(--radius-sheet)] border-2 border-ink bg-hivis px-5 text-xs font-bold tracking-[0.12em] uppercase shadow-[3px_3px_0_0_var(--color-ink)] hover:bg-hivis-deep"
-      >
+      <div aria-hidden="true" className="hazard-band mt-8 h-1.5 w-40 rounded-full" />
+      <Link to="/" className={`mt-8 ${primaryLinkClass}`}>
         Back to your dashboard
       </Link>
     </div>

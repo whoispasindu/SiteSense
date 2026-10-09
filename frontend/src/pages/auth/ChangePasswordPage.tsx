@@ -43,7 +43,7 @@ export function ChangePasswordPage() {
 
   return (
     <GateLayout>
-      <GatePass eyebrow="SS-AUTH-02" title={forced ? "Set your own password" : "Change password"}>
+      <GatePass title={forced ? "Set your own password" : "Change password"}>
         <p className="mt-2 text-ink-soft">
           {forced
             ? "You signed in with a temporary password. Choose a private one to continue."
@@ -94,10 +94,10 @@ export function ChangePasswordPage() {
 
           <ul aria-label="Password requirements" className="grid gap-1.5 sm:grid-cols-2">
             {checks.map((check) => (
-              <li key={check.label} className="flex items-center gap-2 text-xs">
+              <li key={check.label} className="flex items-center gap-2 text-sm">
                 <span
                   aria-hidden="true"
-                  className={`grid size-4 place-items-center rounded-[2px] border font-mono text-[0.6rem] ${
+                  className={`grid size-4 place-items-center rounded-full border text-[0.625rem] ${
                     check.ok ? "border-signal-low bg-signal-low text-paper" : "border-rule-strong text-transparent"
                   }`}
                 >

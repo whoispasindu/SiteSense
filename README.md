@@ -207,5 +207,5 @@ problems privately as described in [SECURITY.md](SECURITY.md).
 
 ## Licence
 
-[MIT](LICENSE). Fonts: Archivo and IBM Plex Mono (SIL Open Font License), self-hosted through
+[MIT](LICENSE). Fonts: IBM Plex Sans and IBM Plex Mono (SIL Open Font License), self-hosted through
 Fontsource.

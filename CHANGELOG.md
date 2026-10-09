@@ -6,6 +6,19 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **Whole-app UI redesign** ([ADR 0006](docs/adr/0006-clean-site-office-ui.md)), keeping the
+  asphalt and hi-vis identity.
+  - Clear type: IBM Plex Sans at a 15 px base in sentence case, replacing widened Archivo and
+    small monospaced capitals. Monospace is used only for codes.
+  - Light, dark and system themes, switchable from the user menu and applied before first paint.
+  - Clean cards, soft shadows and no grid backgrounds or sheet codes.
+  - A new dashboard: portfolio KPIs, schedule health per project and a contract value chart; the
+    company admin gets system status and admin shortcuts.
+  - Charts restyled: the S-curve shows actual as a filled accent line, and the programme timeline
+    shows the shortfall against today's plan as a red segment.
+  - Sidebar icons, an avatar user menu and calmer error pages. The sign-in button now says "Sign in".
+
 ### Added
 - **Phase 3: schedule basics.**
   - Programme tasks with planned dates, weight (share of the contract), percent complete and an

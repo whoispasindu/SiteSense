@@ -8,7 +8,7 @@ async function fillAndSubmit(email: string, password: string) {
   const user = userEvent.setup();
   await user.type(await screen.findByLabelText("Email"), email);
   await user.type(screen.getByLabelText("Password"), password);
-  await user.click(screen.getByRole("button", { name: "Enter site office" }));
+  await user.click(screen.getByRole("button", { name: "Sign in" }));
   return user;
 }
 
@@ -68,7 +68,7 @@ describe("SignInPage", () => {
     await fillAndSubmit("someone@site.lk", "wrong-password");
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Email or password is incorrect.");
-    expect(screen.getByRole("button", { name: "Enter site office" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled();
   });
 
   it("explains a locked account", async () => {
@@ -98,7 +98,7 @@ describe("SignInPage", () => {
     const user = userEvent.setup();
     renderRoute("/sign-in");
 
-    await user.click(await screen.findByRole("button", { name: "Enter site office" }));
+    await user.click(await screen.findByRole("button", { name: "Sign in" }));
 
     expect(screen.getByText("Enter the email address you use for SiteSense.")).toBeInTheDocument();
     expect(screen.getByText("Enter your password.")).toBeInTheDocument();

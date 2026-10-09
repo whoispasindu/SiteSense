@@ -51,7 +51,7 @@ export function SignInPage() {
 
   return (
     <GateLayout>
-      <GatePass eyebrow="SS-AUTH-01" title="Sign in">
+      <GatePass title="Sign in">
         <p className="mt-2 text-ink-soft">Use the account your company admin created for you.</p>
 
         <form noValidate onSubmit={(event) => void onSubmit(event)} className="mt-7 space-y-5">
@@ -86,11 +86,11 @@ export function SignInPage() {
           />
 
           <Button type="submit" variant="primary" disabled={submitting} className="w-full">
-            {submitting ? "Checking pass…" : "Enter site office"}
+            {submitting ? "Signing in…" : "Sign in"}
           </Button>
         </form>
 
-        <p className="mt-6 border-t border-dashed border-rule pt-4 text-xs leading-relaxed text-ink-faint">
+        <p className="mt-6 border-t border-rule pt-4 text-sm leading-relaxed text-ink-faint">
           Forgot your password? Your company admin can issue a new temporary one. After 5 failed attempts the account
           locks for 15 minutes.
         </p>

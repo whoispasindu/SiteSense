@@ -2,6 +2,7 @@ import { NavLink } from "react-router";
 
 import { useHealth } from "../../api/health";
 import { useAuth } from "../../auth/context";
+import { Icon } from "../ui/icons";
 import { LogoMark } from "../ui/Logo";
 import { isAvailable, navForPermissions, type NavItem } from "./navigation";
 
@@ -9,19 +10,17 @@ interface SidebarProps {
   onNavigate?: () => void;
 }
 
-function NavEntry({ item, onNavigate }: { item: NavItem; onNavigate?: (() => void) | undefined }) {
-  const base =
-    "group relative flex min-h-11 items-center gap-3 rounded-[var(--radius-sheet)] px-3 text-sm transition-colors";
+const ITEM = "group relative flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm transition-colors";
 
+function NavEntry({ item, onNavigate }: { item: NavItem; onNavigate?: (() => void) | undefined }) {
   if (!isAvailable(item)) {
     return (
-      <span aria-disabled="true" className={`${base} cursor-default text-asphalt-muted/70`}>
-        <span className="font-mono text-[0.7rem] text-asphalt-muted/60">{item.code}</span>
+      <span aria-disabled="true" className={`${ITEM} cursor-default text-asphalt-muted/70`}>
+        <Icon name={item.icon} />
         <span className="flex-1">{item.label}</span>
-        <span className="font-mono text-[0.62rem] tracking-wider text-asphalt-muted">
-          <span className="sr-only">Coming in phase </span>
-          <span aria-hidden="true">P</span>
-          {item.phase}
+        <span className="rounded-full border border-asphalt-line px-1.5 py-px text-[0.6875rem] text-asphalt-muted">
+          <span className="sr-only">Coming in phase {item.phase}</span>
+          <span aria-hidden="true">Soon</span>
         </span>
       </span>
     );
@@ -33,15 +32,21 @@ function NavEntry({ item, onNavigate }: { item: NavItem; onNavigate?: (() => voi
       end={item.path === "/"}
       onClick={onNavigate}
       className={({ isActive }) =>
-        `${base} ${
+        `${ITEM} ${
           isActive
-            ? "bg-asphalt-raised font-semibold text-hivis before:absolute before:inset-y-2 before:-left-3 before:w-1 before:bg-hivis"
-            : "text-asphalt-text hover:bg-asphalt-raised hover:text-paper"
+            ? "bg-asphalt-raised font-medium text-white before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-hivis"
+            : "text-asphalt-text/85 hover:bg-asphalt-raised hover:text-white"
         }`
       }
     >
-      <span className="font-mono text-[0.7rem] opacity-70">{item.code}</span>
-      <span className="flex-1">{item.label}</span>
+      {({ isActive }) => (
+        <>
+          <span className={isActive ? "text-hivis" : "text-asphalt-muted group-hover:text-asphalt-text"}>
+            <Icon name={item.icon} />
+          </span>
+          <span className="flex-1">{item.label}</span>
+        </>
+      )}
     </NavLink>
   );
 }
@@ -52,14 +57,14 @@ function ApiStatus() {
   const dot = isPending ? "bg-asphalt-muted" : isError ? "bg-signal-high" : "bg-[#5fd08a] animate-pulse-dot";
 
   return (
-    <div className="flex items-center justify-between gap-2 font-mono text-[0.7rem] text-asphalt-muted">
+    <div className="flex items-center justify-between gap-2 text-xs text-asphalt-muted">
       <span className="flex items-center gap-2">
         <span aria-hidden="true" className={`size-2 rounded-full text-[#5fd08a] ${dot}`} />
         <span>
           API <span className="text-asphalt-text">{label}</span>
         </span>
       </span>
-      {data ? <span className="tabular">{data.latencyMs} ms</span> : null}
+      <span className="tabular">{data ? `${String(data.latencyMs)} ms · ` : ""}v{__APP_VERSION__}</span>
     </div>
   );
 }
@@ -70,22 +75,20 @@ export function SidebarContent({ onNavigate }: SidebarProps) {
 
   return (
     <div className="on-asphalt flex h-full flex-col bg-asphalt text-asphalt-text">
-      <div aria-hidden="true" className="hazard-band h-1.5 shrink-0" />
+      <div aria-hidden="true" className="hazard-band h-1 shrink-0" />
 
-      <div className="flex items-center gap-3 px-6 pt-6 pb-8">
+      <div className="flex items-center gap-3 px-5 pt-5 pb-6">
         <LogoMark className="size-9" />
-        <div className="leading-none">
-          <p className="font-wide text-base font-extrabold tracking-[0.18em] text-paper uppercase">SiteSense</p>
-          <p className="mt-1.5 font-mono text-[0.62rem] tracking-[0.2em] text-asphalt-muted uppercase">
-            Delay &amp; cost control
-          </p>
+        <div className="leading-tight">
+          <p className="text-[1.0625rem] font-semibold tracking-tight text-white">SiteSense</p>
+          <p className="text-xs text-asphalt-muted">Delay &amp; cost control</p>
         </div>
       </div>
 
-      <nav aria-label="Main" className="flex-1 space-y-7 overflow-y-auto px-6">
+      <nav aria-label="Main" className="flex-1 space-y-6 overflow-y-auto px-3">
         {groups.map((group) => (
           <div key={group.label}>
-            <p className="font-wide mb-2 text-[0.62rem] font-bold tracking-[0.24em] text-asphalt-muted uppercase">
+            <p className="mb-1.5 px-3 text-[0.6875rem] font-semibold text-asphalt-muted uppercase">
               {group.label}
             </p>
             <ul className="space-y-0.5">
@@ -99,11 +102,8 @@ export function SidebarContent({ onNavigate }: SidebarProps) {
         ))}
       </nav>
 
-      <div className="space-y-2 border-t border-asphalt-line px-6 py-5">
+      <div className="border-t border-asphalt-line px-5 py-4">
         <ApiStatus />
-        <p className="font-mono text-[0.62rem] text-asphalt-muted">
-          Web <span className="text-asphalt-text">v{__APP_VERSION__}</span>
-        </p>
       </div>
     </div>
   );

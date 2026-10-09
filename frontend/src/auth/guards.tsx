@@ -10,7 +10,7 @@ function GateLoader() {
     <div role="status" className="grid min-h-dvh place-items-center bg-asphalt text-asphalt-text">
       <div className="flex flex-col items-center gap-4">
         <LogoMark className="size-12 animate-pulse" />
-        <p className="font-mono text-xs tracking-[0.2em] uppercase">Opening the site gate…</p>
+        <p className="text-sm text-asphalt-muted">Loading SiteSense…</p>
       </div>
     </div>
   );

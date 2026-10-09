@@ -27,10 +27,10 @@ describe("programme", () => {
 });
 
 describe("navigation", () => {
-  it("uses unique paths and codes", () => {
+  it("uses unique paths and labels", () => {
     const items = NAV_GROUPS.flatMap((g) => g.items);
     expect(new Set(items.map((i) => i.path)).size).toBe(items.length);
-    expect(new Set(items.map((i) => i.code)).size).toBe(items.length);
+    expect(new Set(items.map((i) => i.label)).size).toBe(items.length);
   });
 
   it("only makes modules available once their phase is reached", () => {
@@ -45,7 +45,7 @@ describe("navigation", () => {
 describe("site time", () => {
   it("formats clocks in Colombo time regardless of the browser zone", () => {
     // 2026-10-09 09:15 UTC is 14:45 in Colombo (UTC+05:30).
-    expect(formatSiteClock(new Date("2026-10-09T09:15:00Z"))).toBe("FRI, 09 OCT 2026 · 14:45");
+    expect(formatSiteClock(new Date("2026-10-09T09:15:00Z"))).toBe("Fri 9 Oct · 14:45");
     expect(formatSiteDate(new Date("2026-10-09T20:00:00Z"))).toBe("10 Oct 2026");
   });
 });

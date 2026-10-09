@@ -1,7 +1,7 @@
 import { useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
 
 const CONTROL =
-  "w-full min-h-11 rounded-[var(--radius-sheet)] border-2 border-rule-strong bg-paper-raised px-3 text-base text-ink placeholder:text-ink-faint transition-colors focus:border-ink focus:outline-none aria-[invalid=true]:border-signal-high disabled:opacity-60";
+  "w-full min-h-10 rounded-lg border border-rule-strong bg-paper-raised px-3 text-[0.9375rem] text-ink placeholder:text-ink-faint transition-[border-color,box-shadow] focus:border-survey focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--c-survey)_18%,transparent)] focus:outline-none aria-[invalid=true]:border-signal-high disabled:opacity-60";
 
 interface FieldShellProps {
   label: string;
@@ -18,7 +18,7 @@ function FieldShell({ label, hint, error, children }: FieldShellProps) {
 
   return (
     <div className="space-y-1.5">
-      <label htmlFor={inputId} className="block font-mono text-[0.7rem] tracking-[0.14em] text-ink-soft uppercase">
+      <label htmlFor={inputId} className="block text-sm font-medium text-ink">
         {label}
       </label>
       {children({ inputId, describedBy })}
