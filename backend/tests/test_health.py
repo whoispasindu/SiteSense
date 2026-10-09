@@ -1,4 +1,3 @@
-import os
 from collections.abc import Iterator
 
 import pytest
@@ -35,11 +34,8 @@ def test_readiness_returns_503_without_leaking_database_errors(app: FastAPI, cli
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(
-    "SITESENSE_TEST_DATABASE_URL" not in os.environ, reason="needs SITESENSE_TEST_DATABASE_URL"
-)
-def test_readiness_against_real_database(client: TestClient) -> None:
-    response = client.get("/api/v1/health/ready")
+def test_readiness_against_real_database(api: TestClient) -> None:
+    response = api.get("/api/v1/health/ready")
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "checks": {"database": "ok"}}

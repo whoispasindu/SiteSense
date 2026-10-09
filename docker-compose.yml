@@ -30,8 +30,10 @@ services:
       SITESENSE_ENVIRONMENT: development
       SITESENSE_DATABASE_URL: postgresql+psycopg://sitesense_app:${SITESENSE_APP_PASSWORD:-change-me-app}@db:5432/sitesense
       SITESENSE_MIGRATION_DATABASE_URL: postgresql+psycopg://sitesense_owner:${SITESENSE_OWNER_PASSWORD:-change-me-owner}@db:5432/sitesense
-      SITESENSE_CORS_ORIGINS: http://localhost:5173
+      SITESENSE_CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
       SITESENSE_ALLOWED_HOSTS: localhost,127.0.0.1,backend
+      SITESENSE_JWT_SECRET: ${SITESENSE_JWT_SECRET:-dev-only-insecure-jwt-secret-change-me-0000000000}
+      SITESENSE_DEMO_PASSWORD: ${SITESENSE_DEMO_PASSWORD:-SiteSense-Demo-2026!}
       WATCHFILES_FORCE_POLLING: "true"
     volumes:
       - ./backend:/app

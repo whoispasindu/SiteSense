@@ -7,6 +7,19 @@ uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Phase 1: authentication, roles and users.**
+  - Sign-in with argon2id passwords, 15-minute access tokens kept in memory, and rotating
+    refresh tokens in an httpOnly cookie with reuse detection.
+  - Account lockout after 5 failed attempts (15 minutes), per-IP rate limiting on sign-in and
+    refresh, uniform answers for wrong password and unknown email.
+  - Six roles with a central permission table; `require_permission`, `require_role` and
+    site-scoping helpers (groundwork for BR-03).
+  - Admin: create users with one-time temporary passwords, change roles, assign sites, reset
+    passwords, deactivate and reactivate; manage sites; read the audit log.
+  - Append-only audit log for sign-ins, lockouts and admin actions (enforced by database grants).
+  - Web: "site gate" sign-in, forced password change, role-based menu, user menu, Users, Sites
+    and Audit log screens.
+  - `python -m app.cli create-admin` and `seed-dev`.
 - **Phase 0: setup and foundations.**
   - FastAPI backend with layered folders (`api`, `models`, `schemas`, `services`, `ai`,
     `integrations`, `core`), settings from environment, SQLAlchemy 2 and Alembic.

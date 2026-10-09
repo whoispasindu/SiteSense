@@ -12,8 +12,8 @@ SiteSense tells a construction company which site will slip before it does, and 
 
 </div>
 
-> **Status: Phase 0 of 14 (foundations).** The skeleton runs end to end; product features
-> arrive phase by phase (see [Roadmap](#roadmap)). Nothing here is production-ready yet.
+> **Status: Phase 1 of 14 (sign-in, roles and users).** Product features arrive phase by phase
+> (see [Roadmap](#roadmap)). Nothing here is production-ready yet.
 
 ## What it will do
 
@@ -51,6 +51,30 @@ Then open:
 The first start creates the database and its two roles, runs migrations, and starts the API
 and the web app with hot reload. Stop with `Ctrl+C`; `docker compose down -v` also deletes the
 local database.
+
+### Sign in
+
+Create demo sites and one account per role (local development only):
+
+```bash
+docker compose exec backend python -m app.cli seed-dev
+```
+
+| Role | Email |
+| --- | --- |
+| Company Admin | `admin@sitesense.example` |
+| Project Manager | `pm@sitesense.example` |
+| Quantity Surveyor | `qs@sitesense.example` |
+| Site Engineer | `engineer@sitesense.example` |
+| Procurement Officer | `procurement@sitesense.example` |
+| Client | `client@sitesense.example` |
+
+The password is the value of `SITESENSE_DEMO_PASSWORD` (see `.env.example`). For a real
+company, create the first admin instead; it prints a one-time password:
+
+```bash
+docker compose exec backend python -m app.cli create-admin --email you@company.lk --name "Your Name"
+```
 
 The defaults are for local development only. To change the database passwords, copy
 `.env.example` to `.env` and edit it **before the first start** (the roles are created once,
@@ -91,8 +115,9 @@ cd frontend
 npm run lint && npm run typecheck && npm run coverage && npm run build
 ```
 
-Backend integration tests that need a real database run when `SITESENSE_TEST_DATABASE_URL` is
-set (CI always sets it). Every pull request also runs dependency audits, a secret scan and
+Backend tests use a real PostgreSQL. Start it first with `docker compose up -d db`; the tests
+migrate the `sitesense_test` database and run each test in a transaction that is rolled back.
+Override the location with `SITESENSE_TEST_DATABASE_URL` and `SITESENSE_TEST_MIGRATION_DATABASE_URL`. Every pull request also runs dependency audits, a secret scan and
 CodeQL; see [docs/security.md](docs/security.md).
 
 ## Configuration
@@ -109,6 +134,13 @@ Backend settings are environment variables prefixed with `SITESENSE_`
 | `SITESENSE_ALLOWED_HOSTS` | Comma-separated accepted `Host` headers | `localhost,127.0.0.1,backend,testserver` |
 | `SITESENSE_MAX_REQUEST_BODY_BYTES` | Largest accepted request body | `1048576` |
 | `SITESENSE_LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING`, `ERROR` | `INFO` |
+| `SITESENSE_JWT_SECRET` | Access-token signing key, 32+ characters | development value (refused in production) |
+| `SITESENSE_ACCESS_TOKEN_TTL_MINUTES` | Access-token lifetime | `15` |
+| `SITESENSE_REFRESH_TOKEN_TTL_DAYS` | Refresh-token lifetime (rotated on use) | `7` |
+| `SITESENSE_SESSION_MAX_DAYS` | Absolute session limit | `30` |
+| `SITESENSE_LOGIN_MAX_FAILURES` / `SITESENSE_LOCKOUT_MINUTES` | Account lockout | `5` / `15` |
+| `SITESENSE_LOGIN_RATE_PER_MINUTE` | Sign-in attempts per IP per minute | `10` |
+| `SITESENSE_COOKIE_SECURE` | Secure flag on the refresh cookie | `true` |
 
 In production the API refuses to start with debug on, wildcard or plain-HTTP origins, or the
 example database password.
@@ -123,7 +155,7 @@ example database password.
 | AI (from Phase 6) | pandas, scikit-learn, XGBoost, SHAP |
 | Quality | pytest, Ruff, mypy, Vitest, Testing Library, ESLint, CodeQL, Gitleaks |
 
-Architecture notes and decision records live in [docs/](docs/).
+Architecture notes, the [roles and access matrix](docs/roles-and-access.md) and decision records live in [docs/](docs/).
 
 ## Project structure
 
@@ -140,8 +172,8 @@ docs/           architecture, decision records, security reviews, model cards
 
 | Phase | Name | Status |
 | --- | --- | --- |
-| 0 | Setup and foundations | In progress |
-| 1 | Authentication, roles and users | Planned |
+| 0 | Setup and foundations | Done |
+| 1 | Authentication, roles and users | In progress |
 | 2 | Projects, BOQ and budget | Planned |
 | 3 | Schedule basics | Planned |
 | 4 | Daily site reports | Planned |

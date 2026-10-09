@@ -59,7 +59,51 @@ export interface RequestOptions<TBody> {
   body?: TBody;
   signal?: AbortSignal;
   timeoutMs?: number;
+  /** Attach the access token and refresh it once on expiry. Off for the auth endpoints themselves. */
+  auth?: boolean;
+  acceptStatuses?: readonly number[];
 }
+
+// --- Session ------------------------------------------------------------------------------
+//
+// The access token lives only in this module's memory: never in localStorage or a readable
+// cookie, so an injected script cannot lift it from storage. The long-lived refresh token is
+// an httpOnly cookie the browser sends to /api/v1/auth only.
+
+let accessToken: string | null = null;
+
+interface SessionHooks {
+  /** Obtain a fresh access token using the refresh cookie. Resolves false if the session is over. */
+  refresh: () => Promise<boolean>;
+  /** Called when the session cannot be recovered, so the app can return to the sign-in page. */
+  onExpired: () => void;
+}
+
+let hooks: SessionHooks | null = null;
+let refreshInFlight: Promise<boolean> | null = null;
+
+export function setAccessToken(token: string | null): void {
+  accessToken = token;
+}
+
+export function getAccessToken(): string | null {
+  return accessToken;
+}
+
+export function configureSession(sessionHooks: SessionHooks | null): void {
+  hooks = sessionHooks;
+}
+
+/** One refresh at a time: concurrent 401s all wait for the same attempt. */
+export function refreshSession(): Promise<boolean> {
+  if (!hooks) return Promise.resolve(false);
+  refreshInFlight ??= hooks.refresh().finally(() => {
+    refreshInFlight = null;
+  });
+  return refreshInFlight;
+}
+
+const SESSION_ERROR_CODES = new Set(["token_expired", "invalid_token", "session_expired", "unauthorized"]);
 
 export interface ApiResponse<T> {
   data: T;
@@ -80,19 +124,38 @@ async function readJson(response: Response): Promise<unknown> {
 export async function apiRequest<TSchema extends z.ZodType, TBody = undefined>(
   path: string,
   schema: TSchema,
-  options: RequestOptions<TBody> & { acceptStatuses?: readonly number[] } = {},
+  options: RequestOptions<TBody> = {},
 ): Promise<ApiResponse<z.infer<TSchema>>> {
   if (!path.startsWith("/") || path.startsWith("//")) {
     // Guards against building a request to another origin from a value like "//evil.example".
     throw new Error(`API paths must be absolute and same-origin, got "${path}"`);
   }
 
+  const useAuth = options.auth ?? true;
+  try {
+    return await send(path, schema, options, useAuth);
+  } catch (error) {
+    const expired = error instanceof ApiError && error.status === 401 && SESSION_ERROR_CODES.has(error.code);
+    if (!useAuth || !expired) throw error;
+    if (await refreshSession()) return send(path, schema, options, useAuth);
+    hooks?.onExpired();
+    throw error;
+  }
+}
+
+async function send<TSchema extends z.ZodType, TBody>(
+  path: string,
+  schema: TSchema,
+  options: RequestOptions<TBody>,
+  useAuth: boolean,
+): Promise<ApiResponse<z.infer<TSchema>>> {
   const { method = "GET", body, timeoutMs = DEFAULT_TIMEOUT_MS, acceptStatuses = [] } = options;
   const timeout = AbortSignal.timeout(timeoutMs);
   const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
 
   const headers: Record<string, string> = { Accept: "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (useAuth && accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
   let response: Response;
   try {

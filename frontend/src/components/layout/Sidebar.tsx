@@ -1,8 +1,9 @@
 import { NavLink } from "react-router";
 
 import { useHealth } from "../../api/health";
+import { useAuth } from "../../auth/context";
 import { LogoMark } from "../ui/Logo";
-import { isAvailable, NAV_GROUPS, type NavItem } from "./navigation";
+import { isAvailable, navForPermissions, type NavItem } from "./navigation";
 
 interface SidebarProps {
   onNavigate?: () => void;
@@ -64,6 +65,9 @@ function ApiStatus() {
 }
 
 export function SidebarContent({ onNavigate }: SidebarProps) {
+  const { can } = useAuth();
+  const groups = navForPermissions(can);
+
   return (
     <div className="on-asphalt flex h-full flex-col bg-asphalt text-asphalt-text">
       <div aria-hidden="true" className="hazard-band h-1.5 shrink-0" />
@@ -79,7 +83,7 @@ export function SidebarContent({ onNavigate }: SidebarProps) {
       </div>
 
       <nav aria-label="Main" className="flex-1 space-y-7 overflow-y-auto px-6">
-        {NAV_GROUPS.map((group) => (
+        {groups.map((group) => (
           <div key={group.label}>
             <p className="font-wide mb-2 text-[0.62rem] font-bold tracking-[0.24em] text-asphalt-muted uppercase">
               {group.label}

@@ -1,0 +1,65 @@
+"""Audit trail: every login, logout and administrative change is recorded here."""
+
+import uuid
+from dataclasses import dataclass
+from typing import Any
+
+from sqlalchemy.orm import Session
+
+from app.core import clock
+from app.models import AuditLog
+
+
+@dataclass(frozen=True, slots=True)
+class RequestMeta:
+    """Who is calling from where; captured once per request and passed to services."""
+
+    ip_address: str | None
+    user_agent: str | None
+
+    @classmethod
+    def build(cls, ip_address: str | None, user_agent: str | None) -> "RequestMeta":
+        return cls(ip_address=(ip_address or None), user_agent=(user_agent or "")[:200] or None)
+
+
+class AuditAction:
+    LOGIN_SUCCEEDED = "auth.login_succeeded"
+    LOGIN_FAILED = "auth.login_failed"
+    ACCOUNT_LOCKED = "auth.account_locked"
+    LOGOUT = "auth.logout"
+    REFRESH_REUSE_DETECTED = "auth.refresh_reuse_detected"
+    PASSWORD_CHANGED = "auth.password_changed"  # noqa: S105 - event name
+    USER_CREATED = "user.created"
+    USER_UPDATED = "user.updated"
+    USER_DEACTIVATED = "user.deactivated"
+    USER_REACTIVATED = "user.reactivated"
+    USER_PASSWORD_RESET = "user.password_reset"  # noqa: S105 - event name
+    USER_SITES_ASSIGNED = "user.sites_assigned"
+    SITE_CREATED = "site.created"
+    SITE_UPDATED = "site.updated"
+
+
+def record(
+    db: Session,
+    action: str,
+    *,
+    meta: RequestMeta | None = None,
+    actor_id: uuid.UUID | None = None,
+    target_type: str | None = None,
+    target_id: uuid.UUID | str | None = None,
+    details: dict[str, Any] | None = None,
+) -> AuditLog:
+    """Add an audit entry to the current transaction. The caller commits."""
+    entry = AuditLog(
+        # App clock (not the database's transaction time) so events in one transaction keep order.
+        occurred_at=clock.utcnow(),
+        actor_id=actor_id,
+        action=action,
+        target_type=target_type,
+        target_id=str(target_id) if target_id is not None else None,
+        ip_address=meta.ip_address if meta else None,
+        user_agent=meta.user_agent if meta else None,
+        details=details or {},
+    )
+    db.add(entry)
+    return entry

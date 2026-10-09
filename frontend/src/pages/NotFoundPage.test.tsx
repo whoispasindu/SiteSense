@@ -2,11 +2,11 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { healthyApi, mockApi, renderRoute } from "../test/utils";
+import { makeMe, mockApi, renderRoute, sessionApi } from "../test/utils";
 
 describe("NotFoundPage", () => {
   it("renders inside the shell for unknown routes and links home", async () => {
-    mockApi(healthyApi);
+    mockApi(sessionApi(makeMe("project_manager")));
     const user = userEvent.setup();
     const { router } = renderRoute("/no/such/sheet");
 
@@ -18,7 +18,7 @@ describe("NotFoundPage", () => {
   });
 
   it("treats not-yet-built modules as unknown routes", async () => {
-    mockApi(healthyApi);
+    mockApi(sessionApi(makeMe("project_manager")));
     renderRoute("/projects");
 
     expect(await screen.findByRole("heading", { name: "Off the drawings." })).toBeInTheDocument();

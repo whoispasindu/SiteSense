@@ -18,7 +18,7 @@ export interface Milestone {
 }
 
 /** The phase currently being built. Bump this as each phase merges. */
-export const CURRENT_PHASE = 0;
+export const CURRENT_PHASE = 1;
 export const PROGRAMME_WEEKS = 26;
 
 export const PHASES: readonly Phase[] = [

@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router";
 
+import { useAuth } from "../../auth/context";
 import { formatSiteClock } from "../../lib/time";
 import { findNavItem, isAvailable } from "./navigation";
+import { UserMenu } from "./UserMenu";
 
 function SiteClock() {
   const [now, setNow] = useState(() => new Date());
@@ -29,9 +31,11 @@ interface TopBarProps {
 
 export function TopBar({ onOpenMenu }: TopBarProps) {
   const { pathname } = useLocation();
+  const { can } = useAuth();
   const match = findNavItem(pathname);
-  // A module that is not built yet renders the 404 page, so it must not be named here either.
-  const current = match && isAvailable(match) ? match : undefined;
+  // Only name pages the user can actually open: unbuilt modules show 404, forbidden ones 403.
+  const allowed = match && isAvailable(match) && (match.permission === undefined || can(match.permission));
+  const current = allowed ? match : undefined;
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-rule bg-paper/90 px-4 backdrop-blur-sm sm:px-8">
@@ -56,9 +60,10 @@ export function TopBar({ onOpenMenu }: TopBarProps) {
 
       <div className="ml-auto flex items-center gap-4">
         <SiteClock />
-        <span className="font-wide rounded-full border border-dashed border-rule-strong px-3 py-1 text-[0.65rem] font-bold tracking-[0.16em] text-ink-faint uppercase">
+        <span className="font-wide hidden rounded-full border border-dashed border-rule-strong px-3 py-1 text-[0.65rem] font-bold tracking-[0.16em] text-ink-faint uppercase lg:inline">
           {import.meta.env.MODE === "production" ? "Live" : "Dev build"}
         </span>
+        <UserMenu />
       </div>
     </header>
   );

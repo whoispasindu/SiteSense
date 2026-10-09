@@ -44,11 +44,34 @@ class Settings(BaseSettings):
 
     max_request_body_bytes: int = Field(default=1_048_576, ge=1024)
 
+    # --- Authentication -------------------------------------------------------------------
+    # HS256 signing key for access tokens. Generate one with:
+    #   python -c "import secrets; print(secrets.token_urlsafe(48))"
+    jwt_secret: SecretStr = SecretStr("dev-only-insecure-jwt-secret-change-me-0000000000")
+    access_token_ttl_minutes: int = Field(default=15, ge=1, le=60)
+    refresh_token_ttl_days: int = Field(default=7, ge=1, le=30)
+    # A refresh-token family (one sign-in) can be rotated for at most this long.
+    session_max_days: int = Field(default=30, ge=1, le=90)
+    # Refresh cookie is Secure by default; browsers accept Secure cookies on http://localhost.
+    cookie_secure: bool = True
+    login_max_failures: int = Field(default=5, ge=3, le=20)
+    lockout_minutes: int = Field(default=15, ge=1, le=1440)
+    # Per-client-IP request budgets for the auth endpoints (per minute).
+    login_rate_per_minute: int = Field(default=10, ge=1)
+    refresh_rate_per_minute: int = Field(default=30, ge=1)
+
     @field_validator("cors_origins", "allowed_hosts", mode="before")
     @classmethod
     def _split_csv(cls, value: object) -> object:
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+    @field_validator("jwt_secret")
+    @classmethod
+    def _validate_jwt_secret(cls, value: SecretStr) -> SecretStr:
+        if len(value.get_secret_value()) < 32:
+            raise ValueError("jwt_secret must be at least 32 characters")
         return value
 
     @field_validator("database_url", "migration_database_url")
@@ -73,6 +96,11 @@ class Settings(BaseSettings):
             url = getattr(self, name)
             if url is not None and "change-me" in url.get_secret_value():
                 problems.append(f"{name} still uses the example password")
+        secret = self.jwt_secret.get_secret_value()
+        if "change-me" in secret or "insecure" in secret:
+            problems.append("jwt_secret is the development default")
+        if not self.cookie_secure:
+            problems.append("cookie_secure must be on")
         if problems:
             raise ValueError("Unsafe production configuration: " + "; ".join(problems))
         return self

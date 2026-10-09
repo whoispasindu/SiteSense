@@ -1,17 +1,69 @@
 import type { RouteObject } from "react-router";
 
+import { AnonymousOnly, RequireAuth, RequirePermission } from "./auth/guards";
 import { AppLayout } from "./components/layout/AppLayout";
-import { DashboardPage } from "./pages/dashboard/DashboardPage";
+import { AuditLogPage } from "./pages/admin/AuditLogPage";
+import { SitesPage } from "./pages/admin/SitesPage";
+import { UsersPage } from "./pages/admin/UsersPage";
+import { ChangePasswordPage } from "./pages/auth/ChangePasswordPage";
+import { SignInPage } from "./pages/auth/SignInPage";
+import { HomePage } from "./pages/HomePage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { RouteErrorPage } from "./pages/RouteErrorPage";
 
 export const routes: RouteObject[] = [
   {
+    path: "/sign-in",
+    element: (
+      <AnonymousOnly>
+        <SignInPage />
+      </AnonymousOnly>
+    ),
+    errorElement: <RouteErrorPage />,
+  },
+  {
+    path: "/change-password",
+    element: (
+      <RequireAuth>
+        <ChangePasswordPage />
+      </RequireAuth>
+    ),
+    errorElement: <RouteErrorPage />,
+  },
+  {
     path: "/",
-    element: <AppLayout />,
+    element: (
+      <RequireAuth>
+        <AppLayout />
+      </RequireAuth>
+    ),
     errorElement: <RouteErrorPage />,
     children: [
-      { index: true, element: <DashboardPage /> },
+      { index: true, element: <HomePage /> },
+      {
+        path: "admin/users",
+        element: (
+          <RequirePermission permission="users:manage">
+            <UsersPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: "admin/sites",
+        element: (
+          <RequirePermission permission="sites:manage">
+            <SitesPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: "admin/audit",
+        element: (
+          <RequirePermission permission="audit:read">
+            <AuditLogPage />
+          </RequirePermission>
+        ),
+      },
       { path: "*", element: <NotFoundPage /> },
     ],
   },

@@ -35,7 +35,8 @@ jobs:
       SITESENSE_ENVIRONMENT: test
       SITESENSE_DATABASE_URL: postgresql+psycopg://sitesense_app:ci-app@localhost:5432/sitesense
       SITESENSE_MIGRATION_DATABASE_URL: postgresql+psycopg://sitesense_owner:ci-owner@localhost:5432/sitesense
-      SITESENSE_TEST_DATABASE_URL: postgresql+psycopg://sitesense_app:ci-app@localhost:5432/sitesense
+      SITESENSE_TEST_DATABASE_URL: postgresql+psycopg://sitesense_app:ci-app@localhost:5432/sitesense_test
+      SITESENSE_TEST_MIGRATION_DATABASE_URL: postgresql+psycopg://sitesense_owner:ci-owner@localhost:5432/sitesense_test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
