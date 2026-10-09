@@ -77,6 +77,10 @@ function reportsApi(role: Role, extra: Record<string, Handler> = {}) {
   });
 }
 
+function urlOf(input: RequestInfo | URL): string {
+  return input instanceof Request ? input.url : input instanceof URL ? input.href : input;
+}
+
 function bodyOf(init: RequestInit | undefined): Record<string, unknown> {
   if (typeof init?.body !== "string") throw new Error("Expected a JSON request body");
   return JSON.parse(init.body) as Record<string, unknown>;
@@ -425,5 +429,180 @@ describe("report helpers", () => {
     expect(timeAgo("2026-10-10T09:00:00Z", now)).toBe("3 h ago");
     expect(timeAgo("2026-10-09T10:00:00Z", now)).toBe("yesterday");
     expect(timeAgo("2026-10-06T10:00:00Z", now)).toBe("4 days ago");
+  });
+});
+
+describe("Report photos and corrections", () => {
+  const PHOTO_2 = "4d5e6f7a-8b9c-4d0e-9f1a-3b4c5d6e7f8a";
+  const twoPhotos: ReportDetail = {
+    ...REPORT,
+    photos: [...REPORT.photos, { ...REPORT.photos[0]!, id: PHOTO_2, caption: null }],
+  };
+  const jpeg = () => new Response(new Uint8Array([0xff, 0xd8, 0xff]), { headers: { "Content-Type": "image/jpeg" } });
+
+  beforeEach(() => {
+    vi.stubGlobal("createImageBitmap", undefined);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("opens photos in a viewer and steps through them", async () => {
+    const user = userEvent.setup();
+    reportsApi("project_manager", {
+      [`/api/v1/reports/${RID}`]: () => jsonResponse({ ...twoPhotos, editable: false }),
+      [`/api/v1/photos/${PHOTO_2}`]: jpeg,
+    });
+    renderRoute(`/reports/${RID}`);
+
+    await user.click(await screen.findByRole("button", { name: "Open photo 1: Level 4 rebar" }));
+    const viewer = screen.getByRole("dialog", { name: "Photo 1 of 2" });
+    expect(within(viewer).getByRole("button", { name: "Previous" })).toBeDisabled();
+    await user.click(within(viewer).getByRole("button", { name: "Next" }));
+    expect(screen.getByRole("dialog", { name: "Photo 2 of 2" })).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog")).getByRole("button", { name: "Next" })).toBeDisabled();
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Previous" }));
+    expect(screen.getByRole("dialog", { name: "Photo 1 of 2" })).toBeInTheDocument();
+  });
+
+  it("says so when a photo cannot be loaded", async () => {
+    reportsApi("project_manager", { [`/api/v1/photos/${PHOTO}`]: () => errorResponse(404, "not_found") });
+    renderRoute(`/reports/${RID}`);
+
+    expect(await screen.findByRole("img", { name: "Level 4 rebar (could not load)" })).toBeInTheDocument();
+  });
+
+  it("lets the author remove a photo", async () => {
+    const user = userEvent.setup();
+    const fetchMock = reportsApi("site_engineer", {
+      [`/api/v1/photos/${PHOTO}`]: (_url, init) => (init?.method === "DELETE" ? new Response(null, { status: 204 }) : jpeg()),
+    });
+    renderRoute(`/reports/${RID}`);
+
+    await user.click(await screen.findByRole("button", { name: "Remove photo 1" }));
+
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(true);
+    });
+  });
+
+  it("lets the author add photos and reports the ones that fail", async () => {
+    const user = userEvent.setup();
+    let uploads = 0;
+    const fetchMock = reportsApi("site_engineer", {
+      [`/api/v1/reports/${RID}/photos`]: () => {
+        uploads += 1;
+        return uploads === 1
+          ? jsonResponse(REPORT.photos[0], 201)
+          : errorResponse(422, "photo_rejected", "Only JPEG, PNG or WebP photos can be uploaded.");
+      },
+    });
+    renderRoute(`/reports/${RID}`);
+
+    const picker = await screen.findByLabelText(/Add photos \(11 left\)/);
+    await user.upload(picker, [
+      new File([new Uint8Array([1])], "ok.jpg", { type: "image/jpeg" }),
+      new File([new Uint8Array([2])], "bad.jpg", { type: "image/jpeg" }),
+    ]);
+    await user.click(screen.getByRole("button", { name: "Remove photo 2" }));
+    await user.upload(screen.getByLabelText(/Add photos/), new File([new Uint8Array([2])], "bad.jpg", { type: "image/jpeg" }));
+    await user.click(screen.getByRole("button", { name: "Upload 2 photos" }));
+
+    expect(await screen.findByText("Some photos were not added")).toBeInTheDocument();
+    expect(screen.getByText("bad.jpg: Only JPEG, PNG or WebP photos can be uploaded.")).toBeInTheDocument();
+    expect(fetchMock.mock.calls.filter(([input]) => urlOf(input).endsWith(`/reports/${RID}/photos`))).toHaveLength(2);
+  });
+
+  it("checks corrections before saving them", async () => {
+    const user = userEvent.setup();
+    const fetchMock = reportsApi("site_engineer");
+    renderRoute(`/reports/${RID}`);
+
+    await user.click(await screen.findByRole("button", { name: /Correct report/ }));
+    const dialog = screen.getByRole("dialog", { name: "Correct the report" });
+    const crew = within(dialog).getByLabelText("Crew on site");
+    const save = within(dialog).getByRole("button", { name: "Save changes" });
+
+    await user.clear(crew);
+    await user.type(crew, "lots");
+    await user.click(save);
+    expect(within(dialog).getByText("Crew must be a whole number from 0 to 5000.")).toBeInTheDocument();
+
+    await user.clear(crew);
+    await user.type(crew, "40");
+    await user.clear(within(dialog).getByLabelText("Work done"));
+    await user.type(within(dialog).getByLabelText("Work done"), "Short");
+    await user.click(save);
+    expect(within(dialog).getByText("Describe the work done (at least 10 characters).")).toBeInTheDocument();
+
+    await user.type(within(dialog).getByLabelText("Work done"), " but now long enough.");
+    await user.clear(within(dialog).getByLabelText("Rainfall (mm)"));
+    await user.type(within(dialog).getByLabelText("Rainfall (mm)"), "-3");
+    await user.click(save);
+    expect(within(dialog).getByText("Rainfall must be a number from 0 to 2000 mm.")).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PATCH")).toBe(false);
+
+    await user.clear(within(dialog).getByLabelText("Rainfall (mm)"));
+    await user.type(within(dialog).getByLabelText("Rainfall (mm)"), "4.5");
+    await user.click(save);
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PATCH")).toBe(true);
+    });
+    const patch = fetchMock.mock.calls.find(([, init]) => init?.method === "PATCH")?.[1];
+    expect(bodyOf(patch)).toMatchObject({ crew_count: 40, rain_mm: "4.5", weather_source: "manual" });
+  });
+});
+
+describe("Reports tab edge cases", () => {
+  it("explains when the site has no coordinates for weather", async () => {
+    reportsApi("project_manager", {
+      [`/api/v1/projects/${PID}/weather`]: () =>
+        jsonResponse({ ...WEATHER, available: false, days: [], message: "Add the site's coordinates (Admin, Sites) to see its weather." }),
+    });
+    renderRoute(`/projects/${PID}/reports`);
+
+    expect(await screen.findByText("Add the site's coordinates (Admin, Sites) to see its weather.")).toBeInTheDocument();
+  });
+
+  it("pages through a long report history", async () => {
+    const user = userEvent.setup();
+    const fetchMock = reportsApi("project_manager", {
+      [`/api/v1/projects/${PID}/reports`]: () =>
+        jsonResponse({ items: [{ ...SUMMARY_ITEM, report_date: addDaysIso(TODAY, -1) }], total: 45 }),
+    });
+    renderRoute(`/projects/${PID}/reports`);
+
+    const newer = await screen.findByRole("button", { name: "Newer" });
+    expect(newer).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Older" }));
+    await user.click(screen.getByRole("button", { name: "Older" }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Older" })).toBeDisabled();
+    });
+    await user.click(screen.getByRole("button", { name: "Newer" }));
+
+    const offsets = fetchMock.mock.calls
+      .map(([input]) => urlOf(input))
+      .filter((url) => url.includes(`/projects/${PID}/reports?`))
+      .map((url) => new URL(url, "http://x").searchParams.get("offset"));
+    expect(offsets).toEqual(expect.arrayContaining(["0", "20", "40"]));
+  });
+});
+
+describe("Weather strip values", () => {
+  it("shows dashes for values the forecast does not have", async () => {
+    reportsApi("project_manager", {
+      [`/api/v1/projects/${PID}/weather`]: () =>
+        jsonResponse({
+          ...WEATHER,
+          days: [{ ...WEATHER.days[1]!, temp_max_c: null, temp_min_c: null, rain_mm: null, rain_probability: null, weather_code: null }],
+        }),
+    });
+    renderRoute(`/projects/${PID}/reports`);
+
+    const day = within(await screen.findByRole("list", { name: /Five-day forecast/ })).getByRole("listitem");
+    expect(day).toHaveTextContent("—");
+    expect(day).toHaveTextContent("Rain —");
+    expect(day).not.toHaveTextContent("%");
   });
 });
