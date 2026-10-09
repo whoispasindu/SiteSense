@@ -1,0 +1,48 @@
+[project]
+name = "sitesense-backend"
+version = "0.0.1"
+description = "SiteSense API: AI-powered delay and cost control for construction projects"
+requires-python = ">=3.13"
+license = "MIT"
+
+[tool.ruff]
+line-length = 110
+target-version = "py313"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = [
+  "E", "W", "F",   # pycodestyle, pyflakes
+  "I",             # isort
+  "B",             # bugbear
+  "UP",            # pyupgrade
+  "S",             # bandit security rules
+  "SIM", "C4", "RUF", "N", "PT", "ASYNC", "LOG", "G",
+]
+ignore = ["S101"]  # assert is used for type narrowing and in tests
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106"]  # fixture passwords in tests
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+plugins = ["pydantic.mypy"]
+exclude = ["alembic/versions/"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config"
+markers = [
+  "integration: needs a real PostgreSQL (SITESENSE_TEST_DATABASE_URL)",
+]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 90

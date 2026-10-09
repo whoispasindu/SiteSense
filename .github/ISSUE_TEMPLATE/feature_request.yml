@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest an improvement as a user story
+labels: [feature]
+body:
+  - type: textarea
+    id: story
+    attributes:
+      label: User story
+      placeholder: As a site engineer, I want the weather filled in automatically so that I can finish my report faster.
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: Main role affected
+      options: [Admin, Project Manager, Quantity Surveyor, Site Engineer, Procurement Officer, Client]
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: How we will know it works.

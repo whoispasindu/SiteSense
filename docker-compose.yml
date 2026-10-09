@@ -1,0 +1,60 @@
+# Local development stack: `docker compose up --build` starts everything.
+# Ports are bound to 127.0.0.1 so nothing is reachable from your network.
+name: sitesense
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-postgres}
+      SITESENSE_OWNER_PASSWORD: ${SITESENSE_OWNER_PASSWORD:-change-me-owner}
+      SITESENSE_APP_PASSWORD: ${SITESENSE_APP_PASSWORD:-change-me-app}
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      # TCP (-h) so the check only passes after init scripts finish (init runs socket-only).
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d sitesense"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+      target: dev
+    environment:
+      SITESENSE_ENVIRONMENT: development
+      SITESENSE_DATABASE_URL: postgresql+psycopg://sitesense_app:${SITESENSE_APP_PASSWORD:-change-me-app}@db:5432/sitesense
+      SITESENSE_MIGRATION_DATABASE_URL: postgresql+psycopg://sitesense_owner:${SITESENSE_OWNER_PASSWORD:-change-me-owner}@db:5432/sitesense
+      SITESENSE_CORS_ORIGINS: http://localhost:5173
+      SITESENSE_ALLOWED_HOSTS: localhost,127.0.0.1,backend
+      WATCHFILES_FORCE_POLLING: "true"
+    volumes:
+      - ./backend:/app
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    environment:
+      VITE_API_PROXY_TARGET: http://backend:8000
+      VITE_USE_POLLING: "true"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
