@@ -20,6 +20,16 @@ const PATHS = {
   close: <path d="M6 6l12 12M18 6 6 18" />,
   chevron: <path d="m9 6 6 6-6 6" />,
   upload: <path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />,
+  cloud: <path d="M7 18h10a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.1 9.1 4.5 4.5 0 0 0 7 18Z" />,
+  rain: <path d="M7 14h10a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.1 5.1 4.5 4.5 0 0 0 7 14Zm1 3-1 3m5-3-1 3m5-3-1 3" />,
+  storm: <path d="M7 14h10a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.1 5.1 4.5 4.5 0 0 0 7 14Zm6 0-2.5 4h3L11 22" />,
+  bell: <path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15L6 16Zm4 4a2 2 0 0 0 4 0" />,
+  camera: <path d="M4 8a1 1 0 0 1 1-1h2.5l1.5-2h6l1.5 2H19a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8Zm8 8.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />,
+  trash: <path d="M5 7h14m-9 0V5h4v2m-7 0 1 13h8l1-13M10 11v6m4-6v6" />,
+  plus: <path d="M12 5v14M5 12h14" />,
+  alert: <path d="M12 4 2.5 20h19L12 4Zm0 6v4m0 3h.01" />,
+  edit: <path d="M4 20h4L19 9l-4-4L4 16v4Zm9-13 4 4" />,
+  crew: <path d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM2 20a6 6 0 0 1 12 0m-2.5-3.5A6 6 0 0 1 22 20" />,
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof PATHS;

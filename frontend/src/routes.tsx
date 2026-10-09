@@ -13,8 +13,12 @@ import { BoqImportPage } from "./pages/projects/BoqImportPage";
 import { BoqPage } from "./pages/projects/BoqPage";
 import { ProjectLayout } from "./pages/projects/ProjectLayout";
 import { ProjectOverview } from "./pages/projects/ProjectOverview";
+import { ProjectReports } from "./pages/projects/ProjectReports";
 import { ProjectSchedule } from "./pages/projects/ProjectSchedule";
 import { ProjectsPage } from "./pages/projects/ProjectsPage";
+import { ReportDetailPage } from "./pages/reports/ReportDetailPage";
+import { ReportFormPage } from "./pages/reports/ReportFormPage";
+import { SiteReportsPage } from "./pages/reports/SiteReportsPage";
 import { SchedulePage } from "./pages/schedule/SchedulePage";
 import { RouteErrorPage } from "./pages/RouteErrorPage";
 
@@ -64,6 +68,22 @@ export const routes: RouteObject[] = [
         ),
       },
       {
+        path: "reports",
+        element: (
+          <RequirePermission permission="reports:read">
+            <SiteReportsPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: "reports/:reportId",
+        element: (
+          <RequirePermission permission="reports:read">
+            <ReportDetailPage />
+          </RequirePermission>
+        ),
+      },
+      {
         path: "projects/:projectId",
         element: (
           <RequirePermission permission="projects:read">
@@ -78,6 +98,22 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission="schedule:read">
                 <ProjectSchedule />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "reports",
+            element: (
+              <RequirePermission permission="reports:read">
+                <ProjectReports />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "reports/new",
+            element: (
+              <RequirePermission permission="reports:create">
+                <ReportFormPage />
               </RequirePermission>
             ),
           },

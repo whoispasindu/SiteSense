@@ -13,6 +13,7 @@ import { SectionHeading } from "../../components/ui/SectionHeading";
 import { Sheet } from "../../components/ui/Sheet";
 import { StatusBadge, type Tone } from "../../components/ui/StatusBadge";
 import { KpiTile } from "../../features/projects/ProjectBits";
+import { TodayReports } from "../../features/reports/TodayReports";
 import { varianceLabel } from "../../features/schedule/variance";
 import { formatCompactLKR, toNumber } from "../../lib/money";
 import { formatSiteDate, greeting } from "../../lib/time";
@@ -286,6 +287,7 @@ export function DashboardPage() {
         </p>
       </div>
 
+      {can("reports:read") ? <TodayReports compact /> : null}
       {can("projects:read") ? <PortfolioOverview /> : null}
       {can("users:manage") ? <SystemStatus /> : null}
     </div>

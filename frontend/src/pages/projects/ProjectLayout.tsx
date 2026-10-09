@@ -74,6 +74,16 @@ export function ProjectLayout() {
         >
           BOQ &amp; budget
         </NavLink>
+        {can("reports:read") ? (
+          <NavLink
+            to={`/projects/${p.id}/reports`}
+            className={({ isActive }) =>
+              `${TAB} ${isActive ? "border-accent-line text-ink" : "border-transparent text-ink-faint hover:border-rule-strong hover:text-ink"}`
+            }
+          >
+            Reports
+          </NavLink>
+        ) : null}
         {can("schedule:read") ? (
           <NavLink
             to={`/projects/${p.id}/schedule`}

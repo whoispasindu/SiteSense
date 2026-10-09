@@ -2,16 +2,19 @@
 
 SiteSense is a layered web application: a React single-page app talks to one FastAPI backend
 over HTTPS with JSON. The backend holds the business rules and runs the AI models in the same
-Python process, which keeps deployment simple. PostgreSQL stores relational data; photos will
-live in object storage. External services (weather, LLM, email) sit behind adapter classes in
-`backend/app/integrations` so they can be mocked in tests and swapped later.
+Python process, which keeps deployment simple. PostgreSQL stores relational data; site photos
+live behind a storage adapter (a local folder today, S3-compatible storage later). External
+services (weather, storage, and later LLM and email) sit behind adapter classes in
+`backend/app/integrations` so they can be mocked in tests and swapped later. Scheduled jobs
+(missing-report reminders at 18:00, weather refresh at 05:30) run in the API process with
+APScheduler and are safe to run more than once ([ADR 0007](adr/0007-daily-reports-photos-weather.md)).
 
 ```
  Browser (React + TS)  --/api/v1-->  FastAPI
                                       |- api/           HTTP only: routing, auth dependencies, schemas in/out
                                       |- services/      workflows and business rules (BR-01..BR-12)
                                       |- ai/            risk model, NLP classifier, supplier model, briefing
-                                      |- integrations/  weather, LLM, notifications (adapters)
+                                      |- integrations/  weather, file storage, later LLM and email (adapters)
                                       |- models/        SQLAlchemy tables
                                       '- core/          config, database, logging, errors, middleware
                                                  |
@@ -54,9 +57,9 @@ CI verifies that `sitesense_app` cannot create tables.
 
 - `src/api`: typed fetch client with Zod validation, React Query hooks
 - `src/components/layout`: the app shell (sidebar, top bar, mobile navigation dialog)
-- `src/components/ui`: design-system primitives (Sheet, Button, StatusBadge, DimensionHeading)
+- `src/components/ui`: design-system primitives (Sheet, Button, StatusBadge, SectionHeading, Dialog, Icon)
 - `src/pages`: one folder per screen
-- `src/features`: feature modules (daily reports from Phase 4)
+- `src/features`: feature modules (admin, projects, schedule, reports)
 
 In development, Vite proxies `/api` to the backend, so the browser sees a single origin, as it
 will in production.

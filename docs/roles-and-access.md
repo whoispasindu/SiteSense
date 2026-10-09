@@ -65,6 +65,25 @@ assigned to. Every site-data endpoint uses the helpers in
 | `DELETE /api/v1/tasks/{id}` | Project Manager | |
 | `GET /api/v1/projects/{id}/progress` | PM, QS, Site Engineer | S-curve points, planned, actual, variance |
 
+## Phase 4 endpoints
+
+| Method and path | Who | Notes |
+| --- | --- | --- |
+| `GET /api/v1/reports/today` | PM, QS, Site Engineer | Today's report status for every visible active project (BR-11) |
+| `GET /api/v1/projects/{id}/reports` | PM, QS, Site Engineer | Report history, newest first, paginated |
+| `POST /api/v1/projects/{id}/reports` | Site Engineer | One per project per day (TC-03); progress updates the programme |
+| `GET /api/v1/reports/{id}` | PM, QS, Site Engineer | |
+| `PATCH /api/v1/reports/{id}` | Site Engineer, **author only**, on the day of submission | |
+| `POST /api/v1/reports/{id}/photos` | Site Engineer, **author only**, on the day of submission | Re-encoded JPEG; rate limited |
+| `GET /api/v1/photos/{id}` | PM, QS, Site Engineer | Authenticated and site-scoped; never a public URL |
+| `DELETE /api/v1/photos/{id}` | Site Engineer, **author only**, on the day of submission | |
+| `GET /api/v1/projects/{id}/weather` | Every role that reads projects | Cached five-day forecast; stale cache when the service is down (TC-08) |
+| `GET /api/v1/notifications` | Everyone | Own notifications only |
+| `POST /api/v1/notifications/{id}/read`, `POST /api/v1/notifications/read-all` | Everyone | Someone else's notification answers 404 |
+
+Every report, photo and weather call goes through the project's site scope: out of scope
+answers `404`, exactly like a missing record.
+
 `backend/tests/test_role_matrix.py` calls every endpoint as every role. New endpoints must be added there.
 
 ## The menu

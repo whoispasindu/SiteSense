@@ -30,6 +30,7 @@ ml/models/*.pkl
 # Uploads and local storage
 storage/
 uploads/
+backend/var/
 
 # OS / editors
 .DS_Store

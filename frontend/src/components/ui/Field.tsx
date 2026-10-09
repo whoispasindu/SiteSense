@@ -1,4 +1,10 @@
-import { useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
+import {
+  useId,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from "react";
 
 const CONTROL =
   "w-full min-h-10 rounded-lg border border-rule-strong bg-paper-raised px-3 text-[0.9375rem] text-ink placeholder:text-ink-faint transition-[border-color,box-shadow] focus:border-survey focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--c-survey)_18%,transparent)] focus:outline-none aria-[invalid=true]:border-signal-high disabled:opacity-60";
@@ -82,6 +88,29 @@ export function SelectField({ label, hint, error, children, className = "", ...p
         >
           {children}
         </select>
+      )}
+    </FieldShell>
+  );
+}
+
+interface TextAreaFieldProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "id"> {
+  label: string;
+  hint?: ReactNode;
+  error?: string | undefined;
+}
+
+export function TextAreaField({ label, hint, error, className = "", rows = 4, ...props }: TextAreaFieldProps) {
+  return (
+    <FieldShell label={label} hint={hint} error={error}>
+      {({ inputId, describedBy }) => (
+        <textarea
+          id={inputId}
+          rows={rows}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
+          className={`${CONTROL} py-2 leading-relaxed ${className}`}
+          {...props}
+        />
       )}
     </FieldShell>
   );

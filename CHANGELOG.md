@@ -20,6 +20,22 @@ uses [Semantic Versioning](https://semver.org/).
   - Sidebar icons, an avatar user menu and calmer error pages. The sign-in button now says "Sign in".
 
 ### Added
+- **Phase 4: daily site reports.**
+  - Site engineers file one report per project per day: weather, crew, work done, problems,
+    task progress and up to 12 photos. A second report for the same day is refused with a link
+    to the first (TC-03).
+  - Weather is pre-filled from a five-day Open-Meteo forecast, cached per site. When the
+    service is down, the last saved forecast is shown with a warning (TC-08).
+  - Photos are checked, re-encoded and stripped of metadata (including GPS position), and are
+    only served to signed-in users who can see the report.
+  - The author can correct a report, and add or remove photos, on the day they submitted it.
+    Task progress in a report updates the programme.
+  - An 18:00 reminder notifies the engineers and project managers of sites still missing
+    today's report (BR-11). Project managers are notified when a report is filed.
+  - In-app notifications with a bell in the top bar. They are reused by later phases.
+  - Web: Site reports page (today's status), project Reports tab with a weather strip and
+    history, a phone-friendly report form and a report detail page with a photo viewer.
+  - `send-reminders` and `refresh-weather` commands; `seed-dev` adds a week of demo reports.
 - **Phase 3: schedule basics.**
   - Programme tasks with planned dates, weight (share of the contract), percent complete and an
     optional BOQ section link; at most 500 tasks and 15 years per project.

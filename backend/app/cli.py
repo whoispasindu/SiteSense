@@ -2,6 +2,8 @@
 
     python -m app.cli create-admin --email admin@company.lk --name "Nimal Perera"
     python -m app.cli seed-dev            # local development only
+    python -m app.cli send-reminders      # missing daily report reminders now (BR-11)
+    python -m app.cli refresh-weather     # fetch the 5-day forecast for every active site
 
 ``create-admin`` prints a one-time temporary password; the admin must change it at first sign-in.
 ``seed-dev`` creates demo sites and one account per role using SITESENSE_DEMO_PASSWORD, and
@@ -11,7 +13,7 @@ refuses to run in production.
 import argparse
 import os
 import sys
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -22,19 +24,39 @@ from app.core import clock
 from app.core.config import get_settings
 from app.core.database import Database
 from app.core.permissions import Role
+from app.core.scheduler import refresh_weather, run_report_reminders
 from app.core.security import (
     PasswordPolicyError,
     generate_temporary_password,
     hash_password,
     validate_password,
 )
-from app.models import BoqSection, ProgressSnapshot, Project, Site, Task, User
+from app.integrations.weather import OpenMeteoClient
+from app.models import BoqSection, DailyReport, ProgressSnapshot, Project, Site, Task, User
 from app.services import audit
 from app.services.audit import RequestMeta
 from app.services.auth_service import normalize_email
 from app.services.boq_import import parse_boq
 from app.services.progress import TaskPlan, actual_percent, planned_fraction, week_dates
 from app.services.project_service import import_boq
+
+# Recent daily reports for Havelock (days ago, crew, weather, rain mm, work done, problems).
+DEMO_REPORTS: list[tuple[int, int, str, Decimal, str, str | None]] = [
+    (1, 46, "Light rain", Decimal("6.2"),
+     "Level 4 slab: fixed bottom reinforcement on grids A-D and started edge formwork. "
+     "Blockwork on level 2 continued on the east side.",
+     "Cement delivery from the supplier did not arrive again; blockwork crew short of mortar after 2 pm."),
+    (2, 51, "Partly cloudy", Decimal("0.0"),
+     "Poured level 3 columns C1-C8 (14 m3). Started scaffolding for the level 4 slab soffit.", None),
+    (3, 38, "Heavy rain", Decimal("24.5"),
+     "Rain stopped concrete work from 10 am. Crew moved to rebar cutting and bending in the yard.",
+     "Heavy rain: level 3 column pour postponed to tomorrow. Site drains overflowing near gate 2."),
+    (4, 49, "Mainly clear", Decimal("0.0"),
+     "Level 3 slab curing. Blockwork on level 1 completed; plastering crew mobilised to level 1.", None),
+    (5, 44, "Light showers", Decimal("3.1"),
+     "Stripped level 2 formwork. MEP sleeves installed in level 3 slab before inspection.",
+     "Tower crane down for two hours (hydraulic leak); lifts delayed."),
+]  # fmt: skip
 
 DEMO_SITES = [
     ("COL-07", "Havelock Residences", "Colombo 05", 6.8836, 79.8650),
@@ -205,6 +227,7 @@ def seed_dev() -> int:
             if target is None or db.scalar(select(Task).where(Task.project_id == target.id)):
                 continue
             _seed_programme(db, target, programme, DEMO_PACE[code])
+        _seed_reports(db)
     database.dispose()
     print(
         f"Seeded {len(DEMO_SITES)} sites, {created} new demo users and {new_projects} new projects "
@@ -257,6 +280,52 @@ def _seed_programme(
     db.commit()
 
 
+def _seed_reports(db: Session) -> None:
+    """A week of Havelock reports by the demo engineer; today's is left for you to file."""
+    project = db.scalar(select(Project).where(Project.code == "HR-2026-01"))
+    engineer = db.scalar(select(User).where(User.email == "engineer@sitesense.example"))
+    if project is None or engineer is None:
+        return
+    if db.scalar(select(DailyReport).where(DailyReport.project_id == project.id)):
+        return
+    today = clock.site_today()
+    for days_ago, crew, summary, rain, work_done, problems in DEMO_REPORTS:
+        db.add(
+            DailyReport(
+                project_id=project.id,
+                author_id=engineer.id,
+                report_date=today - timedelta(days=days_ago),
+                weather_summary=summary,
+                temp_max_c=Decimal("30.5"),
+                temp_min_c=Decimal("24.0"),
+                rain_mm=rain,
+                weather_source="manual",
+                crew_count=crew,
+                work_done=work_done,
+                problems=problems,
+                submitted_at=clock.utcnow() - timedelta(days=days_ago, hours=-1),
+            )
+        )
+    db.commit()
+
+
+def send_reminders() -> int:
+    database = Database(get_settings())
+    created = run_report_reminders(database.session_factory)
+    database.dispose()
+    print(f"Created {created} reminder notifications.")
+    return 0
+
+
+def refresh_site_weather() -> int:
+    settings = get_settings()
+    database = Database(settings)
+    refreshed = refresh_weather(database.session_factory, OpenMeteoClient(settings.weather_timeout_seconds))
+    database.dispose()
+    print(f"Refreshed the forecast for {refreshed} sites.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -264,10 +333,16 @@ def main(argv: list[str] | None = None) -> int:
     admin.add_argument("--email", required=True)
     admin.add_argument("--name", required=True)
     sub.add_parser("seed-dev", help="create demo sites and one user per role (not in production)")
+    sub.add_parser("send-reminders", help="remind sites missing today's daily report")
+    sub.add_parser("refresh-weather", help="fetch the 5-day forecast for every active site")
     args = parser.parse_args(argv)
 
     if args.command == "create-admin":
         return create_admin(args.email, args.name)
+    if args.command == "send-reminders":
+        return send_reminders()
+    if args.command == "refresh-weather":
+        return refresh_site_weather()
     return seed_dev()
 
 

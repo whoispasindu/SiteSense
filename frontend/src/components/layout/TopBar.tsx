@@ -5,6 +5,7 @@ import { useAuth } from "../../auth/context";
 import { formatSiteClock } from "../../lib/time";
 import { Icon } from "../ui/icons";
 import { findNavItem, isAvailable } from "./navigation";
+import { NotificationBell } from "./NotificationBell";
 import { UserMenu } from "./UserMenu";
 
 function SiteClock() {
@@ -51,13 +52,14 @@ export function TopBar({ onOpenMenu }: TopBarProps) {
 
       <p className="min-w-0 truncate text-sm font-medium text-ink">{current?.label ?? "SiteSense"}</p>
 
-      <div className="ml-auto flex items-center gap-4">
+      <div className="ml-auto flex items-center gap-2 sm:gap-4">
         <SiteClock />
         {import.meta.env.MODE === "production" ? null : (
           <span className="hidden rounded-full bg-paper-sunk px-2.5 py-0.5 text-xs text-ink-faint lg:inline">
             Development
           </span>
         )}
+        <NotificationBell />
         <UserMenu />
       </div>
     </header>

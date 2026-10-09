@@ -34,6 +34,11 @@ strict = true
 plugins = ["pydantic.mypy"]
 exclude = ["alembic/versions/"]
 
+[[tool.mypy.overrides]]
+# APScheduler 3.x ships without type hints.
+module = ["apscheduler.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers --strict-config"

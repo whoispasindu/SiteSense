@@ -14,3 +14,7 @@ openpyxl==3.1.5
 # openpyxl parses workbook XML through defusedxml when it is installed (XXE / entity bombs).
 defusedxml==0.7.1
 python-multipart==0.0.32
+# Site photos: decode, verify, strip metadata and re-encode (also bounds decompression bombs).
+pillow==12.3.0
+# In-process scheduled jobs (missing-report reminders, weather refresh).
+APScheduler==3.11.3

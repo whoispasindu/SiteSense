@@ -34,6 +34,9 @@ services:
       SITESENSE_ALLOWED_HOSTS: localhost,127.0.0.1,backend
       SITESENSE_JWT_SECRET: ${SITESENSE_JWT_SECRET:-dev-only-insecure-jwt-secret-change-me-0000000000}
       SITESENSE_DEMO_PASSWORD: ${SITESENSE_DEMO_PASSWORD:-SiteSense-Demo-2026!}
+      # Photos land in backend/var/media on your machine (git-ignored).
+      SITESENSE_MEDIA_ROOT: /app/var/media
+      SITESENSE_WEATHER_ENABLED: ${SITESENSE_WEATHER_ENABLED:-true}
       WATCHFILES_FORCE_POLLING: "true"
     volumes:
       - ./backend:/app

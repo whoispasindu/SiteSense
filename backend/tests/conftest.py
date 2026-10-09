@@ -36,6 +36,8 @@ TEST_MIGRATION_URL = os.environ.get(
 
 PASSWORD = "Correct-Horse-Battery-9"
 
+pytest_plugins = ["tests.report_fixtures"]
+
 
 @pytest.fixture(autouse=True)
 def _isolate_environment(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -55,14 +57,18 @@ def make_settings(**overrides: object) -> Settings:
         "allowed_hosts": ["testserver", "localhost"],
         "max_request_body_bytes": 2048,
         "jwt_secret": SecretStr("test-jwt-secret-that-is-long-enough-0123456789"),
+        # No network calls and no background threads in tests.
+        "weather_enabled": False,
+        "scheduler_enabled": False,
     }
     values.update(overrides)
     return Settings.model_validate(values)
 
 
 @pytest.fixture
-def settings() -> Settings:
-    return make_settings()
+def settings(tmp_path: Path) -> Settings:
+    # Photo files go to a per-test folder, never into the source tree.
+    return make_settings(media_root=str(tmp_path / "media"))
 
 
 @pytest.fixture
