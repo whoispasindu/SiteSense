@@ -142,15 +142,15 @@ describe("ProjectsPage", () => {
 });
 
 describe("Project overview", () => {
-  it("shows the title block, KPIs, section costs and team", async () => {
+  it("shows the project details, KPIs, section costs and team", async () => {
     projectApi("project_manager");
     renderRoute(`/projects/${PID}`);
 
     expect(await screen.findByRole("heading", { level: 1, name: "Havelock Residences" })).toBeInTheDocument();
     expect(screen.getByText("COL-07 · Havelock Residences")).toBeInTheDocument();
     expect(screen.getByText("82 weeks")).toBeInTheDocument();
-    expect(screen.getByText("Contract value").parentElement).toHaveTextContent("LKR 1.11 bn");
-    expect(screen.getByText("11.9 %")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Contract value" })).toHaveTextContent("LKR 1.11 bn");
+    expect(screen.getByText("11.9%")).toBeInTheDocument();
     const table = screen.getByRole("table", { name: /by section/ });
     expect(within(table).getByRole("rowheader", { name: /Substructure/ })).toBeInTheDocument();
     const team = screen.getByRole("region", { name: "Team" });

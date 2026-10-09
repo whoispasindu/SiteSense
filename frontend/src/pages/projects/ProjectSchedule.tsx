@@ -4,7 +4,7 @@ import { useProgress, useTasks, type Task } from "../../api/schedule";
 import { useAuth } from "../../auth/context";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { DimensionHeading } from "../../components/ui/DimensionHeading";
+import { SectionHeading } from "../../components/ui/SectionHeading";
 import { Sheet } from "../../components/ui/Sheet";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { errorText } from "../../features/admin/adminUtils";
@@ -36,22 +36,22 @@ export function ProjectSchedule() {
   const overruns = p.programme_end > p.contract_end;
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-10">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiTile sheetCode="S-01" label="Planned today" value={`${p.planned_percent.toFixed(1)} %`} note={`As of ${formatDate(p.as_of)}`} />
-        <KpiTile sheetCode="S-02" label="Actual" value={`${p.actual_percent.toFixed(1)} %`} note="Weighted by task share of the contract" />
+        <KpiTile icon="schedule" label="Planned today" value={`${p.planned_percent.toFixed(1)}%`} note={`As of ${formatDate(p.as_of)}`} />
+        <KpiTile icon="reports" label="Actual" value={`${p.actual_percent.toFixed(1)}%`} note="Weighted by task share of the contract" />
         <div className="relative rounded-[var(--radius-sheet)] border border-rule bg-paper-raised p-5 shadow-[var(--shadow-sheet)]">
-          <p className="font-wide text-[0.68rem] font-bold tracking-[0.18em] text-ink-soft uppercase">Variance</p>
-          <p className="tabular mt-4 font-mono text-2xl leading-none">
+          <p className="text-sm font-medium text-ink-soft">Variance</p>
+          <p className="tabular mt-2 text-[1.75rem] leading-tight font-semibold tracking-tight text-ink">
             {p.variance > 0 ? "+" : ""}
             {p.variance.toFixed(1)} pts
           </p>
-          <p className="mt-3">
+          <p className="mt-2">
             <StatusBadge tone={variance.tone} label={variance.label} />
           </p>
         </div>
         <KpiTile
-          sheetCode="S-04"
+          icon="schedule"
           label="Programme end"
           value={formatDate(p.programme_end)}
           note={overruns ? `Past the contract end (${formatDate(p.contract_end)})` : `Contract end ${formatDate(p.contract_end)}`}
@@ -65,9 +65,9 @@ export function ProjectSchedule() {
       ) : null}
 
       <section aria-labelledby="curve-heading">
-        <DimensionHeading id="curve-heading" annotation="planned vs actual">
+        <SectionHeading id="curve-heading" annotation="planned vs actual">
           S-curve
-        </DimensionHeading>
+        </SectionHeading>
         <Sheet className="p-4 sm:p-6">
           {list.length === 0 ? (
             <p className="py-10 text-center text-ink-soft">Add tasks with dates and weights to draw the planned curve.</p>
@@ -79,9 +79,9 @@ export function ProjectSchedule() {
 
       {list.length > 0 ? (
         <section aria-labelledby="timeline-heading">
-          <DimensionHeading id="timeline-heading" annotation={`${String(list.length)} tasks`}>
+          <SectionHeading id="timeline-heading" annotation={`${String(list.length)} tasks`}>
             Programme
-          </DimensionHeading>
+          </SectionHeading>
           <Sheet className="p-4 sm:p-6">
             <TaskTimeline tasks={list} start={p.programme_start} end={p.programme_end} today={p.as_of} />
           </Sheet>
@@ -91,9 +91,9 @@ export function ProjectSchedule() {
       <section aria-labelledby="tasks-heading">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <DimensionHeading id="tasks-heading" annotation={`weights ${weightTotal.toFixed(2)} %`}>
+            <SectionHeading id="tasks-heading" annotation={`weights ${weightTotal.toFixed(2)}%`}>
               Tasks
-            </DimensionHeading>
+            </SectionHeading>
           </div>
         </div>
         {canManage ? (

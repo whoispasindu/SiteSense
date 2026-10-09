@@ -16,13 +16,13 @@ export function RouteErrorPage() {
 
   return (
     <div role="alert" className="mx-auto max-w-2xl px-6 py-24">
-      <p className="font-mono text-xs tracking-[0.2em] text-ink-faint uppercase">Unexpected error</p>
-      <h1 className="font-wide mt-4 text-4xl font-extrabold tracking-tight">Work stopped on this screen.</h1>
+      <span className="rounded-full bg-signal-high-tint px-3 py-1 text-sm font-medium text-signal-high">Unexpected error</span>
+      <h1 className="mt-5 text-3xl font-semibold tracking-tight text-ink">Work stopped on this screen.</h1>
       <p className="mt-4 text-ink-soft">
         Something went wrong while showing this page. Your data has not been changed. Try again, and if it keeps
         happening, report it with the time it occurred.
       </p>
-      <Link to="/" className="mt-8 inline-block font-semibold text-survey underline underline-offset-4">
+      <Link to="/" className="mt-8 inline-block font-medium text-survey hover:underline">
         Return to the dashboard
       </Link>
     </div>

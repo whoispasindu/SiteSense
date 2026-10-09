@@ -5,9 +5,8 @@ export function formatSiteClock(date: Date): string {
   const day = new Intl.DateTimeFormat("en-GB", {
     timeZone: SITE_TIME_ZONE,
     weekday: "short",
-    day: "2-digit",
+    day: "numeric",
     month: "short",
-    year: "numeric",
   }).format(date);
   const time = new Intl.DateTimeFormat("en-GB", {
     timeZone: SITE_TIME_ZONE,
@@ -15,7 +14,7 @@ export function formatSiteClock(date: Date): string {
     minute: "2-digit",
     hourCycle: "h23",
   }).format(date);
-  return `${day} · ${time}`.toUpperCase();
+  return `${day} · ${time}`;
 }
 
 export function formatSiteDate(date: Date): string {

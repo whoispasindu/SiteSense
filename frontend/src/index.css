@@ -1,45 +1,122 @@
 @import "tailwindcss";
 
 /*
- * SiteSense design tokens: "site office".
- * Warm drafting-paper surfaces, asphalt chrome, and hi-vis yellow reserved for the one
- * primary action on each screen. Signal colours are always paired with a text label.
+ * SiteSense design tokens.
+ *
+ * The identity stays: asphalt navigation, hi-vis yellow for the primary action, signal colours
+ * that always come with a text label. The working area is clean and quiet so data reads first.
+ *
+ * Colours are defined twice (light and dark) as plain CSS variables and exposed to Tailwind
+ * through `@theme inline`, so every utility follows the active theme without `dark:` variants.
+ * Token names describe a role: paper = page, paper-raised = card, paper-sunk = subtle fill,
+ * rule = border, ink = text.
  */
-@theme {
-  --font-sans: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+
+:root {
+  color-scheme: light;
+  --c-paper: #f5f5f2;
+  --c-paper-raised: #ffffff;
+  --c-paper-sunk: #f0efea;
+  --c-rule: #e4e2db;
+  --c-rule-strong: #cdcac0;
+  --c-ink: #1b1a17;
+  --c-ink-soft: #4b4943;
+  --c-ink-faint: #6c695f;
+
+  --c-asphalt: #1c1b18;
+  --c-asphalt-raised: #2a2925;
+  --c-asphalt-line: #36352f;
+  --c-asphalt-text: #e4e1d8;
+  --c-asphalt-muted: #a6a294;
+
+  --c-hivis: #ffc21a;
+  --c-hivis-deep: #eaab00;
+  --c-accent-line: #d79a00;
+
+  --c-signal-high: #b9321b;
+  --c-signal-high-tint: #fbe8e3;
+  --c-signal-medium: #8a5600;
+  --c-signal-medium-tint: #fcefd6;
+  --c-signal-low: #23744a;
+  --c-signal-low-tint: #e2f2e8;
+  --c-survey: #2d5bd2;
+
+  --c-shadow: 0 1px 2px rgb(20 19 15 / 0.05), 0 1px 3px rgb(20 19 15 / 0.04);
+  --c-shadow-pop: 0 10px 30px -12px rgb(20 19 15 / 0.25);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --c-paper: #111110;
+  --c-paper-raised: #1a1a18;
+  --c-paper-sunk: #222220;
+  --c-rule: #2d2c29;
+  --c-rule-strong: #403f3a;
+  --c-ink: #edece6;
+  --c-ink-soft: #c2bfb5;
+  --c-ink-faint: #94918a;
+
+  --c-asphalt: #0b0b0a;
+  --c-asphalt-raised: #1c1b19;
+  --c-asphalt-line: #292825;
+  --c-asphalt-text: #e4e1d8;
+  --c-asphalt-muted: #9a9689;
+
+  --c-hivis: #ffc933;
+  --c-hivis-deep: #f0b300;
+  --c-accent-line: #ffc933;
+
+  --c-signal-high: #ff8f78;
+  --c-signal-high-tint: rgb(255 143 120 / 0.14);
+  --c-signal-medium: #f4c35a;
+  --c-signal-medium-tint: rgb(244 195 90 / 0.14);
+  --c-signal-low: #74d29e;
+  --c-signal-low-tint: rgb(116 210 158 / 0.13);
+  --c-survey: #8eabff;
+
+  --c-shadow: 0 1px 0 rgb(0 0 0 / 0.35);
+  --c-shadow-pop: 0 16px 40px -12px rgb(0 0 0 / 0.7);
+}
+
+@theme inline {
+  --font-sans: "IBM Plex Sans Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
 
-  --color-paper: #f3f1ea;
-  --color-paper-raised: #fbfaf6;
-  --color-paper-sunk: #e9e5da;
-  --color-rule: #d6d0c0;
-  --color-rule-strong: #b9b19c;
-  --color-ink: #17160f;
-  --color-ink-soft: #4d493f;
-  --color-ink-faint: #6f6a5c;
+  --color-paper: var(--c-paper);
+  --color-paper-raised: var(--c-paper-raised);
+  --color-paper-sunk: var(--c-paper-sunk);
+  --color-rule: var(--c-rule);
+  --color-rule-strong: var(--c-rule-strong);
+  --color-ink: var(--c-ink);
+  --color-ink-soft: var(--c-ink-soft);
+  --color-ink-faint: var(--c-ink-faint);
 
-  --color-asphalt: #1b1a16;
-  --color-asphalt-raised: #26251f;
-  --color-asphalt-line: #3a3830;
-  --color-asphalt-text: #d9d4c4;
-  --color-asphalt-muted: #9a9482;
+  --color-asphalt: var(--c-asphalt);
+  --color-asphalt-raised: var(--c-asphalt-raised);
+  --color-asphalt-line: var(--c-asphalt-line);
+  --color-asphalt-text: var(--c-asphalt-text);
+  --color-asphalt-muted: var(--c-asphalt-muted);
 
-  --color-hivis: #ffc21a;
-  --color-hivis-deep: #e0a600;
+  --color-hivis: var(--c-hivis);
+  --color-hivis-deep: var(--c-hivis-deep);
+  --color-accent-line: var(--c-accent-line);
 
-  --color-signal-high: #b02e17;
-  --color-signal-high-tint: #f8ded6;
-  --color-signal-medium: #8a5200;
-  --color-signal-medium-tint: #f7e6c4;
-  --color-signal-low: #2a6e45;
-  --color-signal-low-tint: #d9ebdd;
-  --color-survey: #2b4fc4;
+  --color-signal-high: var(--c-signal-high);
+  --color-signal-high-tint: var(--c-signal-high-tint);
+  --color-signal-medium: var(--c-signal-medium);
+  --color-signal-medium-tint: var(--c-signal-medium-tint);
+  --color-signal-low: var(--c-signal-low);
+  --color-signal-low-tint: var(--c-signal-low-tint);
+  --color-survey: var(--c-survey);
 
-  --radius-sheet: 3px;
-  --shadow-sheet: 0 1px 0 rgb(23 22 15 / 0.06), 0 8px 24px -16px rgb(23 22 15 / 0.35);
+  --radius-sheet: 10px;
+  --shadow-sheet: var(--c-shadow);
+  --shadow-pop: var(--c-shadow-pop);
+}
 
+@theme {
   --animate-pulse-dot: pulse-dot 2.4s ease-in-out infinite;
-  --animate-rise: rise 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-rise: rise 280ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 
   @keyframes pulse-dot {
     0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent); }
@@ -47,39 +124,31 @@
   }
 
   @keyframes rise {
-    from { opacity: 0; transform: translateY(6px); }
+    from { opacity: 0; transform: translateY(4px); }
     to { opacity: 1; transform: none; }
   }
 }
 
 @layer base {
   html {
-    color-scheme: light;
     -webkit-text-size-adjust: 100%;
   }
 
   body {
     @apply bg-paper font-sans text-ink antialiased;
-    font-variation-settings: "wdth" 100;
+    font-size: 0.9375rem;
+    line-height: 1.55;
     min-height: 100dvh;
-  }
-
-  /* Faint drafting grid on the working area; reads as paper, never competes with data. */
-  .drafting-grid {
-    background-image:
-      linear-gradient(to right, rgb(23 22 15 / 0.045) 1px, transparent 1px),
-      linear-gradient(to bottom, rgb(23 22 15 / 0.045) 1px, transparent 1px);
-    background-size: 24px 24px;
-    background-position: -1px -1px;
+    font-feature-settings: "ss02";
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-survey);
+    outline: 2px solid var(--c-survey);
     outline-offset: 2px;
   }
 
   .on-asphalt :focus-visible {
-    outline-color: var(--color-hivis);
+    outline-color: var(--c-hivis);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -91,23 +160,15 @@
   }
 }
 
-@utility font-wide {
-  font-variation-settings: "wdth" 118;
-}
-
-@utility font-condensed {
-  font-variation-settings: "wdth" 82;
-}
-
 @utility tabular {
-  font-variant-numeric: tabular-nums slashed-zero;
+  font-variant-numeric: tabular-nums;
 }
 
-/* Diagonal hazard band: used once per screen at most, as a structural accent. */
+/* Diagonal hazard band: a brand accent used sparingly (top of the navigation, auth screens). */
 @utility hazard-band {
   background-image: repeating-linear-gradient(
     -45deg,
-    var(--color-hivis) 0 8px,
-    var(--color-asphalt) 8px 16px
+    var(--c-hivis) 0 8px,
+    var(--c-asphalt) 8px 16px
   );
 }

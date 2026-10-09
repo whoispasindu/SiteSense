@@ -42,7 +42,7 @@ export function CraneDrawing({ className = "" }: { className?: string }) {
       <g stroke="currentColor" strokeWidth="1" opacity="0.6">
         <path d="M210 352H360M210 347V357M360 347V357" />
       </g>
-      <text x="285" y="352" dy="-4" textAnchor="middle" fontSize="9" fontFamily="var(--font-mono)" fill="currentColor" opacity="0.7">
+      <text x="285" y="352" dy="-4" textAnchor="middle" fontSize="9" fill="currentColor" opacity="0.7">
         24 000
       </text>
     </svg>

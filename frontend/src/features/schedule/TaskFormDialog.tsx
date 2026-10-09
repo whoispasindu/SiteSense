@@ -74,11 +74,11 @@ export function TaskFormDialog({ project, task, open, onClose }: TaskFormDialogP
   }
 
   return (
-    <Dialog open={open} onClose={close} title={task ? `Edit ${task.code ?? "task"}` : "Add a task"} code={task?.code ?? "T-NEW"}>
+    <Dialog open={open} onClose={close} title={task ? `Edit ${task.code ?? "task"}` : "Add a task"}>
       <form noValidate onSubmit={onSubmit} className="space-y-5">
         {save.isError ? <Alert tone="error">{errorText(save.error)}</Alert> : null}
         <div className="grid gap-5 sm:grid-cols-[9rem_1fr]">
-          <TextField label="Code (optional)" name="code" defaultValue={task?.code ?? ""} placeholder="T-010" className="font-mono uppercase" error={errors.code} />
+          <TextField label="Code (optional)" name="code" defaultValue={task?.code ?? ""} placeholder="T-010" className="font-mono" error={errors.code} />
           <TextField label="Task name" name="name" defaultValue={task?.name} autoComplete="off" error={errors.name} />
         </div>
         <SelectField
@@ -107,7 +107,7 @@ export function TaskFormDialog({ project, task, open, onClose }: TaskFormDialogP
           inputMode="decimal"
           defaultValue={task?.weight}
           placeholder="12.5"
-          className="tabular font-mono"
+          className="tabular"
           error={errors.weight}
           hint="All task weights together should add up to 100%."
         />
@@ -115,7 +115,7 @@ export function TaskFormDialog({ project, task, open, onClose }: TaskFormDialogP
           <input type="checkbox" name="is_critical" defaultChecked={task?.is_critical} className="size-4 accent-[var(--color-ink)]" />
           Critical task (delay here delays handover). Calculated automatically from Phase 9.
         </label>
-        <div className="flex justify-end gap-3 border-t border-dashed border-rule pt-4">
+        <div className="flex justify-end gap-3 border-t border-rule pt-4">
           <Button onClick={close}>Cancel</Button>
           <Button type="submit" variant="primary" disabled={save.isPending}>
             {save.isPending ? "Saving…" : task ? "Save task" : "Add task"}

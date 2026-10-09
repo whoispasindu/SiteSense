@@ -1,5 +1,12 @@
-import type { Task } from "../../api/schedule";
+import type { Task, TaskState } from "../../api/schedule";
 import { formatDate } from "../projects/dates";
+
+const FILL: Record<TaskState, string> = {
+  not_started: "bg-accent-line",
+  on_track: "bg-accent-line",
+  behind: "bg-accent-line",
+  done: "bg-signal-low",
+};
 
 const DAY_MS = 86_400_000;
 const monthLabel = new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: "UTC" });
@@ -42,11 +49,11 @@ export function TaskTimeline({ tasks, start, end, today }: TaskTimelineProps) {
   return (
     <div className="relative overflow-x-auto">
       <div className="min-w-[44rem]" aria-hidden="true">
-        <div className="relative ml-56 h-6 border-b border-rule-strong">
+        <div className="relative ml-56 h-7 overflow-hidden border-b border-rule">
           {months(from, to).map((m) => (
             <span
               key={m.at}
-              className={`absolute top-0 h-full border-l pl-1 font-mono text-[0.6rem] ${m.year ? "border-ink font-semibold text-ink" : "border-rule text-ink-faint"}`}
+              className={`absolute top-0 h-full border-l pl-1.5 text-xs ${m.year ? "border-ink-faint font-semibold text-ink" : "border-rule text-ink-faint"}`}
               style={{ left: pos(m.at) }}
             >
               {/* January shows the year instead, so the scale reads ... Nov Dec '27 Feb ... */}
@@ -58,7 +65,7 @@ export function TaskTimeline({ tasks, start, end, today }: TaskTimelineProps) {
         <div className="relative">
           {showToday ? (
             <div className="pointer-events-none absolute top-0 bottom-0 z-10 ml-56" style={{ left: 0, right: 0 }}>
-              <div className="absolute top-0 bottom-0 w-0.5 bg-hivis-deep" style={{ left: pos(todayAt) }} />
+              <div className="absolute top-0 bottom-0 w-0.5 bg-survey/70" style={{ left: pos(todayAt) }} />
             </div>
           ) : null}
 
@@ -68,26 +75,29 @@ export function TaskTimeline({ tasks, start, end, today }: TaskTimelineProps) {
             const done = Number(task.percent_complete);
             return (
               <div key={task.id} className="flex h-10 items-center border-b border-rule">
-                <div className="w-56 shrink-0 truncate pr-3 text-xs">
+                <div className="w-56 shrink-0 truncate pr-3 text-sm text-ink">
                   {task.is_critical ? <span className="mr-1 font-bold text-signal-high">!</span> : null}
-                  <span className="mr-1.5 font-mono text-ink-faint">{task.code ?? ""}</span>
+                  <span className="mr-1.5 font-mono text-xs text-ink-faint">{task.code ?? ""}</span>
                   {task.name}
                 </div>
                 <div className="relative h-full flex-1">
                   <div
                     title={`${task.name}: ${formatDate(task.planned_start)} to ${formatDate(task.planned_end)}, ${task.percent_complete}% done`}
-                    className={`absolute top-1/2 h-4 -translate-y-1/2 overflow-hidden rounded-[2px] border ${
-                      task.is_critical ? "border-signal-high" : "border-ink"
-                    } bg-paper-sunk`}
+                    className={`absolute top-1/2 h-4 -translate-y-1/2 overflow-hidden rounded-full bg-paper-sunk ring-1 ${
+                      task.is_critical ? "ring-signal-high" : "ring-rule-strong"
+                    }`}
                     style={{ left: pos(s), width: `calc(${pos(e)} - ${pos(s)})` }}
                   >
-                    <div
-                      className={`h-full ${task.state === "behind" ? "hazard-band" : "bg-ink"}`}
-                      style={{ width: `${String(done)}%` }}
-                    />
+                    <div className={`h-full ${FILL[task.state]}`} style={{ width: `${String(done)}%` }} />
+                    {task.state === "behind" && task.planned_percent_today > done ? (
+                      <span
+                        className="absolute inset-y-0 bg-signal-high/45"
+                        style={{ left: `${String(done)}%`, width: `${String(task.planned_percent_today - done)}%` }}
+                      />
+                    ) : null}
                     {task.planned_percent_today > 0 && task.planned_percent_today < 100 ? (
                       <span
-                        className="absolute top-0 bottom-0 w-0.5 bg-survey"
+                        className="absolute top-0 bottom-0 w-[3px] -translate-x-1/2 bg-survey"
                         style={{ left: `${String(task.planned_percent_today)}%` }}
                       />
                     ) : null}
@@ -98,8 +108,9 @@ export function TaskTimeline({ tasks, start, end, today }: TaskTimelineProps) {
           })}
         </div>
       </div>
-      <p className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-ink-soft">
-        <span>Filled: reported progress (striped when behind plan).</span>
+      <p className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-ink-soft">
+        <span>Filled: reported progress (green when complete).</span>
+        <span>Red segment: shortfall against today's plan.</span>
         <span>Blue mark: where the plan says the task should be today.</span>
         <span>Red outline and "!": critical task.</span>
       </p>

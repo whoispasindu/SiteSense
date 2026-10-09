@@ -1,8 +1,9 @@
 import { useId } from "react";
 import {
+  Area,
   CartesianGrid,
+  ComposedChart,
   Line,
-  LineChart,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -26,10 +27,10 @@ function CurveTooltip({ active, payload, label }: TooltipContentProps<TooltipVal
   const planned = payload.find((p) => p.dataKey === "planned")?.value;
   const actual = payload.find((p) => p.dataKey === "actual")?.value;
   return (
-    <div className="rounded-[var(--radius-sheet)] border border-ink bg-paper-raised px-3 py-2 font-mono text-xs shadow-[var(--shadow-sheet)]">
-      <p className="mb-1 text-ink-faint">{typeof label === "string" ? formatDate(label) : ""}</p>
-      <p>Planned {typeof planned === "number" ? planned.toFixed(1) : "—"} %</p>
-      <p className="font-semibold">Actual {typeof actual === "number" ? actual.toFixed(1) : "—"} %</p>
+    <div className="rounded-lg border border-rule bg-paper-raised px-3 py-2 text-sm shadow-[var(--shadow-pop)]">
+      <p className="mb-1 text-xs text-ink-faint">{typeof label === "string" ? formatDate(label) : ""}</p>
+      <p className="tabular text-ink-soft">Planned {typeof planned === "number" ? `${planned.toFixed(1)}%` : "—"}</p>
+      <p className="tabular font-semibold text-ink">Actual {typeof actual === "number" ? `${actual.toFixed(1)}%` : "—"}</p>
     </div>
   );
 }
@@ -40,6 +41,7 @@ function CurveTooltip({ active, payload, label }: TooltipContentProps<TooltipVal
  */
 export function SCurve({ progress }: { progress: Progress }) {
   const tableId = useId();
+  const fillId = `actual-fill-${tableId.replace(/[^a-zA-Z0-9]/g, "")}`;
   const data = progress.points.map((p) => ({ date: p.date, planned: p.planned, actual: p.actual }));
   const actualPoints = progress.points.filter((p) => p.actual !== null);
 
@@ -51,36 +53,42 @@ export function SCurve({ progress }: { progress: Progress }) {
         className="h-72 w-full sm:h-80"
       >
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 16, right: 32, bottom: 4, left: -8 }}>
-            <CartesianGrid stroke="var(--color-rule)" strokeDasharray="2 4" vertical={false} />
+          <ComposedChart data={data} margin={{ top: 16, right: 32, bottom: 4, left: -8 }}>
+            <defs>
+              <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--color-accent-line)" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="var(--color-accent-line)" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke="var(--color-rule)" vertical={false} />
             <XAxis
               dataKey="date"
               tickFormatter={shortDate}
               minTickGap={36}
-              tick={{ fontSize: 11, fontFamily: "var(--font-mono)", fill: "var(--color-ink-faint)" }}
-              axisLine={{ stroke: "var(--color-rule-strong)" }}
+              tick={{ fontSize: 12, fill: "var(--color-ink-faint)" }}
+              axisLine={{ stroke: "var(--color-rule)" }}
               tickLine={false}
             />
             <YAxis
               domain={[0, 100]}
               ticks={[0, 25, 50, 75, 100]}
               tickFormatter={(v: number) => `${String(v)}%`}
-              tick={{ fontSize: 11, fontFamily: "var(--font-mono)", fill: "var(--color-ink-faint)" }}
+              tick={{ fontSize: 12, fill: "var(--color-ink-faint)" }}
               axisLine={false}
               tickLine={false}
             />
-            <Tooltip content={CurveTooltip} />
+            <Tooltip content={CurveTooltip} cursor={{ stroke: "var(--color-rule-strong)" }} />
             <ReferenceLine
               x={progress.contract_end}
-              stroke="var(--color-ink-soft)"
-              strokeDasharray="1 3"
-              label={{ value: "Contract end", position: "insideTopRight", fontSize: 10, fill: "var(--color-ink-soft)" }}
+              stroke="var(--color-ink-faint)"
+              strokeDasharray="3 3"
+              label={{ value: "Contract end", position: "insideTopRight", fontSize: 12, fill: "var(--color-ink-soft)" }}
             />
             <ReferenceLine
               x={progress.as_of}
-              stroke="var(--color-hivis-deep)"
-              strokeWidth={2}
-              label={{ value: "Today", position: "insideTopLeft", fontSize: 10, fill: "var(--color-ink)" }}
+              stroke="var(--color-survey)"
+              strokeWidth={1.5}
+              label={{ value: "Today", position: "insideTopLeft", fontSize: 12, fill: "var(--color-survey)" }}
             />
             <Line
               type="monotone"
@@ -92,53 +100,55 @@ export function SCurve({ progress }: { progress: Progress }) {
               dot={false}
               isAnimationActive={false}
             />
-            <Line
+            <Area
               type="monotone"
               dataKey="actual"
               name="Actual"
-              stroke="var(--color-ink)"
+              stroke="var(--color-accent-line)"
               strokeWidth={3}
+              fill={`url(#${fillId})`}
               dot={false}
+              activeDot={{ r: 4, fill: "var(--color-accent-line)", stroke: "var(--color-paper-raised)", strokeWidth: 2 }}
               connectNulls={false}
               isAnimationActive={false}
             />
-          </LineChart>
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
 
-      <figcaption className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-ink-soft">
+      <figcaption className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-soft">
         <span className="flex items-center gap-2">
           <span aria-hidden="true" className="inline-block h-0 w-6 border-t-2 border-dashed border-ink-faint" />
           Planned (from task weights and dates)
         </span>
         <span className="flex items-center gap-2">
-          <span aria-hidden="true" className="inline-block h-0 w-6 border-t-[3px] border-ink" />
+          <span aria-hidden="true" className="inline-block h-0 w-6 border-t-[3px] border-accent-line" />
           Actual (reported progress)
         </span>
         <span className="flex items-center gap-2">
-          <span aria-hidden="true" className="inline-block h-3 w-0.5 bg-hivis-deep" />
+          <span aria-hidden="true" className="inline-block h-3 w-0.5 bg-survey" />
           Today
         </span>
       </figcaption>
 
       <details className="text-sm">
-        <summary className="cursor-pointer text-ink-soft hover:text-ink">Show the numbers</summary>
-        <div className="mt-2 max-h-64 overflow-y-auto rounded-[var(--radius-sheet)] border border-rule">
-          <table id={tableId} className="w-full font-mono text-xs">
+        <summary className="cursor-pointer font-medium text-survey hover:underline">Show the numbers</summary>
+        <div className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-rule">
+          <table id={tableId} className="w-full text-sm">
             <caption className="sr-only">Planned and actual progress by date, percent</caption>
-            <thead className="sticky top-0 bg-paper-sunk">
+            <thead className="sticky top-0 bg-paper-sunk text-xs text-ink-faint">
               <tr>
-                <th scope="col" className="px-3 py-1.5 text-left font-normal">Date</th>
-                <th scope="col" className="px-3 py-1.5 text-right font-normal">Planned %</th>
-                <th scope="col" className="px-3 py-1.5 text-right font-normal">Actual %</th>
+                <th scope="col" className="px-3 py-2 text-left font-medium">Date</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">Planned %</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">Actual %</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-rule">
               {progress.points.map((p) => (
                 <tr key={p.date}>
-                  <td className="px-3 py-1">{formatDate(p.date)}</td>
-                  <td className="tabular px-3 py-1 text-right">{p.planned.toFixed(1)}</td>
-                  <td className="tabular px-3 py-1 text-right">{p.actual === null ? "—" : p.actual.toFixed(1)}</td>
+                  <td className="px-3 py-1.5">{formatDate(p.date)}</td>
+                  <td className="tabular px-3 py-1.5 text-right text-ink-soft">{p.planned.toFixed(1)}</td>
+                  <td className="tabular px-3 py-1.5 text-right">{p.actual === null ? "—" : p.actual.toFixed(1)}</td>
                 </tr>
               ))}
             </tbody>

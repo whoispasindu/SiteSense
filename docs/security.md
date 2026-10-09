@@ -30,6 +30,26 @@ here, newest first. The baseline design is in [ADR 0003](adr/0003-security-basel
 | Money | NUMERIC columns with check constraints; Decimal end to end; decimal strings in JSON | `models/project.py`, `schemas/project.py` | `test_projects_api.py` |
 | Supply chain | Pinned deps, Dependabot (pip, npm, actions, docker), pip-audit, npm audit, dependency review, CodeQL `security-extended`, actions pinned to SHAs, `permissions: contents: read`, `persist-credentials: false` | `.github/` | CI |
 
+## UI redesign review: 2026-10-09
+
+A front-end change only ([ADR 0006](adr/0006-clean-site-office-ui.md)): no API, permission or
+data changes.
+
+- **CSP unchanged.** The pre-paint theme script is a same-origin file
+  (`public/theme-init.js`), so `script-src 'self'` still holds with no inline script or hash.
+  Charts and bars set their sizes through the DOM style API, which `style-src 'self'` allows.
+- **Local storage holds only the theme choice** (`sitesense-theme`). The script compares the
+  stored value with fixed strings and never writes it into the page. Reads and writes are
+  wrapped in try/catch, so blocked storage falls back to the system theme. Tokens stay in memory
+  and in the httpOnly cookie, as before.
+- **No new data paths.** The dashboard uses the existing, site-scoped `/projects` and
+  `/schedule/summary` endpoints. Chart labels are rendered as text by React, never as HTML.
+- **Dependencies:** added `@fontsource-variable/ibm-plex-sans` 5.3.0 (self-hosted font, SIL OFL)
+  and removed Archivo. `npm audit` reports 0 vulnerabilities.
+- **Checks:** ESLint (including jsx-a11y), strict TypeScript, 120 Vitest tests and a production
+  build pass. Light and dark themes were checked in the browser at desktop and 375 px widths,
+  with no horizontal page scroll.
+
 ## Phase 3 review: 2026-10-09
 
 **Scope:** the whole repository at the end of Phase 3 (programme tasks, planned and actual

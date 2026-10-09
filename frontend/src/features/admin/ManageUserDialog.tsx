@@ -12,8 +12,8 @@ import { errorText, isSiteScoped } from "./adminUtils";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-3 border-t border-dashed border-rule pt-5 first:border-t-0 first:pt-0">
-      <h3 className="font-wide text-[0.7rem] font-extrabold tracking-[0.16em] text-ink-soft uppercase">{title}</h3>
+    <section className="space-y-3 border-t border-rule pt-5 first:border-t-0 first:pt-0">
+      <h3 className="text-sm font-semibold text-ink">{title}</h3>
       {children}
     </section>
   );
@@ -50,14 +50,14 @@ export function ManageUserDialog({ user, onClose }: { user: AdminUser | null; on
 
   if (temporary) {
     return (
-      <Dialog open onClose={close} title="Password reset" code="U-RST">
+      <Dialog open onClose={close} title="Password reset">
         <TemporaryPassword password={temporary} name={user.full_name} onDone={close} />
       </Dialog>
     );
   }
 
   return (
-    <Dialog open onClose={close} title={user.full_name} code={`U-${user.id.slice(0, 4).toUpperCase()}`}>
+    <Dialog open onClose={close} title={user.full_name}>
       <div className="space-y-5">
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <span className="text-ink-soft">{user.email}</span>

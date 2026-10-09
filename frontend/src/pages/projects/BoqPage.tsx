@@ -4,7 +4,8 @@ import { Link, useLocation } from "react-router";
 import { useBoq, useUpdateBudgetLine, type Boq } from "../../api/projects";
 import { useAuth } from "../../auth/context";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
+import { Button, primaryLinkClass } from "../../components/ui/Button";
+import { Icon } from "../../components/ui/icons";
 import { Sheet } from "../../components/ui/Sheet";
 import { errorText } from "../../features/admin/adminUtils";
 import { formatAmount, formatQuantity, toNumber } from "../../lib/money";
@@ -36,7 +37,7 @@ function BudgetEditor({ projectId, section, onDone }: { projectId: string; secti
         onChange={(e) => {
           setValue(e.target.value);
         }}
-        className="tabular min-h-9 w-44 rounded-[2px] border-2 border-ink bg-paper-raised px-2 text-right font-mono text-sm focus:outline-none aria-[invalid=true]:border-signal-high"
+        className="tabular min-h-9 w-44 rounded-lg border border-rule-strong bg-paper-raised px-2.5 text-right text-sm text-ink focus:border-survey focus:ring-2 focus:ring-survey/25 focus:outline-none aria-[invalid=true]:border-signal-high"
       />
       <Button type="submit" variant="primary" disabled={!valid || update.isPending} className="min-h-9">
         Save
@@ -68,27 +69,27 @@ function SectionSheet({ projectId, section, canEdit }: { projectId: string; sect
           }}
           className="flex min-h-11 min-w-0 items-center gap-3 text-left"
         >
-          <span aria-hidden="true" className={`font-mono text-xs transition-transform ${open ? "rotate-90" : ""}`}>
-            ▶
+          <span aria-hidden="true" className={`text-ink-faint transition-transform ${open ? "rotate-90" : ""}`}>
+            <Icon name="chevron" className="size-4" />
           </span>
-          <span className="font-wide grid size-9 shrink-0 place-items-center rounded-[2px] bg-asphalt text-sm font-extrabold text-hivis">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-asphalt text-sm font-semibold text-hivis">
             {section.code}
           </span>
           <span className="min-w-0">
-            <span className="block truncate font-semibold">{section.name}</span>
+            <span className="block truncate font-semibold text-ink">{section.name}</span>
             <span className="block text-xs text-ink-faint">{section.item_count} items</span>
           </span>
         </button>
 
         <div className="grid grid-cols-3 gap-4 text-right md:min-w-[30rem]">
           <p>
-            <span className="block font-mono text-[0.62rem] tracking-wider text-ink-faint uppercase">BOQ value</span>
-            <span className="tabular font-mono text-sm">{formatAmount(section.amount)}</span>
+            <span className="block text-xs text-ink-faint">BOQ value</span>
+            <span className="tabular text-sm font-medium text-ink">{formatAmount(section.amount)}</span>
           </p>
           <div>
-            <span className="block font-mono text-[0.62rem] tracking-wider text-ink-faint uppercase">Budget</span>
+            <span className="block text-xs text-ink-faint">Budget</span>
             {editing ? null : (
-              <span className="tabular font-mono text-sm">
+              <span className="tabular text-sm font-medium text-ink">
                 {formatAmount(section.budget_amount)}
                 {canEdit ? (
                   <button
@@ -96,7 +97,7 @@ function SectionSheet({ projectId, section, canEdit }: { projectId: string; sect
                     onClick={() => {
                       setEditing(true);
                     }}
-                    className="mt-0.5 block w-full text-right text-xs text-survey underline underline-offset-2"
+                    className="mt-0.5 block w-full text-right text-xs font-medium text-survey hover:underline"
                     aria-label={`Edit budget for section ${section.code}`}
                   >
                     Edit
@@ -106,8 +107,8 @@ function SectionSheet({ projectId, section, canEdit }: { projectId: string; sect
             )}
           </div>
           <p>
-            <span className="block font-mono text-[0.62rem] tracking-wider text-ink-faint uppercase">Margin</span>
-            <span className={`tabular font-mono text-sm ${margin < 0 ? "text-signal-high" : ""}`}>{margin.toFixed(1)} %</span>
+            <span className="block text-xs text-ink-faint">Margin</span>
+            <span className={`tabular text-sm font-medium ${margin < 0 ? "text-signal-high" : "text-ink"}`}>{margin.toFixed(1)}%</span>
           </p>
         </div>
         {editing ? (
@@ -126,25 +127,25 @@ function SectionSheet({ projectId, section, canEdit }: { projectId: string; sect
       <div id={panelId} hidden={!open} className="relative overflow-x-auto border-t border-rule">
         <table className="w-full text-sm">
           <caption className="sr-only">Items in section {section.code}</caption>
-          <thead className="bg-paper-sunk font-mono text-[0.62rem] tracking-[0.14em] text-ink-soft uppercase">
+          <thead className="bg-paper-sunk/60 text-xs font-medium text-ink-faint">
             <tr>
-              <th scope="col" className="px-4 py-2 text-left font-normal">Item</th>
-              <th scope="col" className="px-4 py-2 text-left font-normal">Description</th>
-              <th scope="col" className="px-4 py-2 text-left font-normal">Unit</th>
-              <th scope="col" className="px-4 py-2 text-right font-normal">Qty</th>
-              <th scope="col" className="px-4 py-2 text-right font-normal">Rate</th>
-              <th scope="col" className="px-4 py-2 text-right font-normal">Amount</th>
+              <th scope="col" className="px-4 py-2 text-left font-medium">Item</th>
+              <th scope="col" className="px-4 py-2 text-left font-medium">Description</th>
+              <th scope="col" className="px-4 py-2 text-left font-medium">Unit</th>
+              <th scope="col" className="px-4 py-2 text-right font-medium">Qty</th>
+              <th scope="col" className="px-4 py-2 text-right font-medium">Rate</th>
+              <th scope="col" className="px-4 py-2 text-right font-medium">Amount</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-rule">
             {section.items.map((item) => (
               <tr key={item.id}>
-                <td className="px-4 py-2.5 font-mono text-xs whitespace-nowrap">{item.item_code}</td>
+                <td className="px-4 py-2.5 font-mono text-xs whitespace-nowrap text-ink-soft">{item.item_code}</td>
                 <td className="min-w-64 px-4 py-2.5">{item.description}</td>
-                <td className="px-4 py-2.5 font-mono text-xs">{item.unit}</td>
-                <td className="tabular px-4 py-2.5 text-right font-mono whitespace-nowrap">{formatQuantity(item.quantity)}</td>
-                <td className="tabular px-4 py-2.5 text-right font-mono whitespace-nowrap">{formatAmount(item.rate)}</td>
-                <td className="tabular px-4 py-2.5 text-right font-mono whitespace-nowrap">{formatAmount(item.amount)}</td>
+                <td className="px-4 py-2.5 text-ink-soft">{item.unit}</td>
+                <td className="tabular px-4 py-2.5 text-right whitespace-nowrap">{formatQuantity(item.quantity)}</td>
+                <td className="tabular px-4 py-2.5 text-right whitespace-nowrap">{formatAmount(item.rate)}</td>
+                <td className="tabular px-4 py-2.5 text-right whitespace-nowrap">{formatAmount(item.amount)}</td>
               </tr>
             ))}
           </tbody>
@@ -164,7 +165,7 @@ export function BoqPage() {
   const importLink = can("boq:manage") ? (
     <Link
       to={`/projects/${project.id}/boq/import`}
-      className="font-wide inline-flex min-h-11 items-center rounded-[var(--radius-sheet)] border-2 border-ink bg-hivis px-5 text-xs font-bold tracking-[0.12em] uppercase shadow-[3px_3px_0_0_var(--color-ink)] hover:bg-hivis-deep"
+      className={primaryLinkClass}
     >
       {project.item_count ? "Re-import BOQ" : "Import BOQ"}
     </Link>
@@ -190,11 +191,11 @@ export function BoqPage() {
             ["Items", String(data.item_count)],
             ["BOQ value (LKR)", formatAmount(data.boq_total)],
             ["Cost budget (LKR)", formatAmount(data.budget_total)],
-            ["Margin", `${margin.toFixed(1)} %`],
+            ["Margin", `${margin.toFixed(1)}%`],
           ].map(([label, value]) => (
             <div key={label}>
-              <dt className="font-mono text-[0.65rem] tracking-[0.14em] text-ink-faint uppercase">{label}</dt>
-              <dd className="tabular mt-1 font-mono text-xl">{value}</dd>
+              <dt className="text-sm text-ink-faint">{label}</dt>
+              <dd className="tabular mt-1 text-xl font-semibold text-ink">{value}</dd>
             </div>
           ))}
         </dl>

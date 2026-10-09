@@ -24,7 +24,6 @@ export function ProjectsPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <PageHeader
-        sheet="P-01"
         title="Projects"
         description={
           user?.site_scoped
@@ -56,7 +55,7 @@ export function ProjectsPage() {
             onChange={(e) => {
               setQuery(e.target.value);
             }}
-            className="min-h-11 w-full rounded-[var(--radius-sheet)] border-2 border-rule-strong bg-paper-raised px-3 focus:border-ink focus:outline-none"
+            className="min-h-10 w-full rounded-lg border border-rule-strong bg-paper-raised px-3 text-sm text-ink placeholder:text-ink-faint focus:border-survey focus:ring-2 focus:ring-survey/25 focus:outline-none"
           />
         </label>
         <div role="group" aria-label="Filter by status" className="flex flex-wrap gap-1.5">
@@ -68,7 +67,7 @@ export function ProjectsPage() {
               onClick={() => {
                 setStatus(s);
               }}
-              className={`min-h-9 rounded-full border px-3 text-xs font-semibold ${
+              className={`min-h-9 rounded-full border px-3 text-sm font-medium ${
                 status === s ? "border-ink bg-ink text-paper" : "border-rule-strong text-ink-soft hover:border-ink"
               }`}
             >
@@ -84,7 +83,7 @@ export function ProjectsPage() {
         <p className="py-10 text-center text-ink-faint">Loading projects…</p>
       ) : list.length === 0 ? (
         <Sheet className="px-6 py-14 text-center">
-          <p className="font-wide text-lg font-bold">No projects {status || query ? "match" : "yet"}</p>
+          <p className="text-lg font-semibold">No projects {status || query ? "match" : "yet"}</p>
           <p className="mt-2 text-ink-soft">
             {status || query
               ? "Try another filter or search."
@@ -101,24 +100,24 @@ export function ProjectsPage() {
               <li key={p.id}>
                 <Link
                   to={`/projects/${p.id}`}
-                  className="group block rounded-[var(--radius-sheet)] border border-rule bg-paper-raised shadow-[var(--shadow-sheet)] transition-colors hover:border-ink focus-visible:border-ink"
+                  className="group block rounded-[var(--radius-sheet)] border border-rule bg-paper-raised shadow-[var(--shadow-sheet)] transition hover:border-rule-strong hover:shadow-[var(--shadow-pop)] focus-visible:border-survey"
                 >
                   <div className="grid gap-4 p-5 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.1fr)] md:items-center md:gap-8">
                     <div className="min-w-0">
                       <p className="flex flex-wrap items-center gap-3">
-                        <span className="font-mono text-xs text-ink-faint">{p.code}</span>
+                        <span className="font-mono text-xs font-medium text-ink-faint">{p.code}</span>
                         <ProjectStatusBadge status={p.status} />
                       </p>
-                      <h2 className="mt-2 truncate text-lg font-semibold group-hover:underline group-hover:underline-offset-4">
+                      <h2 className="mt-2 truncate text-base font-semibold text-ink group-hover:text-survey">
                         {p.name}
                       </h2>
                       <p className="mt-0.5 truncate text-sm text-ink-soft">
                         {p.client_name} · {TYPE_LABELS[p.project_type]} ·{" "}
-                        <span className="font-mono text-xs">{p.site.code}</span>
+                        <span>{p.site.code}</span>
                       </p>
                     </div>
                     <div>
-                      <p className="tabular font-mono text-lg">{formatCompactLKR(p.contract_value)}</p>
+                      <p className="tabular text-lg font-semibold text-ink">{formatCompactLKR(p.contract_value)}</p>
                       <p className="mt-0.5 text-xs text-ink-faint">
                         {p.item_count > 0
                           ? `BOQ ${String(p.item_count)} items · ${coverage.toFixed(1)}% of contract`
@@ -127,7 +126,7 @@ export function ProjectsPage() {
                     </div>
                     <div>
                       <ProgrammeBar start={p.start_date} end={p.planned_end} />
-                      <p className="tabular mt-2 flex justify-between font-mono text-[0.7rem] text-ink-faint">
+                      <p className="tabular mt-2 flex justify-between text-xs text-ink-faint">
                         <span>{formatDate(p.start_date)}</span>
                         <span>{formatDate(p.planned_end)}</span>
                       </p>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router";
 
+import { Icon } from "../ui/icons";
 import { SidebarContent } from "./Sidebar";
 import { TopBar } from "./TopBar";
 
@@ -29,10 +30,10 @@ export function AppLayout() {
   }, []);
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[17rem_1fr]">
+    <div className="min-h-dvh lg:grid lg:grid-cols-[16rem_1fr]">
       <a
         href="#main"
-        className="font-wide sr-only z-50 bg-hivis px-4 py-3 text-xs font-bold tracking-widest text-ink uppercase focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+        className="sr-only z-50 rounded-lg bg-hivis px-4 py-2.5 text-sm font-semibold text-asphalt focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
       >
         Skip to content
       </a>
@@ -45,7 +46,7 @@ export function AppLayout() {
         ref={dialogRef}
         aria-label="Navigation"
         onClose={closeMenu}
-        className="m-0 h-dvh max-h-none w-[min(19rem,86vw)] max-w-none bg-transparent p-0 backdrop:bg-asphalt/60 lg:hidden"
+        className="m-0 h-dvh max-h-none w-[min(18rem,86vw)] max-w-none bg-transparent p-0 backdrop:bg-black/50 lg:hidden"
       >
         <div className="relative h-full">
           <SidebarContent onNavigate={closeMenu} />
@@ -53,11 +54,9 @@ export function AppLayout() {
             type="button"
             onClick={closeMenu}
             aria-label="Close navigation"
-            className="absolute top-5 right-3 inline-flex size-11 items-center justify-center text-asphalt-text hover:text-paper"
+            className="absolute top-5 right-3 inline-flex size-10 items-center justify-center rounded-lg text-asphalt-text hover:bg-asphalt-raised hover:text-white"
           >
-            <svg viewBox="0 0 24 24" className="size-5" aria-hidden="true">
-              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" />
-            </svg>
+            <Icon name="close" className="size-5" />
           </button>
         </div>
       </dialog>
@@ -68,7 +67,7 @@ export function AppLayout() {
             setMenuOpen(true);
           }}
         />
-        <main id="main" tabIndex={-1} className="drafting-grid flex-1 px-4 py-8 outline-none sm:px-8 lg:py-10">
+        <main id="main" tabIndex={-1} className="flex-1 px-4 py-6 outline-none sm:px-8 lg:py-8">
           <Outlet />
         </main>
       </div>

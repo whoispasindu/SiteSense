@@ -4,7 +4,7 @@ export function PasswordToggle({ visible, onToggle }: { visible: boolean; onTogg
       type="button"
       onClick={onToggle}
       aria-pressed={visible}
-      className="min-h-9 rounded-[2px] px-3 font-mono text-[0.68rem] tracking-wider text-ink-soft uppercase hover:bg-paper-sunk hover:text-ink"
+      className="min-h-8 rounded-md px-2.5 text-sm font-medium text-ink-soft hover:bg-paper-sunk hover:text-ink"
     >
       {visible ? "Hide" : "Show"}
     </button>

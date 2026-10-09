@@ -13,7 +13,7 @@ describe("NotFoundPage", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Off the drawings." })).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Main" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("link", { name: "Back to the site office" }));
+    await user.click(screen.getByRole("link", { name: "Back to the dashboard" }));
     expect(router.state.location.pathname).toBe("/");
   });
 

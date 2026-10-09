@@ -20,13 +20,13 @@ export function TemporaryPassword({ password, name, onDone }: { password: string
         Give this temporary password to <strong className="text-ink">{name}</strong> in person or by phone. They will
         be asked to replace it at first sign-in.
       </p>
-      <div className="rounded-[var(--radius-sheet)] border-2 border-dashed border-ink bg-paper-sunk px-4 py-4">
-        <p className="font-mono text-[0.65rem] tracking-[0.18em] text-ink-faint uppercase">Temporary password</p>
-        <p className="tabular mt-1 font-mono text-xl font-medium break-all select-all" data-testid="temporary-password">
+      <div className="rounded-lg border border-hivis/60 bg-hivis/10 px-4 py-4">
+        <p className="text-sm font-medium text-ink-soft">Temporary password</p>
+        <p className="mt-1 font-mono text-xl font-medium break-all text-ink select-all" data-testid="temporary-password">
           {password}
         </p>
       </div>
-      <p className="font-wide text-[0.68rem] font-bold tracking-[0.14em] text-signal-medium uppercase">
+      <p className="text-sm font-medium text-signal-medium">
         Shown once. It cannot be displayed again.
       </p>
       <div className="flex flex-wrap gap-3">
@@ -62,15 +62,15 @@ export function SiteCheckboxes({
   }
   return (
     <fieldset>
-      <legend className="font-mono text-[0.7rem] tracking-[0.14em] text-ink-soft uppercase">Assigned sites</legend>
+      <legend className="text-sm font-medium text-ink">Assigned sites</legend>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         {active.map((site) => {
           const checked = selected.includes(site.id);
           return (
             <label
               key={site.id}
-              className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-[var(--radius-sheet)] border-2 px-3 text-sm ${
-                checked ? "border-ink bg-hivis/15" : "border-rule hover:border-rule-strong"
+              className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 text-sm ${
+                checked ? "border-accent-line bg-hivis/10" : "border-rule hover:border-rule-strong"
               }`}
             >
               <input
@@ -81,7 +81,7 @@ export function SiteCheckboxes({
                   onChange(e.target.checked ? [...selected, site.id] : selected.filter((id) => id !== site.id));
                 }}
               />
-              <span className="shrink-0 font-mono text-xs whitespace-nowrap">{site.code}</span>
+              <span className="shrink-0 font-mono text-xs font-medium whitespace-nowrap">{site.code}</span>
               <span className="truncate text-ink-soft">{site.name}</span>
             </label>
           );

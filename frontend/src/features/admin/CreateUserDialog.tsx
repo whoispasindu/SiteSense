@@ -59,7 +59,7 @@ export function CreateUserDialog({ open, onClose }: { open: boolean; onClose: ()
   }
 
   return (
-    <Dialog open={open} onClose={close} title={created ? "Account created" : "Add a user"} code="U-NEW">
+    <Dialog open={open} onClose={close} title={created ? "Account created" : "Add a user"}>
       {created ? (
         <TemporaryPassword password={created.password} name={created.name} onDone={close} />
       ) : (
@@ -84,7 +84,7 @@ export function CreateUserDialog({ open, onClose }: { open: boolean; onClose: ()
           {isSiteScoped(role) ? (
             <SiteCheckboxes sites={sites.data ?? []} selected={siteIds} onChange={setSiteIds} />
           ) : null}
-          <div className="flex justify-end gap-3 border-t border-dashed border-rule pt-4">
+          <div className="flex justify-end gap-3 border-t border-rule pt-4">
             <Button onClick={close}>Cancel</Button>
             <Button type="submit" variant="primary" disabled={createUser.isPending}>
               {createUser.isPending ? "Creating…" : "Create account"}
