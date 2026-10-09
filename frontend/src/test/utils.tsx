@@ -7,6 +7,8 @@ import { vi } from "vitest";
 import { ROLE_LABELS, type Me, type Role } from "../api/auth";
 import { setAccessToken } from "../api/client";
 import { AuthProvider } from "../auth/AuthProvider";
+import { isAvailable, NAV_GROUPS, type NavItem } from "../components/layout/navigation";
+import { CURRENT_PHASE, PHASES } from "../lib/programme";
 import { routes } from "../routes";
 
 export function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
@@ -56,9 +58,9 @@ export const healthyApi: Record<string, Handler> = {
 /** Mirrors app/core/permissions.py for the permissions the UI uses. */
 export const ROLE_PERMISSIONS: Record<Role, string[]> = {
   admin: ["users:manage", "sites:manage", "audit:read", "dashboard:view"],
-  project_manager: ["dashboard:view", "projects:read", "projects:manage", "schedule:read", "reports:read", "materials:read", "risk:read", "cost:read"],
+  project_manager: ["dashboard:view", "projects:read", "projects:manage", "schedule:read", "schedule:manage", "schedule:progress", "reports:read", "materials:read", "risk:read", "cost:read"],
   quantity_surveyor: ["dashboard:view", "projects:read", "boq:manage", "schedule:read", "reports:read", "materials:read", "risk:read", "cost:read"],
-  site_engineer: ["dashboard:view", "projects:read", "schedule:read", "reports:create", "reports:read", "materials:read"],
+  site_engineer: ["dashboard:view", "projects:read", "schedule:read", "schedule:progress", "reports:create", "reports:read", "materials:read"],
   procurement_officer: ["dashboard:view", "projects:read", "materials:read"],
   client: ["client:portal", "variations:client_decide"],
 };
@@ -106,3 +108,16 @@ export function renderRoute(path = "/") {
   );
   return { ...result, router, queryClient };
 }
+
+/** The first menu module a project manager can see that is not built yet (changes every phase). */
+export function nextUnbuiltModule(): NavItem {
+  const pm = new Set(ROLE_PERMISSIONS.project_manager);
+  const item = NAV_GROUPS.flatMap((g) => g.items).find(
+    (i) => !isAvailable(i) && (i.permission === undefined || pm.has(i.permission)),
+  );
+  if (!item) throw new Error("Every module is built: update the tests that rely on an unbuilt one.");
+  return item;
+}
+
+export const currentPhaseName = (): string => PHASES[CURRENT_PHASE]?.name ?? "";
+export const previousPhaseName = (): string => PHASES[CURRENT_PHASE - 1]?.name ?? "";

@@ -54,6 +54,17 @@ assigned to. Every site-data endpoint uses the helpers in
 | `POST /api/v1/projects/{id}/boq/import?dry_run=` | Quantity Surveyor | Multipart file; dry run by default |
 | `PATCH /api/v1/projects/{id}/budget-lines/{line_id}` | Quantity Surveyor | Adjust a section's cost budget |
 
+## Phase 3 endpoints
+
+| Method and path | Who | Notes |
+| --- | --- | --- |
+| `GET /api/v1/schedule/summary` | PM, QS, Site Engineer | Planned vs actual for every visible project |
+| `GET /api/v1/projects/{id}/tasks` | PM, QS, Site Engineer | Tasks with plan-today and state |
+| `POST /api/v1/projects/{id}/tasks` | Project Manager | |
+| `PATCH /api/v1/tasks/{id}` | PM (any field), Site Engineer (`percent_complete` only) | Records a progress snapshot |
+| `DELETE /api/v1/tasks/{id}` | Project Manager | |
+| `GET /api/v1/projects/{id}/progress` | PM, QS, Site Engineer | S-curve points, planned, actual, variance |
+
 `backend/tests/test_role_matrix.py` calls every endpoint as every role. New endpoints must be added there.
 
 ## The menu

@@ -13,7 +13,9 @@ import { BoqImportPage } from "./pages/projects/BoqImportPage";
 import { BoqPage } from "./pages/projects/BoqPage";
 import { ProjectLayout } from "./pages/projects/ProjectLayout";
 import { ProjectOverview } from "./pages/projects/ProjectOverview";
+import { ProjectSchedule } from "./pages/projects/ProjectSchedule";
 import { ProjectsPage } from "./pages/projects/ProjectsPage";
+import { SchedulePage } from "./pages/schedule/SchedulePage";
 import { RouteErrorPage } from "./pages/RouteErrorPage";
 
 export const routes: RouteObject[] = [
@@ -54,6 +56,14 @@ export const routes: RouteObject[] = [
         ),
       },
       {
+        path: "schedule",
+        element: (
+          <RequirePermission permission="schedule:read">
+            <SchedulePage />
+          </RequirePermission>
+        ),
+      },
+      {
         path: "projects/:projectId",
         element: (
           <RequirePermission permission="projects:read">
@@ -63,6 +73,14 @@ export const routes: RouteObject[] = [
         children: [
           { index: true, element: <ProjectOverview /> },
           { path: "boq", element: <BoqPage /> },
+          {
+            path: "schedule",
+            element: (
+              <RequirePermission permission="schedule:read">
+                <ProjectSchedule />
+              </RequirePermission>
+            ),
+          },
           {
             path: "boq/import",
             element: (

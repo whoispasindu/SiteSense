@@ -123,7 +123,7 @@ function SectionSheet({ projectId, section, canEdit }: { projectId: string; sect
         ) : null}
       </div>
 
-      <div id={panelId} hidden={!open} className="overflow-x-auto border-t border-rule">
+      <div id={panelId} hidden={!open} className="relative overflow-x-auto border-t border-rule">
         <table className="w-full text-sm">
           <caption className="sr-only">Items in section {section.code}</caption>
           <thead className="bg-paper-sunk font-mono text-[0.62rem] tracking-[0.14em] text-ink-soft uppercase">

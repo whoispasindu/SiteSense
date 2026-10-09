@@ -41,6 +41,10 @@ class AuditAction:
     PROJECT_UPDATED = "project.updated"
     BOQ_IMPORTED = "boq.imported"
     BUDGET_LINE_UPDATED = "budget_line.updated"
+    TASK_CREATED = "task.created"
+    TASK_UPDATED = "task.updated"
+    TASK_PROGRESS_UPDATED = "task.progress_updated"
+    TASK_DELETED = "task.deleted"
 
 
 def record(

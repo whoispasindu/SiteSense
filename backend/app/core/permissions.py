@@ -39,6 +39,8 @@ class Permission(StrEnum):
     BOQ_MANAGE = "boq:manage"
     SCHEDULE_READ = "schedule:read"
     SCHEDULE_MANAGE = "schedule:manage"
+    # Update a task's percent complete only (site engineers report progress; Phase 4 via reports).
+    SCHEDULE_PROGRESS = "schedule:progress"
     # Site reports (Phase 4)
     REPORTS_CREATE = "reports:create"
     REPORTS_READ = "reports:read"
@@ -73,6 +75,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             P.PROJECTS_MANAGE,
             P.SCHEDULE_READ,
             P.SCHEDULE_MANAGE,
+            P.SCHEDULE_PROGRESS,
             P.REPORTS_READ,
             P.MATERIALS_READ,
             P.MATERIALS_REQUEST,
@@ -105,6 +108,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             P.DASHBOARD_VIEW,
             P.PROJECTS_READ,
             P.SCHEDULE_READ,
+            P.SCHEDULE_PROGRESS,
             P.REPORTS_CREATE,
             P.REPORTS_READ,
             P.MATERIALS_REQUEST,

@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { jsonResponse, makeMe, mockApi, renderRoute, sessionApi } from "../../test/utils";
+import { currentPhaseName, jsonResponse, makeMe, mockApi, previousPhaseName, renderRoute, sessionApi } from "../../test/utils";
 
 describe("DashboardPage", () => {
   it("greets the signed-in user by first name", async () => {
@@ -69,10 +69,8 @@ describe("DashboardPage", () => {
     const items = within(programme).getAllByRole("listitem");
     expect(items).toHaveLength(15 + 2); // 15 phases plus the v0.1 and v1.0 releases
     expect(within(programme).getByText("Setup and foundations").closest("li")).toHaveTextContent("Complete");
-    expect(within(programme).getByText("Authentication, roles and users").closest("li")).toHaveTextContent(
-      "Complete",
-    );
-    expect(within(programme).getByText("Projects, BOQ and budget").closest("li")).toHaveTextContent("In progress");
+    expect(within(programme).getByText(previousPhaseName()).closest("li")).toHaveTextContent("Complete");
+    expect(within(programme).getByText(currentPhaseName()).closest("li")).toHaveTextContent("In progress");
     expect(within(programme).getByText("Client portal").closest("li")).toHaveTextContent("Planned");
     expect(within(programme).getByText(/Release v0.1 MVP/)).toBeInTheDocument();
   });

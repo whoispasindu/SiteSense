@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core.permissions import Role
-from app.models import BoqSection, BudgetLine, Project, Site, User
+from app.models import BoqSection, BudgetLine, Project, Site, Task, User
 from tests.conftest import bearer, login
 
 ALL_ROLES = frozenset(Role)
@@ -22,6 +22,8 @@ PROJECT_READERS = frozenset(
     {Role.PROJECT_MANAGER, Role.QUANTITY_SURVEYOR, Role.SITE_ENGINEER, Role.PROCUREMENT_OFFICER}
 )
 PM_ONLY = frozenset({Role.PROJECT_MANAGER})
+SCHEDULE_READERS = frozenset({Role.PROJECT_MANAGER, Role.QUANTITY_SURVEYOR, Role.SITE_ENGINEER})
+PROGRESS_EDITORS = frozenset({Role.PROJECT_MANAGER, Role.SITE_ENGINEER})
 QS_ONLY = frozenset({Role.QUANTITY_SURVEYOR})
 BOQ_CSV = (
     b"Section Code,Section Name,Item Code,Description,Unit,Quantity,Rate\nA,Prelims,A.1,Setup,item,1,100\n"
@@ -63,6 +65,14 @@ ENDPOINTS = [
     Endpoint("POST", "/api/v1/projects/{project_id}/boq/import", QS_ONLY, upload=True),
     Endpoint("PATCH", "/api/v1/projects/{project_id}/budget-lines/{budget_line_id}", QS_ONLY,
              {"budget_amount": "50.00"}),
+    Endpoint("GET", "/api/v1/schedule/summary", SCHEDULE_READERS),
+    Endpoint("GET", "/api/v1/projects/{project_id}/tasks", SCHEDULE_READERS),
+    Endpoint("POST", "/api/v1/projects/{project_id}/tasks", PM_ONLY,
+             {"name": "Matrix task", "planned_start": "2026-02-01", "planned_end": "2026-02-28",
+              "weight": "10"}),
+    Endpoint("PATCH", "/api/v1/tasks/{task_id}", PROGRESS_EDITORS, {"percent_complete": "10"}),
+    Endpoint("DELETE", "/api/v1/tasks/{task_id}", PM_ONLY),
+    Endpoint("GET", "/api/v1/projects/{project_id}/progress", SCHEDULE_READERS),
 ]  # fmt: skip
 
 
@@ -103,8 +113,18 @@ def ids(make_user: Callable[..., User], make_site: Callable[..., Site], db: Sess
     section = BoqSection(project_id=project.id, code="A", name="Prelims", position=1)
     section.budget_line = BudgetLine(project_id=project.id, budget_amount=Decimal("100.00"))
     db.add(section)
+    task = Task(
+        project_id=project.id,
+        name="Matrix base task",
+        planned_start=date(2026, 1, 5),
+        planned_end=date(2026, 3, 31),
+        weight=Decimal("50.00"),
+        position=1,
+    )
+    db.add(task)
     db.commit()
     return {
+        "task_id": str(task.id),
         "user_id": str(target.id),
         "site_id": str(site.id),
         "project_id": str(project.id),

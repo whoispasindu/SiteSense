@@ -30,6 +30,40 @@ here, newest first. The baseline design is in [ADR 0003](adr/0003-security-basel
 | Money | NUMERIC columns with check constraints; Decimal end to end; decimal strings in JSON | `models/project.py`, `schemas/project.py` | `test_projects_api.py` |
 | Supply chain | Pinned deps, Dependabot (pip, npm, actions, docker), pip-audit, npm audit, dependency review, CodeQL `security-extended`, actions pinned to SHAs, `permissions: contents: read`, `persist-credentials: false` | `.github/` | CI |
 
+## Phase 3 review: 2026-10-09
+
+**Scope:** the whole repository at the end of Phase 3 (programme tasks, planned and actual
+progress, S-curve, schedule screens).
+
+### OWASP Top 10 (2021) walk-through
+
+| Risk | Phase 3 status |
+| --- | --- |
+| A01 Broken access control | All 6 new endpoints are in the role matrix. Field-level rule: site engineers may change a task's `percent_complete` and nothing else (403 otherwise), tested and mutation-checked. Tasks are reached only through their project's site scope (404 outside it). |
+| A04 Insecure design | Every progress change writes a dated snapshot, so the actual curve is history, not a recalculation that could be quietly rewritten. Changes are audited with from/to values. |
+| A05 / DoS | **Fixed:** project and task dates had no upper bound, so a task ending in 9999 would make each S-curve request compute about 400,000 weekly points. Spans are now capped at 15 years (projects and tasks), tasks per project at 500, and the snapshot lookup uses binary search. Worst case: 787 points × 500 tasks in 0.17 s. |
+| A06 Vulnerable components | pip-audit **0**, npm audit **0** (new: recharts). |
+| A09 Logging and monitoring failures | `task.created`, `task.updated`, `task.progress_updated` (from/to) and `task.deleted` are audited. |
+
+### Verification beyond unit tests
+
+- **Mutation checks:** removing the progress-only rule, the snapshot write or the 15-year cap
+  each makes a test fail.
+- **Browser, as the PM:** the portfolio schedule (furthest behind first), the S-curve with
+  history, Today and contract-end lines, and the programme timeline. Changing a task's progress
+  moved the actual line at once (the Phase 3 "Done when"); the change was then reverted.
+
+### Findings fixed during the review
+
+1. **Unbounded dates (DoS)**, described above.
+2. **The progress input rejected decimals** (`step=5`): the browser silently blocked "71.2". Now
+   `step="any"`, with a regression test.
+3. **Page-wide horizontal scroll:** a screen-reader-only label inside a scrollable table escaped
+   its container. Every horizontal scroll container is now a positioning context.
+4. **Timeline month labels overlapped** at the year boundary.
+5. **Tests that named a specific "unbuilt" module** broke at every phase. They now derive it from
+   the build plan.
+
 ## Phase 2 review: 2026-10-09
 
 **Scope:** the whole repository at the end of Phase 2 (projects, BOQ import, budget lines, and

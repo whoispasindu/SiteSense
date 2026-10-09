@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from decimal import Decimal
 
 import pytest
 from sqlalchemy import Connection, select
@@ -6,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app import cli
 from app.core.security import verify_password
-from app.models import AuditLog, Site, User
+from app.models import AuditLog, ProgressSnapshot, Project, Site, Task, User
 from tests.conftest import make_settings
 
 DEMO_PASSWORD = "Demo-Password-For-Tests-1"
@@ -65,6 +66,14 @@ def test_seed_dev_creates_sites_and_one_user_per_role(
     )
     assert all(verify_password(DEMO_PASSWORD, u.password_hash) for u in users)
     assert {s.code for s in cli_db.scalars(select(Site)).all()} >= {"COL-07", "KDY-02", "GAL-11"}
+    havelock = cli_db.scalar(select(Project).where(Project.code == "HR-2026-01"))
+    assert havelock is not None
+    tasks = cli_db.scalars(select(Task).where(Task.project_id == havelock.id)).all()
+    assert len(tasks) == 11
+    assert sum(t.weight for t in tasks) == Decimal("100.00")
+    assert (
+        cli_db.scalar(select(ProgressSnapshot).where(ProgressSnapshot.project_id == havelock.id)) is not None
+    )
 
 
 def test_seed_dev_needs_a_valid_password(cli_db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
