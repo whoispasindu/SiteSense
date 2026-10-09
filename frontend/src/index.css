@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+/*
+ * SiteSense design tokens: "site office".
+ * Warm drafting-paper surfaces, asphalt chrome, and hi-vis yellow reserved for the one
+ * primary action on each screen. Signal colours are always paired with a text label.
+ */
+@theme {
+  --font-sans: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
+
+  --color-paper: #f3f1ea;
+  --color-paper-raised: #fbfaf6;
+  --color-paper-sunk: #e9e5da;
+  --color-rule: #d6d0c0;
+  --color-rule-strong: #b9b19c;
+  --color-ink: #17160f;
+  --color-ink-soft: #4d493f;
+  --color-ink-faint: #6f6a5c;
+
+  --color-asphalt: #1b1a16;
+  --color-asphalt-raised: #26251f;
+  --color-asphalt-line: #3a3830;
+  --color-asphalt-text: #d9d4c4;
+  --color-asphalt-muted: #9a9482;
+
+  --color-hivis: #ffc21a;
+  --color-hivis-deep: #e0a600;
+
+  --color-signal-high: #b02e17;
+  --color-signal-high-tint: #f8ded6;
+  --color-signal-medium: #8a5200;
+  --color-signal-medium-tint: #f7e6c4;
+  --color-signal-low: #2a6e45;
+  --color-signal-low-tint: #d9ebdd;
+  --color-survey: #2b4fc4;
+
+  --radius-sheet: 3px;
+  --shadow-sheet: 0 1px 0 rgb(23 22 15 / 0.06), 0 8px 24px -16px rgb(23 22 15 / 0.35);
+
+  --animate-pulse-dot: pulse-dot 2.4s ease-in-out infinite;
+  --animate-rise: rise 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+
+  @keyframes pulse-dot {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent); }
+    50% { box-shadow: 0 0 0 5px transparent; }
+  }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-paper font-sans text-ink antialiased;
+    font-variation-settings: "wdth" 100;
+    min-height: 100dvh;
+  }
+
+  /* Faint drafting grid on the working area; reads as paper, never competes with data. */
+  .drafting-grid {
+    background-image:
+      linear-gradient(to right, rgb(23 22 15 / 0.045) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(23 22 15 / 0.045) 1px, transparent 1px);
+    background-size: 24px 24px;
+    background-position: -1px -1px;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-survey);
+    outline-offset: 2px;
+  }
+
+  .on-asphalt :focus-visible {
+    outline-color: var(--color-hivis);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 1ms !important;
+    }
+  }
+}
+
+@utility font-wide {
+  font-variation-settings: "wdth" 118;
+}
+
+@utility font-condensed {
+  font-variation-settings: "wdth" 82;
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+
+/* Diagonal hazard band: used once per screen at most, as a structural accent. */
+@utility hazard-band {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--color-hivis) 0 8px,
+    var(--color-asphalt) 8px 16px
+  );
+}

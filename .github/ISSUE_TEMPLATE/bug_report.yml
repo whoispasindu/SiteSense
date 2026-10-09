@@ -1,0 +1,36 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Security problems must not be reported here.** See SECURITY.md for private reporting.
+        Do not paste real names, passwords, tokens or contract figures.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Sign in as a site engineer
+        2. Open ...
+    validations:
+      required: true
+  - type: input
+    id: request-id
+    attributes:
+      label: Request ID
+      description: Shown in error messages and the X-Request-ID response header, if you have one.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+    validations:
+      required: true
