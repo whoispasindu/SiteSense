@@ -1,4 +1,4 @@
-FROM node:24-alpine AS deps
+FROM node:25-alpine AS deps
 WORKDIR /app
 # Everything runs as the unprivileged "node" user, which also owns node_modules so Vite can
 # write its cache inside the container.
