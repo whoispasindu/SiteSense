@@ -12,7 +12,7 @@ SiteSense tells a construction company which site will slip before it does, and 
 
 </div>
 
-> **Status: Phase 2 of 14 (projects, BOQ and budget).** Product features arrive phase by phase
+> **Status: Phase 3 of 14 (schedule and S-curve).** Product features arrive phase by phase
 > (see [Roadmap](#roadmap)). Nothing here is production-ready yet.
 
 ## What it will do
@@ -76,6 +76,13 @@ company, create the first admin instead; it prints a one-time password:
 
 ```bash
 docker compose exec backend python -m app.cli create-admin --email you@company.lk --name "Your Name"
+```
+
+After pulling changes that add dependencies, rebuild and renew the containers' `node_modules`
+volume (otherwise the web container keeps its old packages):
+
+```bash
+docker compose up --build -V
 ```
 
 The defaults are for local development only. To change the database passwords, copy
@@ -176,8 +183,8 @@ docs/           architecture, decision records, security reviews, model cards
 | --- | --- | --- |
 | 0 | Setup and foundations | Done |
 | 1 | Authentication, roles and users | Done |
-| 2 | Projects, BOQ and budget | In progress |
-| 3 | Schedule basics | Planned |
+| 2 | Projects, BOQ and budget | Done |
+| 3 | Schedule basics | In progress |
 | 4 | Daily site reports | Planned |
 | 5 | Materials, approvals and rules engine | Planned |
 | 6 | Demo data and risk model v1 → **v0.1 MVP** | Planned |

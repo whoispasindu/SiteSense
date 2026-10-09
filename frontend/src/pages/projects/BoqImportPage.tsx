@@ -96,7 +96,7 @@ function ReportView({ report }: { report: ImportReport }) {
           <DimensionHeading id="preview-sections" annotation={`${String(report.sections.length)} sections`}>
             {report.error_rows ? "Valid rows so far" : "What will be imported"}
           </DimensionHeading>
-          <Sheet className="overflow-x-auto">
+          <Sheet className="relative overflow-x-auto">
             <table className="w-full text-sm">
               <caption className="sr-only">Sections found in the file, amounts in LKR</caption>
               <thead className="border-b border-rule-strong bg-paper-sunk font-mono text-[0.62rem] tracking-[0.14em] text-ink-soft uppercase">

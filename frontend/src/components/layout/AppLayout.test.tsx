@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { makeMe, mockApi, renderRoute, sessionApi } from "../../test/utils";
+import { makeMe, mockApi, nextUnbuiltModule, renderRoute, sessionApi } from "../../test/utils";
 
 describe("AppLayout", () => {
   beforeEach(() => {
@@ -28,11 +28,12 @@ describe("AppLayout", () => {
     renderRoute("/");
 
     const nav = await screen.findByRole("navigation", { name: "Main" });
+    const next = nextUnbuiltModule();
     expect(within(nav).getByRole("link", { name: /Projects/ })).toHaveAttribute("href", "/projects");
-    expect(within(nav).queryByRole("link", { name: /Schedule/ })).not.toBeInTheDocument();
-    const schedule = within(nav).getByText("Schedule").closest("[aria-disabled]");
-    expect(schedule).toHaveAttribute("aria-disabled", "true");
-    expect(schedule).toHaveTextContent(/Coming in phase\s*P?3/);
+    expect(within(nav).queryByRole("link", { name: new RegExp(next.label) })).not.toBeInTheDocument();
+    const upcoming = within(nav).getByText(next.label).closest("[aria-disabled]");
+    expect(upcoming).toHaveAttribute("aria-disabled", "true");
+    expect(upcoming).toHaveTextContent(new RegExp(`Coming in phase\\s*P?${String(next.phase)}`));
   });
 
   it("opens and closes the mobile navigation", async () => {

@@ -133,6 +133,7 @@ def test_project_input_is_validated(api: TestClient, make_user: Callable[..., Us
     headers = headers_for(api, make_user, Role.PROJECT_MANAGER, [colombo])
     bad = [
         {"planned_end": "2026-01-01"},
+        {"planned_end": "9999-12-31"},
         {"contract_value": "0"},
         {"contract_value": "-5"},
         {"contract_value": "12.345"},
@@ -171,6 +172,8 @@ def test_update_project_and_reject_bad_dates(
 
     updated = api.patch(url, json={"status": "on_hold", "contract_value": "1200000000.50"}, headers=headers)
     bad_dates = api.patch(url, json={"planned_end": "2020-01-01"}, headers=headers)
+    forever = api.patch(url, json={"planned_end": "9999-12-31"}, headers=headers)
+    assert forever.status_code == 422
     cannot_move = api.patch(url, json={"site_id": str(colombo.id)}, headers=headers)
     null_name = api.patch(url, json={"name": None}, headers=headers)
 

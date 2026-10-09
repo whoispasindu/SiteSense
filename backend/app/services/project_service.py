@@ -14,6 +14,7 @@ from app.models import BoqItem, BoqSection, BudgetLine, Project, ProjectStatus, 
 from app.models.user import user_site_assignments
 from app.schemas.auth import SiteSummary
 from app.schemas.project import (
+    MAX_PROJECT_DAYS,
     BoqItemOut,
     BoqOut,
     BoqSectionOut,
@@ -218,6 +219,8 @@ def update_project(
     end = changes.get("planned_end", project.planned_end)
     if start is None or end is None or end < start:
         raise BusinessRuleError("The planned end date must be on or after the start date.")
+    if (end - start).days > MAX_PROJECT_DAYS:
+        raise BusinessRuleError("A project can run for at most 15 years.")
     for required in ("name", "client_name", "project_type", "status", "contract_value"):
         if required in changes and changes[required] is None:
             raise BusinessRuleError(f"{required.replace('_', ' ').capitalize()} cannot be empty.")

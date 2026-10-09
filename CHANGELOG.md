@@ -7,6 +7,16 @@ uses [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Phase 3: schedule basics.**
+  - Programme tasks with planned dates, weight (share of the contract), percent complete and an
+    optional BOQ section link; at most 500 tasks and 15 years per project.
+  - Planned progress curve week by week from task weights; actual progress from task progress,
+    with a daily snapshot history so the actual line shows the real past.
+  - Site engineers can report progress (percent complete only); project managers plan.
+  - Web: portfolio Schedule page (furthest behind first), project Schedule tab with KPIs,
+    planned-against-actual S-curve (Recharts, with a data table), programme timeline and task
+    editor.
+  - Demo programmes for Havelock Residences (behind plan) and Peradeniya Road Offices.
 - **Phase 2: projects, BOQ and budget.**
   - Projects with client, contract value, type, status and contract period, scoped to the
     user's sites; project managers create and edit them.

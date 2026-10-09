@@ -20,6 +20,10 @@ ProjectCode = Annotated[str, BeforeValidator(_upper), StringConstraints(pattern=
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=160)]
 Money = Annotated[Decimal, Field(max_digits=16, decimal_places=2)]
 
+# Longest contract period accepted. It bounds every week-by-week calculation (S-curves), so an
+# absurd date such as 9999-12-31 cannot turn one request into minutes of work.
+MAX_PROJECT_DAYS = 15 * 366
+
 
 class ProjectCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -39,6 +43,8 @@ class ProjectCreate(BaseModel):
     def _dates_in_order(self) -> "ProjectCreate":
         if self.planned_end < self.start_date:
             raise ValueError("The planned end date must be on or after the start date.")
+        if (self.planned_end - self.start_date).days > MAX_PROJECT_DAYS:
+            raise ValueError("A project can run for at most 15 years.")
         return self
 
 

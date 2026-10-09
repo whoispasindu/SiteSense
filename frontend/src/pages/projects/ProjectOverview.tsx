@@ -93,7 +93,7 @@ export function ProjectOverview() {
             ) : null}
           </Sheet>
         ) : (
-          <Sheet className="overflow-x-auto">
+          <Sheet className="relative overflow-x-auto">
             <table className="w-full text-sm">
               <caption className="sr-only">BOQ value and cost budget by section, in LKR</caption>
               <thead className="border-b border-rule-strong bg-paper-sunk font-mono text-[0.65rem] tracking-[0.14em] text-ink-soft uppercase">
