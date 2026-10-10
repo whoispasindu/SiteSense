@@ -20,6 +20,36 @@ uses [Semantic Versioning](https://semver.org/).
   - Sidebar icons, an avatar user menu and calmer error pages. The sign-in button now says "Sign in".
 
 ### Added
+- **Phase 5: materials, approvals and rules engine.**
+  - Material requests against BOQ items, with a rules engine of pure functions:
+    - BR-01: a unit price more than 5% above the budgeted rate needs the PM.
+    - BR-13: the section's committed cost plus the request exceeding its budget line needs the PM.
+    - BR-02: quantity is blocked beyond the BOQ plus 3%.
+    - BR-04: no approving your own request.
+    - BR-05: no purchase order before approval.
+    - The request page names the rule that sent a request to the PM.
+  - Rates and amounts only for the PM, QS and procurement. Site engineers get cost-free API
+    responses (role-specific schemas) and see item, unit, BOQ quantity, requested and remaining.
+    They raise requests without prices: the price is pending until the QS enters the quoted price,
+    with the budgeted rate shown beside the field. Approval is refused until it is entered.
+  - BR-14: at purchase-order issue, an order price more than 5% above the approved price sends the
+    request back for PM approval. BR-13 is checked again at issue with the order prices, so lines
+    that fit alone but not together cannot both be ordered. The other lines are still ordered.
+  - Committed cost is cumulative: each approved, ordered or delivered request once at its latest
+    value; pending requests are excluded. The budget shows Committed, Spent, On order and Left.
+  - Approval state machine: QS check, PM approval, approved, ordered and delivered, plus rejected,
+    change requested and cancelled. Invalid transitions are refused, and every step is audited
+    and notified.
+  - Suppliers, purchase orders (one project each, price never above the approved price) and
+    deliveries (never more than ordered).
+  - Budget per BOQ section shows approved, committed and spent cost, derived from orders and
+    deliveries so it updates by itself. The BOQ cannot be replaced once requests refer to it.
+  - Web: Materials page with pipeline counts and filters; a request form with a BOQ item picker
+    and a live rules check; a request page with rule results, history and approve, reject or
+    request-change actions. Purchase-order, delivery and supplier screens for procurement, and
+    a cost-control panel on the BOQ tab.
+  - `seed-dev` adds suppliers and requests at every stage.
+  - `docs/business-rules.md` documents every rule.
 - **Phase 4: daily site reports.**
   - Site engineers file one report per project per day: weather, crew, work done, problems,
     task progress and up to 12 photos. A second report for the same day is refused with a link
@@ -31,7 +61,7 @@ uses [Semantic Versioning](https://semver.org/).
   - The author can correct a report, and add or remove photos, on the day they submitted it.
     Task progress in a report updates the programme.
   - An 18:00 reminder notifies the engineers and project managers of sites still missing
-    today's report (BR-11). Project managers are notified when a report is filed.
+    today's report (BR-07). Project managers are notified when a report is filed.
   - In-app notifications with a bell in the top bar. They are reused by later phases.
   - Web: Site reports page (today's status), project Reports tab with a weather strip and
     history, a phone-friendly report form and a report detail page with a photo viewer.

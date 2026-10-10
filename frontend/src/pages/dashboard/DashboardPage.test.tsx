@@ -36,6 +36,22 @@ describe("DashboardPage", () => {
     expect(await screen.findByRole("heading", { level: 1, name: /, Ruwan$/ })).toBeInTheDocument();
   });
 
+  it("shows a site engineer no contract values", async () => {
+    const strip = (p: ProjectSummary) => ({ ...p, contract_value: undefined, boq_total: undefined, budget_total: undefined });
+    mockApi({
+      ...sessionApi(makeMe("site_engineer")),
+      "/api/v1/projects": () => jsonResponse([strip(HAVELOCK), strip(PERADENIYA)]),
+      "/api/v1/schedule/summary": () => jsonResponse([]),
+      "/api/v1/reports/today": () => jsonResponse({ date: "2026-10-10", deadline: "2026-10-10T18:00:00+05:30", deadline_passed: false, projects: [] }),
+    });
+    renderRoute("/");
+
+    expect(await screen.findByRole("group", { name: "Active projects" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Contract value" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Contract value by project" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/LKR/)).not.toBeInTheDocument();
+  });
+
   it("summarises the portfolio in KPIs", async () => {
     portfolioApi();
     renderRoute("/");

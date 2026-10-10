@@ -8,7 +8,7 @@
 Phase 4 makes site engineers file one structured report per day. Later phases use these
 reports for NLP tagging (Phase 7), delay forecasting (Phases 6 and 10) and the client portal
 (Phase 12). The reports carry photos from phones on site connections, pull weather from a third
-party, and must keep working when that third party is down (TC-08). BR-11 needs a missing-report
+party, and must keep working when that third party is down (TC-08). BR-07 needs a missing-report
 reminder at 18:00 site time.
 
 ## Decisions
@@ -48,7 +48,7 @@ Sri Lankan locations.
 
 **Reminders from an in-process scheduler (APScheduler).**
 - An 18:00 job notifies the site engineers and project managers of every active project on an
-  active site that has no report for the day (BR-11).
+  active site that has no report for the day (BR-07).
 - Notifications carry a `dedupe_key`, unique per user, so running the job twice (several API
   workers, a restart, the `send-reminders` command) never sends a reminder twice.
 - Each job opens its own database session and logs instead of raising.

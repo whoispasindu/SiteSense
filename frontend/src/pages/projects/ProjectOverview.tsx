@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 
 import { TYPE_LABELS } from "../../api/projects";
+import { useBudget } from "../../api/materials";
 import { useAuth } from "../../auth/context";
 import { primaryLinkClass } from "../../components/ui/Button";
 import { SectionHeading } from "../../components/ui/SectionHeading";
@@ -13,11 +14,14 @@ import { useCurrentProject } from "./projectContext";
 export function ProjectOverview() {
   const p = useCurrentProject();
   const { can } = useAuth();
-  const boq = toNumber(p.boq_total);
-  const budget = toNumber(p.budget_total);
+  const costs = useBudget(p.id, can("cost:read") && p.item_count > 0);
+  // Rates and amounts arrive only for roles with "rates:read"; site engineers get none of them.
+  const priced = p.contract_value !== undefined;
+  const boq = toNumber(p.boq_total ?? 0);
+  const budget = toNumber(p.budget_total ?? 0);
   const margin = boq > 0 ? ((boq - budget) / boq) * 100 : 0;
-  const coverage = percent(p.boq_total, p.contract_value);
-  const largest = Math.max(...p.sections.map((s) => toNumber(s.amount)), 1);
+  const coverage = percent(p.boq_total ?? 0, p.contract_value ?? 0);
+  const largest = Math.max(...p.sections.map((s) => toNumber(s.amount ?? 0)), 1);
 
   const titleRows: [string, string][] = [
     ["Client", p.client_name],
@@ -47,21 +51,26 @@ export function ProjectOverview() {
           </div>
         </Sheet>
 
+        {priced ? (
         <div className="grid content-start gap-4 sm:grid-cols-2">
-          <KpiTile icon="cost" label="Contract value" value={formatCompactLKR(p.contract_value)} title={`LKR ${formatAmount(p.contract_value)}`} />
+          <KpiTile icon="cost" label="Contract value" value={formatCompactLKR(p.contract_value ?? 0)} title={`LKR ${formatAmount(p.contract_value ?? 0)}`} />
           <KpiTile
             icon="projects"
             label="BOQ total"
-            value={p.item_count ? formatCompactLKR(p.boq_total) : "—"}
-            title={`LKR ${formatAmount(p.boq_total)}`}
+            value={p.item_count ? formatCompactLKR(p.boq_total ?? 0) : "—"}
+            title={`LKR ${formatAmount(p.boq_total ?? 0)}`}
             note={p.item_count ? `${String(p.item_count)} items · ${coverage.toFixed(1)}% of contract value` : "No BOQ imported yet"}
           />
           <KpiTile
             icon="materials"
             label="Cost budget"
-            value={p.item_count ? formatCompactLKR(p.budget_total) : "—"}
-            title={`LKR ${formatAmount(p.budget_total)}`}
-            note="Committed and spent cost arrive with materials (Phase 5)"
+            value={p.item_count ? formatCompactLKR(p.budget_total ?? 0) : "—"}
+            title={`LKR ${formatAmount(p.budget_total ?? 0)}`}
+            note={
+              costs.data
+                ? `Committed ${formatCompactLKR(costs.data.totals.committed)} · spent ${formatCompactLKR(costs.data.totals.spent)}`
+                : "Cost to date is on the BOQ & budget tab"
+            }
           />
           <KpiTile
             icon="risk"
@@ -71,11 +80,21 @@ export function ProjectOverview() {
             note="BOQ value less cost budget"
           />
         </div>
+        ) : (
+          <div className="grid content-start gap-4 sm:grid-cols-2">
+            <KpiTile
+              icon="projects"
+              label="BOQ items"
+              value={String(p.item_count)}
+              note={p.sections.length ? `In ${String(p.sections.length)} sections` : "No BOQ imported yet"}
+            />
+          </div>
+        )}
       </div>
 
       <section aria-labelledby="sections-heading">
         <SectionHeading id="sections-heading" annotation={p.sections.length ? `${String(p.sections.length)} sections` : undefined}>
-          Cost by BOQ section
+          {priced ? "Cost by BOQ section" : "BOQ sections"}
         </SectionHeading>
         {p.sections.length === 0 ? (
           <Sheet className="px-6 py-10 text-center">
@@ -91,6 +110,20 @@ export function ProjectOverview() {
                 Import BOQ
               </Link>
             ) : null}
+          </Sheet>
+        ) : !priced ? (
+          <Sheet>
+            <ul aria-label="BOQ sections" className="divide-y divide-rule">
+              {p.sections.map((s) => (
+                <li key={s.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                  <span>
+                    <span className="mr-2 font-mono text-xs text-ink-faint">{s.code}</span>
+                    {s.name}
+                  </span>
+                  <span className="text-ink-faint">{s.item_count} items</span>
+                </li>
+              ))}
+            </ul>
           </Sheet>
         ) : (
           <Sheet className="relative overflow-x-auto">
@@ -114,8 +147,8 @@ export function ProjectOverview() {
               </thead>
               <tbody className="divide-y divide-rule">
                 {p.sections.map((s) => {
-                  const width = (toNumber(s.amount) / largest) * 100;
-                  const budgetMark = percent(s.budget_amount, s.amount);
+                  const width = (toNumber(s.amount ?? 0) / largest) * 100;
+                  const budgetMark = percent(s.budget_amount ?? 0, s.amount ?? 0);
                   return (
                     <tr key={s.id}>
                       <th scope="row" className="px-4 py-3 text-left font-normal">
@@ -131,8 +164,8 @@ export function ProjectOverview() {
                           />
                         </div>
                       </td>
-                      <td className="tabular px-4 py-3 text-right font-medium text-ink">{formatCompactLKR(s.amount)}</td>
-                      <td className="tabular px-4 py-3 text-right text-ink-soft">{formatCompactLKR(s.budget_amount)}</td>
+                      <td className="tabular px-4 py-3 text-right font-medium text-ink">{formatCompactLKR(s.amount ?? 0)}</td>
+                      <td className="tabular px-4 py-3 text-right text-ink-soft">{formatCompactLKR(s.budget_amount ?? 0)}</td>
                     </tr>
                   );
                 })}

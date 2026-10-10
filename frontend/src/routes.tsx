@@ -19,6 +19,12 @@ import { ProjectsPage } from "./pages/projects/ProjectsPage";
 import { ReportDetailPage } from "./pages/reports/ReportDetailPage";
 import { ReportFormPage } from "./pages/reports/ReportFormPage";
 import { SiteReportsPage } from "./pages/reports/SiteReportsPage";
+import { MaterialsPage } from "./pages/materials/MaterialsPage";
+import { RequestDetailPage } from "./pages/materials/RequestDetailPage";
+import { RequestFormPage } from "./pages/materials/RequestFormPage";
+import { PurchaseOrderDetailPage } from "./pages/procurement/PurchaseOrderDetailPage";
+import { PurchaseOrdersPage } from "./pages/procurement/PurchaseOrdersPage";
+import { SuppliersPage } from "./pages/procurement/SuppliersPage";
 import { SchedulePage } from "./pages/schedule/SchedulePage";
 import { RouteErrorPage } from "./pages/RouteErrorPage";
 
@@ -64,6 +70,54 @@ export const routes: RouteObject[] = [
         element: (
           <RequirePermission permission="schedule:read">
             <SchedulePage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: "materials",
+        element: (
+          <RequirePermission permission="materials:read">
+            <MaterialsPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: "materials/new",
+        element: (
+          <RequirePermission permission="materials:request">
+            <RequestFormPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: "materials/:requestId",
+        element: (
+          <RequirePermission permission="materials:read">
+            <RequestDetailPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: "purchase-orders",
+        element: (
+          <RequirePermission permission="materials:read">
+            <PurchaseOrdersPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: "purchase-orders/:orderId",
+        element: (
+          <RequirePermission permission="materials:read">
+            <PurchaseOrderDetailPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: "suppliers",
+        element: (
+          <RequirePermission permission="suppliers:manage">
+            <SuppliersPage />
           </RequirePermission>
         ),
       },

@@ -7,8 +7,17 @@ from app.api.deps import CurrentUser, DbSession, Meta, require_permission
 from app.core.errors import ForbiddenError
 from app.core.permissions import Permission, Role, has_permission
 from app.models import User
-from app.schemas.schedule import ProgressOut, ScheduleSummary, TaskCreate, TaskList, TaskOut, TaskUpdate
+from app.schemas.schedule import (
+    ProgressOut,
+    ScheduleSummary,
+    ScheduleSummaryBasics,
+    TaskCreate,
+    TaskList,
+    TaskOut,
+    TaskUpdate,
+)
 from app.services import project_service, schedule_service
+from app.services.visibility import shape_all
 
 router = APIRouter(tags=["schedule"])
 
@@ -29,9 +38,9 @@ def progress_editor(user: CurrentUser) -> User:
 Editor = Annotated[User, Depends(progress_editor)]
 
 
-@router.get("/schedule/summary", response_model=list[ScheduleSummary])
-def schedule_summary(user: Reader, db: DbSession) -> list[ScheduleSummary]:
-    return schedule_service.summaries(db, user)
+@router.get("/schedule/summary", response_model=list[ScheduleSummary] | list[ScheduleSummaryBasics])
+def schedule_summary(user: Reader, db: DbSession) -> list[ScheduleSummary] | list[ScheduleSummaryBasics]:
+    return shape_all(user, schedule_service.summaries(db, user), ScheduleSummaryBasics)
 
 
 @router.get("/projects/{project_id}/tasks", response_model=TaskList)

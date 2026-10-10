@@ -10,7 +10,7 @@ import { StatusBadge } from "../../components/ui/StatusBadge";
 import { formatSiteTime } from "../../lib/time";
 import { errorText } from "../admin/adminUtils";
 
-/** BR-11 at a glance: has every active project filed today's report, and is the deadline close? */
+/** BR-07 at a glance: has every active project filed today's report, and is the deadline close? */
 export function TodayReports({ compact = false }: { compact?: boolean }) {
   const status = useTodayStatus();
   const { can } = useAuth();

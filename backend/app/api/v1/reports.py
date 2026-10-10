@@ -31,7 +31,7 @@ Reader = Annotated[User, Depends(require_permission(Permission.REPORTS_READ))]
 Author = Annotated[User, Depends(require_permission(Permission.REPORTS_READ, Permission.REPORTS_CREATE))]
 ProjectReader = Annotated[User, Depends(require_permission(Permission.PROJECTS_READ))]
 
-HEAVY_RAIN_MM = Decimal("10.0")  # BR-08 threshold, shown on the weather strip
+HEAVY_RAIN_MM = Decimal("10.0")  # BR-06 threshold, shown on the weather strip
 
 
 def _storage(request: Request) -> Storage:
@@ -49,7 +49,7 @@ PhotoStorage = Annotated[Storage, Depends(_storage)]
 
 @router.get("/reports/today", response_model=ReportStatus)
 def today_status(user: Reader, db: DbSession, settings: AppSettings) -> ReportStatus:
-    """Today's report status for every active project the user can see (BR-11)."""
+    """Today's report status for every active project the user can see (BR-07)."""
     return report_service.today_status(db, user, deadline_hour=settings.report_deadline_hour)
 
 

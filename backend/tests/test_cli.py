@@ -2,13 +2,23 @@ from collections.abc import Iterator
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import Connection, select
+from sqlalchemy import Connection, func, select
 from sqlalchemy.orm import Session
 
 from app import cli
 from app.core import clock
 from app.core.security import verify_password
-from app.models import AuditLog, DailyReport, ProgressSnapshot, Project, Site, Task, User
+from app.models import (
+    AuditLog,
+    DailyReport,
+    MaterialRequest,
+    ProgressSnapshot,
+    Project,
+    Site,
+    Supplier,
+    Task,
+    User,
+)
 from tests.conftest import make_settings
 from tests.report_fixtures import FakeWeather
 
@@ -80,6 +90,9 @@ def test_seed_dev_creates_sites_and_one_user_per_role(
     assert len(reports) == 5
     # Today's report is left for the demo engineer to file.
     assert clock.site_today() not in {r.report_date for r in reports}
+    statuses = sorted(r.status for r in cli_db.scalars(select(MaterialRequest)).all())
+    assert statuses == ["approved", "change_requested", "delivered", "ordered", "pm_approval", "requested"]
+    assert cli_db.scalar(select(func.count(Supplier.id))) == 5
 
 
 def test_send_reminders_command(cli_db: Session, capsys: pytest.CaptureFixture[str]) -> None:

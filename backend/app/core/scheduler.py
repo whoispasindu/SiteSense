@@ -1,6 +1,6 @@
 """Scheduled jobs (APScheduler, in-process).
 
-- 18:00 site time: remind sites that have not filed today's report (BR-11).
+- 18:00 site time: remind sites that have not filed today's report (BR-07).
 - 05:30 site time: refresh the weather forecast for every active site.
 
 Jobs are safe to run more than once (several API workers, a restart, the CLI): reminders are

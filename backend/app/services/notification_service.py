@@ -9,7 +9,9 @@ from sqlalchemy.orm import Session
 
 from app.core import clock
 from app.core.errors import NotFoundError
+from app.core.permissions import Role
 from app.models import Notification, User
+from app.models.user import user_site_assignments
 from app.schemas.report import NotificationList, NotificationOut
 
 LIST_LIMIT = 30
@@ -24,6 +26,27 @@ class NewNotification:
     link: str | None = None
     project_id: uuid.UUID | None = None
     dedupe_key: str | None = None
+
+
+def site_people(db: Session, site_id: uuid.UUID, roles: set[Role]) -> list[User]:
+    """Active users with one of ``roles`` who are assigned to the site."""
+    return list(
+        db.scalars(
+            select(User)
+            .join(user_site_assignments, user_site_assignments.c.user_id == User.id)
+            .where(
+                user_site_assignments.c.site_id == site_id,
+                User.is_active.is_(True),
+                User.role.in_([r.value for r in roles]),
+            )
+        ).all()
+    )
+
+
+def company_people(db: Session, roles: set[Role]) -> list[User]:
+    """Active users with one of ``roles`` across the company (roles that are not site-scoped)."""
+    stmt = select(User).where(User.is_active.is_(True), User.role.in_([r.value for r in roles]))
+    return list(db.scalars(stmt).all())
 
 
 def _safe_link(link: str | None) -> str | None:

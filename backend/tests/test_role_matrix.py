@@ -15,7 +15,19 @@ from sqlalchemy.orm import Session
 
 from app.core import clock
 from app.core.permissions import Role
-from app.models import BoqSection, BudgetLine, DailyReport, Project, ReportPhoto, Site, Task, User
+from app.models import (
+    BoqItem,
+    BoqSection,
+    BudgetLine,
+    DailyReport,
+    MaterialRequest,
+    Project,
+    ReportPhoto,
+    Site,
+    Supplier,
+    Task,
+    User,
+)
 from tests.conftest import bearer, login
 from tests.report_fixtures import image_bytes
 
@@ -30,6 +42,12 @@ PROGRESS_EDITORS = frozenset({Role.PROJECT_MANAGER, Role.SITE_ENGINEER})
 QS_ONLY = frozenset({Role.QUANTITY_SURVEYOR})
 REPORT_READERS = frozenset({Role.PROJECT_MANAGER, Role.QUANTITY_SURVEYOR, Role.SITE_ENGINEER})
 SE_ONLY = frozenset({Role.SITE_ENGINEER})
+MATERIAL_READERS = frozenset(
+    {Role.PROJECT_MANAGER, Role.QUANTITY_SURVEYOR, Role.SITE_ENGINEER, Role.PROCUREMENT_OFFICER}
+)
+REQUESTERS = frozenset({Role.PROJECT_MANAGER, Role.QUANTITY_SURVEYOR, Role.SITE_ENGINEER})
+COST_READERS = frozenset({Role.PROJECT_MANAGER, Role.QUANTITY_SURVEYOR})
+PROCUREMENT = frozenset({Role.PROCUREMENT_OFFICER})
 BOQ_CSV = (
     b"Section Code,Section Name,Item Code,Description,Unit,Quantity,Rate\nA,Prelims,A.1,Setup,item,1,100\n"
 )
@@ -89,6 +107,29 @@ ENDPOINTS = [
     Endpoint("GET", "/api/v1/photos/{photo_id}", REPORT_READERS),
     Endpoint("DELETE", "/api/v1/photos/{photo_id}", SE_ONLY),
     Endpoint("GET", "/api/v1/projects/{project_id}/weather", PROJECT_READERS),
+    Endpoint("GET", "/api/v1/material-requests", MATERIAL_READERS),
+    Endpoint("POST", "/api/v1/material-requests/check", REQUESTERS,
+             {"project_id": "{project_id}", "boq_item_id": "{boq_item_id}", "quantity": "1",
+              "unit_price": "10"}),
+    Endpoint("POST", "/api/v1/material-requests", REQUESTERS,
+             {"project_id": "{project_id}", "boq_item_id": "{boq_item_id}", "quantity": "1",
+              "unit_price": "10", "needed_by": "{today}"}),
+    Endpoint("GET", "/api/v1/material-requests/{request_id}", MATERIAL_READERS),
+    Endpoint("PATCH", "/api/v1/material-requests/{request_id}", REQUESTERS, {"quantity": "2"}),
+    Endpoint("POST", "/api/v1/material-requests/{request_id}/decision", REQUESTERS, {"decision": "approve"}),
+    Endpoint("GET", "/api/v1/projects/{project_id}/boq-items", REQUESTERS),
+    Endpoint("GET", "/api/v1/projects/{project_id}/budget", COST_READERS),
+    Endpoint("GET", "/api/v1/suppliers", MATERIAL_READERS),
+    Endpoint("POST", "/api/v1/suppliers", PROCUREMENT, {"name": "Matrix Supplies"}),
+    Endpoint("PATCH", "/api/v1/suppliers/{supplier_id}", PROCUREMENT, {"contact_name": "Renamed"}),
+    Endpoint("GET", "/api/v1/purchase-orders/ready", PROCUREMENT),
+    Endpoint("GET", "/api/v1/purchase-orders", MATERIAL_READERS),
+    Endpoint("POST", "/api/v1/purchase-orders", PROCUREMENT,
+             {"supplier_id": "{supplier_id}", "expected_delivery": "{today}",
+              "lines": [{"request_id": "{request_id}"}]}),
+    Endpoint("GET", "/api/v1/purchase-orders/{order_id}", MATERIAL_READERS),
+    Endpoint("POST", "/api/v1/purchase-orders/{order_id}/deliveries", PROCUREMENT,
+             {"request_id": "{request_id}", "quantity": "1", "delivered_on": "{today}"}),
     Endpoint("GET", "/api/v1/notifications", ALL_ROLES),
     Endpoint("POST", "/api/v1/notifications/{notification_id}/read", ALL_ROLES),
     Endpoint("POST", "/api/v1/notifications/read-all", ALL_ROLES),
@@ -156,6 +197,19 @@ def ids(make_user: Callable[..., User], make_site: Callable[..., Site], db: Sess
         created_at=clock.utcnow(),
     )
     db.add(photo)
+    item = BoqItem(
+        project_id=project.id, section_id=section.id, item_code="A.1", description="Matrix item", unit="nr",
+        quantity=Decimal("100"), rate=Decimal("10"), amount=Decimal("1000.00"), position=1,
+    )  # fmt: skip
+    db.add(item)
+    db.flush()
+    material = MaterialRequest(
+        number="MR-9999", project_id=project.id, boq_item_id=item.id, requested_by=target.id,
+        quantity=Decimal("1"), unit_price=Decimal("10"), needed_by=clock.site_today(), status="requested",
+        approval_level="qs", submitted_at=clock.utcnow(),
+    )  # fmt: skip
+    supplier = Supplier(name="Matrix Base Supplier")
+    db.add_all([material, supplier])
     task = Task(
         project_id=project.id,
         name="Matrix base task",
@@ -176,6 +230,10 @@ def ids(make_user: Callable[..., User], make_site: Callable[..., Site], db: Sess
         "photo_id": str(photo.id),
         "notification_id": str(uuid.uuid4()),
         "today": clock.site_today().isoformat(),
+        "boq_item_id": str(item.id),
+        "request_id": str(material.id),
+        "supplier_id": str(supplier.id),
+        "order_id": str(uuid.uuid4()),
     }
 
 

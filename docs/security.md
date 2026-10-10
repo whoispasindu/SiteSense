@@ -30,8 +30,91 @@ here, newest first. The baseline design is in [ADR 0003](adr/0003-security-basel
 | Money | NUMERIC columns with check constraints; Decimal end to end; decimal strings in JSON | `models/project.py`, `schemas/project.py` | `test_projects_api.py` |
 | Photo uploads | Magic-byte check (JPEG/PNG/WebP), full decode under a 50 MP budget, re-encode to a fresh JPEG with no metadata (GPS removed); random server-generated storage keys checked against a pattern; 10 MB, 12 per report, per-IP rate limit; files outside any served folder; served only through an authenticated, site-scoped endpoint | `services/photos.py`, `integrations/storage.py`, `api/v1/reports.py` | `test_report_photos.py` |
 | Outbound calls (SSRF) | Weather: fixed https host, query built from stored coordinates only, redirects refused, 64 KB cap, response schema-validated, 5 s timeout; failures fall back to the cache | `integrations/weather.py`, `services/weather.py` | `test_weather.py` |
+| Approvals | Stage-and-role checks, segregation of duties (BR-04), state machine (invalid transitions 409), order price never above approved, row locks against double approval and quantity races | `rules/materials.py`, `services/materials_service.py`, `services/procurement_service.py` | `test_rules_materials.py`, `test_materials_api.py` |
 | Notifications | Per-user only (others answer 404); links restricted to in-app paths by service and database constraint; de-duplicated reminders | `services/notification_service.py`, migration 0005 | `test_reminders_notifications.py`, `reports.test.tsx` |
 | Supply chain | Pinned deps, Dependabot (pip, npm, actions, docker), pip-audit, npm audit, dependency review, CodeQL `security-extended`, actions pinned to SHAs, `permissions: contents: read`, `persist-credentials: false` | `.github/` | CI |
+
+## Phase 5 review: 2026-10-10
+
+**Scope:** the whole repository at the end of Phase 5 (material requests, approvals, suppliers,
+purchase orders, deliveries, the rules engine and the budget view). Design decisions are in
+[ADR 0008](adr/0008-materials-approvals-costs.md), and the rules in
+[business-rules.md](business-rules.md).
+
+### OWASP Top 10 (2021) walk-through
+
+| Risk | Phase 5 status |
+| --- | --- |
+| A01 Broken access control | All 18 new endpoints are in the role matrix. Decisions are checked by stage and role: a site engineer approving gets 403 and nothing changes (TC-01), and an approver cannot decide their own request (BR-04, TC-05, for both the QS and the PM). The PM cannot skip the QS check. Only the requester edits (after "change requested") or cancels. Requests, orders and budgets are site-scoped (404 outside); procurement is company-wide by design. Budget figures need `cost:read` (PM, QS); clients never get them (TC-07). |
+| A04 Insecure design | Business-logic abuse was walked through. **Price creep at ordering:** the order price may not exceed the approved price. **Splitting a request to dodge BR-01:** the line check is cumulative, so splitting does not help. **Editing after approval:** edits are only possible in "change requested", and they resubmit to the QS. **Stale routing:** the level is re-checked when the QS approves. **Double ordering:** unique request per order line. **Over-delivery:** refused. |
+| A04 Race conditions | Row locks on the BOQ item (request creation, BR-02), the request (decisions), the requests being ordered, and the order (deliveries). Verified against the running API: of two simultaneous requests that together exceed the allowance, one is accepted and the other refused. |
+| A05 / DoS | Lists are capped at 100 per page and orders at 50 lines; notes are limited to 2,000 characters and comments to 1,000. Needed-by is within 2 years and expected delivery within 1. The live rules check is debounced in the browser and runs a fixed number of indexed queries. |
+| A06 Vulnerable components | pip-audit **0**, npm audit **0** (no new dependencies). |
+| A08 Data integrity | Committed and spent cost are derived from order lines and deliveries, so no stored totals can drift. Money is NUMERIC with check constraints (quantities and prices > 0) and exact decimals end to end. |
+| A09 Logging and monitoring failures | New audit events: `material_request.created`, `.updated` and `.decided` (from/to status), `purchase_order.issued`, `delivery.recorded`, `supplier.created` and `.updated`. Every decision also notifies the people concerned. |
+
+**Cost visibility (amended at the project owner's request).** Rates and amounts are now limited
+to the PM, QS and procurement (`rates:read`). This reverses the earlier choice that let every
+internal project role see section budgets.
+
+- **Enforcement.** Site engineers receive role-specific response schemas that do not declare any
+  cost field: projects, BOQ, schedule summary, item picker, requests and rule checks, and purchase
+  orders. The BR-01 and BR-13 results are filtered out of their rule checks.
+- **Prices.** Engineers cannot send a price (`422 price_not_allowed`); the QS prices their requests.
+- **Tests.** `test_cost_visibility.py` walks every endpoint an engineer can call and fails on any
+  cost field at any depth. Mutation-checked: making the visibility helper return everything makes
+  it fail. It also confirms that PM, QS and procurement still receive the cost fields, and that
+  clients are refused all of these endpoints.
+
+### Verification beyond unit tests
+
+- **Mutation checks (10 of 10 caught):** breaking any of these makes a test fail:
+  - the BR-01 threshold
+  - the BR-02 allowance
+  - the BR-04 own-request check
+  - the BR-05 order gate
+  - the order-price cap
+  - the over-delivery check
+  - the stage permission (TC-01)
+  - spent-cost derivation
+  - the BOQ freeze
+  - excluding rejected or cancelled requests from BR-02
+- **Concurrency:** two parallel over-allowance requests against the running API, described above.
+- **Browser, end to end:**
+  - As the QS, approved a request from the pipeline and saw the cost-control panel with real
+    committed and spent figures.
+  - As procurement, ordered two approved requests on one purchase order and recorded a partial
+    delivery. The order and request statuses and the budget moved accordingly (the Phase 5
+    "Done when").
+
+### Findings fixed during the review
+
+1. **Procurement could reach the decision endpoint** and was only refused deeper in the service.
+   The endpoint now requires a request or approval permission up front, so the refusal is
+   consistent and tested in the role matrix.
+2. **The rule check on an approved or ordered request counted its own cost twice** in the
+   budget-line figure. The request's own contribution is now excluded.
+3. **BOQ re-import would have orphaned requests.** The import is now refused once requests exist,
+   with a `RESTRICT` foreign key as a backstop.
+4. **Mislabelled rules in Phase 4:** the daily-report deadline is BR-07 (was written as BR-11),
+   and heavy rain is BR-06 (was BR-08). Corrected in code and docs, using the build guide's rule
+   table.
+5. **Rule messages showed raw decimals** ("400.000 of 1650.000"). They now read "400 of 1,650".
+6. **Rates and amounts reached site engineers** (contract values, BOQ rates, request prices, order
+   totals). They are now limited to `rates:read` by role-specific schemas, as described above.
+7. **The schedule summary embedded the full project summary**, including its contract value and
+   totals. It now uses the cost-free project card for engineers.
+8. **Rule messages with amounts in the request history.** The first version of the send-back at
+   ordering wrote the BR-13 message ("committed cost would be LKR …") into the history comment,
+   which engineers can read. The history now gives the reason in words only. The full messages go
+   to procurement in the order response and to the audit log. The cost-visibility test now walks a
+   sent-back request and fails on any string containing "LKR". Mutation-checked: restoring the old
+   comment makes it fail.
+9. **Price pending and ordering, reviewed.** `price_required` is enforced in the service, not only
+   in the screen. The order path still locks the requests and re-checks BR-05 first. A line sent
+   back drops out of the running committed total, so it cannot block the lines after it. A request
+   the PM approved is re-sent only if its order amount exceeds the approved amount, so procurement
+   cannot raise a price past the PM unseen, and the PM is not asked twice for the same excess.
 
 ## Phase 4 review: 2026-10-10
 

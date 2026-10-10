@@ -77,7 +77,7 @@ class Settings(BaseSettings):
     weather_timeout_seconds: float = Field(default=5.0, gt=0, le=30)
     # In-process scheduler for reminders and weather refresh. Off in tests and one-off tools.
     scheduler_enabled: bool = True
-    # BR-11: every active site submits its daily report by this hour (site time).
+    # BR-07: every active site submits its daily report by this hour (site time).
     report_deadline_hour: int = Field(default=18, ge=0, le=23)
 
     @field_validator("cors_origins", "allowed_hosts", mode="before")

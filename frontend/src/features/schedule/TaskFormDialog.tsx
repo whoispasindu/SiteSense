@@ -88,7 +88,11 @@ export function TaskFormDialog({ project, task, open, onClose }: TaskFormDialogP
           onChange={(e) => {
             setSectionId(e.target.value);
           }}
-          hint={section ? `Section ${section.code} is ${percent(section.amount, project.boq_total).toFixed(1)}% of the BOQ value: a guide for the weight.` : undefined}
+          hint={
+            section?.amount !== undefined && project.boq_total !== undefined
+              ? `Section ${section.code} is ${percent(section.amount, project.boq_total).toFixed(1)}% of the BOQ value: a guide for the weight.`
+              : undefined
+          }
         >
           <option value="">None</option>
           {project.sections.map((s) => (

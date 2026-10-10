@@ -22,7 +22,7 @@ function shortDate(iso: string): string {
   return tickDate.format(new Date(`${iso}T00:00:00Z`));
 }
 
-function CurveTooltip({ active, payload, label }: TooltipContentProps<TooltipValueType, string | number>) {
+export function CurveTooltip({ active, payload, label }: TooltipContentProps<TooltipValueType, string | number>) {
   if (!active || payload.length === 0) return null;
   const planned = payload.find((p) => p.dataKey === "planned")?.value;
   const actual = payload.find((p) => p.dataKey === "actual")?.value;
