@@ -8,6 +8,7 @@ import { SectionHeading } from "../../components/ui/SectionHeading";
 import { Sheet } from "../../components/ui/Sheet";
 import { durationWeeks, formatDate } from "../../features/projects/dates";
 import { KpiTile, ProgrammeBar } from "../../features/projects/ProjectBits";
+import { StopWorkBanner } from "../../features/reports/StopWorkBanner";
 import { ProjectRiskPanel } from "../../features/risk/ProjectRiskPanel";
 import { formatAmount, formatCompactLKR, percent, toNumber } from "../../lib/money";
 import { useCurrentProject } from "./projectContext";
@@ -35,6 +36,7 @@ export function ProjectOverview() {
 
   return (
     <div className="space-y-10">
+      {can("reports:read") ? <StopWorkBanner projectId={p.id} /> : null}
       <div className="grid gap-6 lg:grid-cols-[22rem_1fr]">
         <Sheet as="div">
           <p className="border-b border-rule px-4 py-3 text-sm font-semibold text-ink">Project details</p>

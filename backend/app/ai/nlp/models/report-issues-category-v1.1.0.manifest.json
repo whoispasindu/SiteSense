@@ -1,0 +1,314 @@
+{
+ "format": "sitesense-onnx-textclf-v1",
+ "name": "report-issues-category",
+ "version": "1.1.0",
+ "base_model": "distilbert-base-uncased",
+ "labels": [
+  "material_delay",
+  "labour",
+  "weather",
+  "equipment",
+  "safety",
+  "design",
+  "quality",
+  "other"
+ ],
+ "max_length": 48,
+ "outputs": "category_logits",
+ "release_tag": "models-report-issues-1.1.0",
+ "files": {
+  "model": {
+   "name": "report-issues-v1.1.0.fp32.onnx",
+   "sha256": "a6342b8a922cbd2af33dd1e13617a10dc1e17b33fe312ccf91fb62ba953d66a2",
+   "bytes": 265599130
+  },
+  "tokenizer": {
+   "name": "tokenizer.json",
+   "sha256": "11ba3839d32ab3fcdba2614768990d23a89fd9023d2f1f70ee913efeb02237aa",
+   "bytes": 711659
+  }
+ },
+ "trained_at": "2026-10-10T21:35:03+00:00",
+ "evidence": {
+  "test_sentences": 199,
+  "baseline_category_macro_f1": 0.73,
+  "distilbert_pytorch": 0.801,
+  "distilbert_onnx_fp32": 0.801,
+  "distilbert_onnx_int8": 0.785,
+  "gain_fp32_vs_baseline_bootstrap": {
+   "mean": 0.072,
+   "low": 0.012,
+   "high": 0.134,
+   "share_above_zero": 0.991
+  },
+  "gain_int8_vs_baseline_bootstrap": {
+   "mean": 0.056,
+   "low": -0.009,
+   "high": 0.121,
+   "share_above_zero": 0.959
+  },
+  "rule": "adopt if the gain on the hand-written test set is about 5 macro F1 points or more"
+ },
+ "golden": [
+  {
+   "text": "slab pour cancelled due to forecast heavy rain",
+   "category": [
+    0.006566,
+    0.001053,
+    0.978451,
+    0.004105,
+    0.000875,
+    0.003066,
+    0.004204,
+    0.00168
+   ]
+  },
+  {
+   "text": "temple loudspeaker noise complaint from residents",
+   "category": [
+    0.004674,
+    0.014296,
+    0.011258,
+    0.377958,
+    0.097372,
+    0.034317,
+    0.021991,
+    0.438134
+   ]
+  },
+  {
+   "text": "column schedule and plan show different sizes for C7",
+   "category": [
+    0.005749,
+    0.0023,
+    0.001235,
+    0.001855,
+    0.002631,
+    0.982172,
+    0.002159,
+    0.001899
+   ]
+  },
+  {
+   "text": "setting out drawing grid lines dont close by 50mm",
+   "category": [
+    0.003224,
+    0.00177,
+    0.001561,
+    0.00321,
+    0.014537,
+    0.945048,
+    0.028961,
+    0.001688
+   ]
+  },
+  {
+   "text": "scaffold base on soft ground looks unsafe",
+   "category": [
+    0.019747,
+    0.000954,
+    0.001795,
+    0.051227,
+    0.022071,
+    0.027975,
+    0.874317,
+    0.001915
+   ]
+  },
+  {
+   "text": "only 4 people turned up, everything stopped",
+   "category": [
+    0.033875,
+    0.872516,
+    0.020717,
+    0.003447,
+    0.014035,
+    0.007984,
+    0.006814,
+    0.04061
+   ]
+  },
+  {
+   "text": "neighbours complained about noise so we stopped at 6pm",
+   "category": [
+    0.000525,
+    0.00469,
+    0.002272,
+    0.001018,
+    0.001088,
+    0.001402,
+    0.001182,
+    0.987824
+   ]
+  },
+  {
+   "text": "cement awa naha, masons idle after 11",
+   "category": [
+    0.686123,
+    0.257884,
+    0.00726,
+    0.016424,
+    0.023822,
+    0.001701,
+    0.004796,
+    0.001992
+   ]
+  },
+  {
+   "text": "fire extinguisher at the store is empty",
+   "category": [
+    0.001378,
+    0.002313,
+    0.003244,
+    0.015398,
+    0.964971,
+    0.004337,
+    0.001639,
+    0.00672
+   ]
+  },
+  {
+   "text": "monsoon rain made the access road muddy and lorries got stuck",
+   "category": [
+    0.002863,
+    0.001387,
+    0.986979,
+    0.000975,
+    0.001572,
+    0.000711,
+    0.002413,
+    0.003099
+   ]
+  },
+  {
+   "text": "municipal council inspector halted work pending approval",
+   "category": [
+    0.000679,
+    0.00299,
+    0.006124,
+    0.002184,
+    0.002574,
+    0.011147,
+    0.003219,
+    0.971083
+   ]
+  },
+  {
+   "text": "road widening works blocking our gate",
+   "category": [
+    0.00401,
+    0.005828,
+    0.166319,
+    0.011748,
+    0.033615,
+    0.082329,
+    0.050659,
+    0.645492
+   ]
+  },
+  {
+   "text": "concrete for footing F7 never turned up and the excavation is filling with water",
+   "category": [
+    0.219747,
+    0.010859,
+    0.017739,
+    0.075436,
+    0.019833,
+    0.321265,
+    0.318025,
+    0.017094
+   ]
+  },
+  {
+   "text": "supplier says the rebar lorry broke down, nothing came today so the slab crew sat idle",
+   "category": [
+    0.613076,
+    0.036464,
+    0.015712,
+    0.216876,
+    0.025295,
+    0.041125,
+    0.018075,
+    0.033378
+   ]
+  },
+  {
+   "text": "waiting for the building permit extension",
+   "category": [
+    0.007002,
+    0.004171,
+    0.005383,
+    0.0037,
+    0.010785,
+    0.25923,
+    0.003073,
+    0.706655
+   ]
+  },
+  {
+   "text": "the land owner next door blocked the access lane",
+   "category": [
+    0.000425,
+    0.00184,
+    0.005017,
+    0.000836,
+    0.005429,
+    0.005123,
+    0.002276,
+    0.979054
+   ]
+  },
+  {
+   "text": "heat stroke - a helper fainted at 2pm",
+   "category": [
+    0.001319,
+    0.002186,
+    0.005713,
+    0.008841,
+    0.974225,
+    0.001642,
+    0.003239,
+    0.002835
+   ]
+  },
+  {
+   "text": "mortar mix too weak this morning - corrected",
+   "category": [
+    0.73048,
+    0.00234,
+    0.012716,
+    0.07256,
+    0.025316,
+    0.005552,
+    0.149444,
+    0.001592
+   ]
+  },
+  {
+   "text": "rusty rebar delivered for the beams",
+   "category": [
+    0.668115,
+    0.003391,
+    0.004135,
+    0.046295,
+    0.062179,
+    0.007149,
+    0.206843,
+    0.001892
+   ]
+  },
+  {
+   "text": "only 8 masons today out of 20",
+   "category": [
+    0.004951,
+    0.975678,
+    0.002535,
+    0.001738,
+    0.012246,
+    0.0008,
+    0.001142,
+    0.000911
+   ]
+  }
+ ]
+}

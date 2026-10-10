@@ -21,6 +21,8 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.ai.nlp import model as text_model
+from app.ai.nlp.tagger import tag_problems
 from app.core import clock
 from app.core.config import get_settings
 from app.core.database import Database
@@ -42,6 +44,7 @@ from app.models import (
     Project,
     PurchaseOrder,
     PurchaseOrderLine,
+    ReportIssue,
     Site,
     Supplier,
     Task,
@@ -274,6 +277,7 @@ def seed_dev() -> int:
         _seed_reports(db)
         _seed_materials(db)
         _seed_risk_inputs(db)
+        _seed_issues(db)
         risk_service.score_all(db)
     database.dispose()
     print(
@@ -482,6 +486,30 @@ def _seed_risk_inputs(db: Session) -> None:
     if peradeniya is not None and pm is not None:
         for days_ago in range(14):
             file(peradeniya, pm, days_ago, 41 + days_ago % 4)
+    db.commit()
+
+
+def _seed_issues(db: Session) -> None:
+    """Tag the demo reports' problems with the shipped classifier and record the confident tags as
+    confirmed by their authors, so the demo has issues and the risk model sees them. Low-confidence
+    tags are left out, as a careful engineer would remove or correct them. Reports that already have
+    issues are left alone."""
+    for report in db.scalars(select(DailyReport).where(DailyReport.problems.is_not(None))):
+        if db.scalar(select(ReportIssue).where(ReportIssue.report_id == report.id)):
+            continue
+        now = clock.utcnow()
+        tags = [t for t in tag_problems(report.problems, [report.author.full_name]) if not t.low_confidence]
+        for position, tag in enumerate(tags):
+            db.add(
+                ReportIssue(
+                    report_id=report.id, project_id=report.project_id, snippet=tag.snippet,
+                    category=tag.category, severity=tag.severity, status="confirmed", source="ai",
+                    ai_category=tag.category, ai_severity=tag.severity,
+                    confidence=Decimal(str(tag.confidence)), low_confidence=False,
+                    model_version=text_model.CURRENT_VERSION,
+                    position=position, created_at=now, confirmed_by=report.author_id, confirmed_at=now,
+                )
+            )  # fmt: skip
     db.commit()
 
 

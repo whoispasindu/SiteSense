@@ -15,6 +15,8 @@ takes its neutral value and a note says so, so the score is still produced but t
     budget_variance_pct    committed cost against the budgeted value of the same work, % over
     crew_vs_plan_pct       average reported crew over the last 14 days against the planned crew, %
     missing_reports_14     working days (Mon to Sat) in the last 14 without a daily report (BR-07)
+    issues_*_14            confirmed material-delay, safety and design issues in the last 14 days of
+                           reports (Phase 7: tagged by the report classifier, confirmed by the author)
     contract_value_m       LKR millions
     type_*                 project type, one-hot
 """
@@ -26,16 +28,18 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
     DailyReport,
     Delivery,
+    IssueStatus,
     ProgressSnapshot,
     Project,
     PurchaseOrder,
     PurchaseOrderLine,
+    ReportIssue,
     Task,
     WeatherForecast,
 )
@@ -54,6 +58,9 @@ FEATURE_NAMES = (
     "budget_variance_pct",
     "crew_vs_plan_pct",
     "missing_reports_14",
+    "issues_material_14",
+    "issues_safety_14",
+    "issues_design_14",
     "contract_value_m",
     *(f"type_{t}" for t in PROJECT_TYPES),
 )
@@ -187,6 +194,29 @@ def _reports(db: Session, project: Project, on: date, notes: list[str]) -> tuple
     return (average / project.planned_crew - 1) * 100, float(missing)
 
 
+def _issues(db: Session, project: Project, on: date) -> dict[str, float]:
+    """Confirmed issues by category in reports dated within the last 14 days."""
+    since = on - timedelta(days=WINDOW_DAYS - 1)
+    counts = dict(
+        db.execute(
+            select(ReportIssue.category, func.count(ReportIssue.id))
+            .join(DailyReport, DailyReport.id == ReportIssue.report_id)
+            .where(
+                ReportIssue.project_id == project.id,
+                ReportIssue.status == IssueStatus.CONFIRMED.value,
+                DailyReport.report_date >= since,
+                DailyReport.report_date <= on,
+            )
+            .group_by(ReportIssue.category)
+        ).all()
+    )
+    return {
+        "issues_material_14": float(counts.get("material_delay", 0)),
+        "issues_safety_14": float(counts.get("safety", 0)),
+        "issues_design_14": float(counts.get("design", 0)),
+    }
+
+
 def build(db: Session, project: Project, on: date) -> FeatureSet:
     notes: list[str] = []
     planned_days = (project.planned_end - project.start_date).days + 1
@@ -210,6 +240,7 @@ def build(db: Session, project: Project, on: date) -> FeatureSet:
         "budget_variance_pct": _cost(db, project),
         "crew_vs_plan_pct": crew,
         "missing_reports_14": missing,
+        **_issues(db, project, on),
         "contract_value_m": float(project.contract_value) / 1_000_000,
         **{f"type_{t}": float(project.project_type == t) for t in PROJECT_TYPES},
     }

@@ -73,7 +73,14 @@ jobs:
           if psql -h localhost -U sitesense_app -d sitesense -c "CREATE TABLE should_fail (id int)"; then
             echo "::error::sitesense_app was able to create a table"; exit 1
           fi
+      - name: Fetch model files (GitHub Release, SHA-256 checked)
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/fetch_models.py
       - name: Pytest
+        env:
+          SITESENSE_REQUIRE_MODELS: "1" # the ONNX tests must run here, never skip
         run: pytest --cov --cov-report=term-missing
 
   frontend:

@@ -39,6 +39,11 @@ exclude = ["alembic/versions/"]
 module = ["apscheduler.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# onnxruntime ships without type hints (the report classifier, Phase 7).
+module = ["onnxruntime.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers --strict-config"

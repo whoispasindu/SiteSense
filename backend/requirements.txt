@@ -18,3 +18,7 @@ python-multipart==0.0.32
 pillow==12.3.0
 # In-process scheduled jobs (missing-report reminders, weather refresh).
 APScheduler==3.11.3
+# Report issue classifier (Phase 7): the DistilBERT category model runs as ONNX; its files are
+# fetched from a GitHub Release and checked against a SHA-256 manifest (scripts/fetch_models.py).
+onnxruntime==1.31.0
+tokenizers==0.23.3

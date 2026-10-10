@@ -20,6 +20,8 @@ from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, No
 from app.core.permissions import Permission, Role, has_permission
 from app.core.scoping import scope_to_user_sites
 from app.models import (
+    ActionKind,
+    ActionStatus,
     Approval,
     BoqItem,
     BoqSection,
@@ -30,6 +32,7 @@ from app.models import (
     Project,
     ProjectStatus,
     PurchaseOrderLine,
+    ReportAction,
     RequestStatus,
     User,
 )
@@ -603,6 +606,7 @@ def create_request(db: Session, user: User, data: RequestCreate, *, meta: Reques
     check = evaluate(facts, data.quantity, unit_price)
     if check.blocked:
         raise _blocked(check)
+    follow_up = _report_follow_up(db, project, data.report_action_id)
 
     request = MaterialRequest(
         number=next_number(db, "MR"),
@@ -638,8 +642,26 @@ def create_request(db: Session, user: User, data: RequestCreate, *, meta: Reques
         },
     )
     _notify_approvers(db, request, project)
+    if follow_up is not None:
+        follow_up.status, follow_up.request_id = ActionStatus.DONE.value, request.id
+        follow_up.closed_by, follow_up.closed_at = user.id, clock.utcnow()
     db.commit()
     return request
+
+
+def _report_follow_up(db: Session, project: Project, action_id: uuid.UUID | None) -> ReportAction | None:
+    """The open "raise a material request" follow-up this request comes from, locked; or None."""
+    if action_id is None:
+        return None
+    action = db.scalars(select(ReportAction).where(ReportAction.id == action_id).with_for_update()).first()
+    if (
+        action is None
+        or action.project_id != project.id
+        or action.kind != ActionKind.MATERIAL_REQUEST.value
+        or action.status != ActionStatus.OPEN.value
+    ):
+        raise BusinessRuleError("That follow-up is not an open material request for this project.")
+    return action
 
 
 def update_request(

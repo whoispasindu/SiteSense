@@ -1,0 +1,20 @@
+{
+  "test_sentences": 199,
+  "baseline_category_macro_f1": 0.73,
+  "distilbert_pytorch": 0.801,
+  "distilbert_onnx_fp32": 0.801,
+  "distilbert_onnx_int8": 0.785,
+  "gain_fp32_vs_baseline_bootstrap": {
+    "mean": 0.072,
+    "low": 0.012,
+    "high": 0.134,
+    "share_above_zero": 0.991
+  },
+  "gain_int8_vs_baseline_bootstrap": {
+    "mean": 0.056,
+    "low": -0.009,
+    "high": 0.121,
+    "share_above_zero": 0.959
+  },
+  "rule": "adopt if the gain on the hand-written test set is about 5 macro F1 points or more"
+}

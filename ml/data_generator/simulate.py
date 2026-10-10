@@ -52,6 +52,9 @@ FEATURES = (
     "budget_variance_pct",  # committed cost against the budgeted value of the same work, % over
     "crew_vs_plan_pct",  # average reported crew over the last 14 days against the planned crew, %
     "missing_reports_14",  # working days in the last 14 days without a daily report (BR-07)
+    "issues_material_14",  # confirmed material-delay issues in reports of the last 14 days (Phase 7)
+    "issues_safety_14",  # confirmed safety issues in the last 14 days
+    "issues_design_14",  # confirmed design or drawing issues in the last 14 days
     "contract_value_m",  # LKR millions
     *(f"type_{t}" for t in PROJECT_TYPES),
 )
@@ -175,6 +178,11 @@ def simulate(
     finished_at: float | None = None
     week = 0
     report_miss = 0.02 + 0.30 * (1 - project.quality) ** 2
+    design_heat = 0.0  # raised by a variation: RFIs and drawing changes follow it for a few weeks
+    # Issue counts use their own random stream, so adding them (Phase 7) left every simulated project,
+    # and its outcome, exactly as in risk model v1.0: only the new inputs differ.
+    issue_rng = np.random.default_rng(10_000 + project.id)
+    issue_history: list[tuple[int, int, int]] = []  # (material, safety, design) issues per week
 
     while finished_at is None and week < 3 * W:
         week_start = project.start + timedelta(weeks=week)
@@ -217,6 +225,7 @@ def simulate(
             extra = rng.uniform(0.02, 0.08)
             required += extra * W
             cost_extra += extra * budget
+            design_heat += 1.5
 
         before = work
         work += efficiency
@@ -236,9 +245,24 @@ def simulate(
                 late_seen[i] = float(max(late_seen.get(i, 0.0), lateness))
 
         # What the app would have recorded this week.
+        filed_days = 0
         for _ in range(WORKING_DAYS):
             filed = rng.random() > report_miss
             daily_crew.append(project.planned_crew * crew_ratio * rng.normal(1, 0.08) if filed else None)
+            filed_days += filed
+        # Issues the engineers tag and confirm in their reports (only in reports that were filed):
+        # material delays follow overdue deliveries, safety issues follow poor site management, and
+        # design issues follow variations.
+        filed_share = filed_days / WORKING_DAYS
+        issue_history.append(
+            (
+                int(issue_rng.poisson((0.1 + 0.5 * overdue) * filed_share)),
+                int(issue_rng.poisson((0.05 + 0.6 * (1 - project.quality) ** 2) * filed_share)),
+                int(issue_rng.poisson((0.08 + design_heat) * filed_share)),
+            )
+        )
+        design_heat *= 0.6
+        recent_issues = issue_history[-2:]
 
         done_fraction = min(work / required, 1.0)
         snapshot = week_start + timedelta(days=6)
@@ -285,6 +309,9 @@ def simulate(
             "budget_variance_pct": variance_pct,
             "crew_vs_plan_pct": float(crew_pct),
             "missing_reports_14": float(sum(1 for c in last_12 if c is None)),
+            "issues_material_14": float(sum(w[0] for w in recent_issues)),
+            "issues_safety_14": float(sum(w[1] for w in recent_issues)),
+            "issues_design_14": float(sum(w[2] for w in recent_issues)),
             "contract_value_m": project.contract_value_m,
             **{f"type_{t}": float(project.project_type == t) for t in PROJECT_TYPES},
         }

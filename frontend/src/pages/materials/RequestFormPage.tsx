@@ -105,7 +105,9 @@ export function RequestFormPage() {
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
   const [neededBy, setNeededBy] = useState(addDaysIso(siteTodayIso(), 7));
-  const [notes, setNotes] = useState("");
+  // Opened from a daily report's follow-up (Phase 7): the notes start with the reported problem.
+  const fromAction = params.get("action") ?? "";
+  const [notes, setNotes] = useState(params.get("notes")?.slice(0, 2000) ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const options = useBoqOptions(projectId);
 
@@ -139,7 +141,7 @@ export function RequestFormPage() {
     setErrors(next);
     if (Object.keys(next).length || !item) return;
     create.mutate(
-      { ...draft, needed_by: neededBy, notes: notes.trim() || null },
+      { ...draft, needed_by: neededBy, notes: notes.trim() || null, ...(fromAction ? { report_action_id: fromAction } : {}) },
       {
         onSuccess: (request) => {
           void navigate(`/materials/${request.id}`);
@@ -157,6 +159,7 @@ export function RequestFormPage() {
       />
 
       {create.isError ? <Alert tone="error">{errorText(create.error)}</Alert> : null}
+      {fromAction ? <Alert tone="info">Raising the material request from a daily report. The report's follow-up closes when you submit.</Alert> : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <Sheet className="space-y-5 p-5">
