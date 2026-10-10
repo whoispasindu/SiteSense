@@ -5,6 +5,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { ApiError } from "../../api/client";
 import { useHealth, useReadiness } from "../../api/health";
 import { useProjects } from "../../api/projects";
+import { useRiskRanking } from "../../api/risk";
 import { useScheduleSummary } from "../../api/schedule";
 import { useAuth } from "../../auth/context";
 import { Button } from "../../components/ui/Button";
@@ -14,6 +15,7 @@ import { Sheet } from "../../components/ui/Sheet";
 import { StatusBadge, type Tone } from "../../components/ui/StatusBadge";
 import { KpiTile } from "../../features/projects/ProjectBits";
 import { TodayReports } from "../../features/reports/TodayReports";
+import { RiskRankingPanel } from "../../features/risk/RiskRankingPanel";
 import { varianceLabel } from "../../features/schedule/variance";
 import { formatCompactLKR, toNumber } from "../../lib/money";
 import { formatSiteDate, greeting } from "../../lib/time";
@@ -133,13 +135,16 @@ function PortfolioOverview() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-[repeat(auto-fit,minmax(13rem,1fr))]">
         <KpiTile icon="projects" label="Active projects" value={projects.isPending ? "—" : String(active)} note={`${String(list.length)} in total`} />
         {priced ? (
           <KpiTile icon="cost" label="Contract value" value={projects.isPending ? "—" : formatCompactLKR(contract)} note="All visible projects" />
         ) : null}
         {can("schedule:read") ? <ScheduleKpis /> : null}
+        {can("risk:read") ? <HighRiskKpi /> : null}
       </div>
+
+      {can("risk:read") ? <RiskRankingPanel /> : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         {can("schedule:read") ? <ScheduleHealth /> : null}
@@ -148,6 +153,20 @@ function PortfolioOverview() {
         ) : null}
       </div>
     </div>
+  );
+}
+
+function HighRiskKpi() {
+  const ranking = useRiskRanking();
+  const high = (ranking.data ?? []).filter((r) => r.level === "high").length;
+  return (
+    <KpiTile
+      icon="risk"
+      label="High risk"
+      value={ranking.isPending ? "—" : String(high)}
+      note={high ? "Risk score 70 or more (BR-10)" : "No project is at high risk"}
+      tone={high ? "down" : "ok"}
+    />
   );
 }
 

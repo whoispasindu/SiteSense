@@ -14,6 +14,8 @@ from app.models import (
     MaterialRequest,
     ProgressSnapshot,
     Project,
+    PurchaseOrder,
+    RiskScore,
     Site,
     Supplier,
     Task,
@@ -87,9 +89,22 @@ def test_seed_dev_creates_sites_and_one_user_per_role(
         cli_db.scalar(select(ProgressSnapshot).where(ProgressSnapshot.project_id == havelock.id)) is not None
     )
     reports = cli_db.scalars(select(DailyReport).where(DailyReport.project_id == havelock.id)).all()
-    assert len(reports) == 5
+    assert len(reports) >= 12  # the week in DEMO_REPORTS plus two earlier weeks with gaps
+    assert len({r.report_date for r in reports}) == len(reports)  # one report a day, even after a re-run
     # Today's report is left for the demo engineer to file.
     assert clock.site_today() not in {r.report_date for r in reports}
+    # Phase 6: every open demo project has its inputs and a risk score from the shipped model.
+    projects = cli_db.scalars(select(Project).where(Project.code.in_(cli.DEMO_CREWS))).all()
+    assert {p.code: p.planned_crew for p in projects} == cli.DEMO_CREWS
+    scores = cli_db.scalars(select(RiskScore)).all()
+    assert {s.project_id for s in scores} == {p.id for p in projects}
+    assert all(s.score_date == clock.site_today() for s in scores)
+    overdue = cli_db.scalars(
+        select(PurchaseOrder).where(
+            PurchaseOrder.project_id == havelock.id, PurchaseOrder.expected_delivery < clock.site_today()
+        )
+    ).all()
+    assert len(overdue) == 2
     statuses = sorted(r.status for r in cli_db.scalars(select(MaterialRequest)).all())
     assert statuses == ["approved", "change_requested", "delivered", "ordered", "pm_approval", "requested"]
     assert cli_db.scalar(select(func.count(Supplier.id))) == 5
@@ -125,3 +140,9 @@ def test_seed_dev_refuses_production(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr(cli, "get_settings", lambda: production)
     assert cli.main(["seed-dev"]) == 1
+
+
+def test_score_risk_command(cli_db: Session, capsys: pytest.CaptureFixture[str]) -> None:
+    assert cli.main(["score-risk"]) == 0
+
+    assert "Scored" in capsys.readouterr().out

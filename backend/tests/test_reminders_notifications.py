@@ -149,9 +149,10 @@ def test_scheduler_has_the_reminder_at_the_deadline(settings: Settings) -> None:
 
     jobs = {job.id: job for job in scheduler.get_jobs()}
 
-    assert set(jobs) == {"report_reminders", "weather_refresh"}
+    assert set(jobs) == {"report_reminders", "weather_refresh", "risk_scoring"}
     assert str(jobs["report_reminders"].trigger) == "cron[hour='18', minute='0']"
     assert str(jobs["weather_refresh"].trigger) == "cron[hour='5', minute='30']"
+    assert str(jobs["risk_scoring"].trigger) == "cron[hour='6', minute='0']"  # after the weather
     database.dispose()
 
 

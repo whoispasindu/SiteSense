@@ -18,7 +18,7 @@ const SUMMARY: ProjectSummary = {
   planned_end: "2027-09-30", boq_total: "0.00", budget_total: "0.00", item_count: 0,
 };
 const DETAIL: ProjectDetail = {
-  ...SUMMARY, description: null, sections: [], team: [],
+  ...SUMMARY, description: null, planned_crew: null, sections: [], team: [],
   created_at: "2026-10-01T08:00:00+00:00", updated_at: "2026-10-01T08:00:00+00:00",
 };
 

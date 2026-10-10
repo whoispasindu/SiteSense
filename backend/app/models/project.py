@@ -60,6 +60,8 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     planned_end: Mapped[date] = mapped_column(Date, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Planned average crew on site: the risk model compares reported crews with it (Phase 6).
+    planned_crew: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     site: Mapped[Site] = relationship(lazy="joined")
     sections: Mapped[list["BoqSection"]] = relationship(
@@ -69,6 +71,7 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint("contract_value > 0", name="contract_value_positive"),
         CheckConstraint("planned_end >= start_date", name="dates_in_order"),
+        CheckConstraint("planned_crew IS NULL OR planned_crew BETWEEN 1 AND 5000", name="planned_crew_range"),
         CheckConstraint(
             "status IN ('planning', 'active', 'on_hold', 'completed', 'cancelled')", name="status_valid"
         ),

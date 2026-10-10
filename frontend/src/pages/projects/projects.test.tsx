@@ -39,6 +39,7 @@ const SECTION = {
 const DETAIL: ProjectDetail = {
   ...SUMMARY,
   description: null,
+  planned_crew: null,
   sections: [SECTION],
   team: [{ id: "1d2e3f4a-5b6c-4d7e-8f9a-0b1c2d3e4f5a", full_name: "Kasun Perera", role: "site_engineer", role_label: "Site Engineer" }],
   created_at: "2026-10-01T08:00:00+00:00",
@@ -125,6 +126,11 @@ describe("ProjectsPage", () => {
 
     await user.clear(within(dialog).getByLabelText("Planned end"));
     await user.type(within(dialog).getByLabelText("Planned end"), "2027-09-30");
+    await user.type(within(dialog).getByLabelText("Planned crew (optional)"), "0");
+    await user.click(within(dialog).getByRole("button", { name: "Create project" }));
+    expect(within(dialog).getByText("Enter a whole number of people, 1 to 5000.")).toBeInTheDocument();
+    await user.clear(within(dialog).getByLabelText("Planned crew (optional)"));
+    await user.type(within(dialog).getByLabelText("Planned crew (optional)"), "55");
     await user.click(within(dialog).getByRole("button", { name: "Create project" }));
 
     await waitFor(() => {
@@ -137,6 +143,7 @@ describe("ProjectsPage", () => {
       contract_value: "1114000000.00",
       status: "planning",
       description: null,
+      planned_crew: 55,
     });
   });
 });

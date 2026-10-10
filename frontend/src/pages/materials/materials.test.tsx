@@ -413,7 +413,7 @@ describe("Suppliers", () => {
 
 describe("Cost control on the BOQ tab", () => {
   const detail: ProjectDetail = {
-    ...PROJECT, description: null, team: [], created_at: "2026-10-01T08:00:00+00:00", updated_at: "2026-10-01T08:00:00+00:00",
+    ...PROJECT, description: null, planned_crew: null, team: [], created_at: "2026-10-01T08:00:00+00:00", updated_at: "2026-10-01T08:00:00+00:00",
     sections: [{ id: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", code: "A", name: "Materials", item_count: 2, amount: "5500000.00",
                  budget_line_id: "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", budget_amount: "4400000.00" }],
   };
@@ -543,7 +543,7 @@ describe("Materials edge cases", () => {
     const over = { boq_amount: "5500000.00", budget: "100000.00", approved: "0.00", on_order: "50000.00", spent: "80000.00",
                    committed: "130000.00", remaining: "-30000.00" };
     const detail: ProjectDetail = {
-      ...PROJECT, description: null, team: [], created_at: "2026-10-01T08:00:00+00:00", updated_at: "2026-10-01T08:00:00+00:00",
+      ...PROJECT, description: null, planned_crew: null, team: [], created_at: "2026-10-01T08:00:00+00:00", updated_at: "2026-10-01T08:00:00+00:00",
       sections: [{ id: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", code: "A", name: "Materials", item_count: 2, amount: "5500000.00",
                    budget_line_id: "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e", budget_amount: "100000.00" }],
     };
@@ -742,7 +742,7 @@ describe("Prices and routing", () => {
 
   it("shows a site engineer the BOQ with quantities only", async () => {
     const detail = {
-      ...PROJECT, contract_value: undefined, boq_total: undefined, budget_total: undefined, description: null, team: [],
+      ...PROJECT, contract_value: undefined, boq_total: undefined, budget_total: undefined, description: null, planned_crew: null, team: [],
       created_at: "2026-10-01T08:00:00+00:00", updated_at: "2026-10-01T08:00:00+00:00",
       sections: [{ id: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", code: "A", name: "Materials", item_count: 1 }],
     };
@@ -771,7 +771,7 @@ describe("Prices and routing", () => {
 describe("Engineer views without costs", () => {
   const card = { ...PROJECT, contract_value: undefined, boq_total: undefined, budget_total: undefined };
   const detail = {
-    ...card, description: null, team: [], created_at: "2026-10-01T08:00:00+00:00", updated_at: "2026-10-01T08:00:00+00:00",
+    ...card, description: null, planned_crew: null, team: [], created_at: "2026-10-01T08:00:00+00:00", updated_at: "2026-10-01T08:00:00+00:00",
     sections: [{ id: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", code: "A", name: "Materials", item_count: 2 }],
   };
   const engineerSummary = { ...SUMMARY, unit_price: undefined, amount: undefined };

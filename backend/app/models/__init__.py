@@ -15,6 +15,7 @@ from app.models.materials import (
 )
 from app.models.project import BoqItem, BoqSection, BudgetLine, Project, ProjectStatus, ProjectType
 from app.models.report import DailyReport, Notification, ReportPhoto, ReportProgress, WeatherForecast
+from app.models.risk import RiskScore
 from app.models.schedule import ProgressSnapshot, Task
 from app.models.user import RefreshToken, RoleRecord, Site, User, user_site_assignments
 
@@ -41,6 +42,7 @@ __all__ = [
     "ReportPhoto",
     "ReportProgress",
     "RequestStatus",
+    "RiskScore",
     "RoleRecord",
     "Site",
     "Supplier",

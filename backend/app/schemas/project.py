@@ -25,6 +25,10 @@ Money = Annotated[Decimal, Field(max_digits=16, decimal_places=2)]
 MAX_PROJECT_DAYS = 15 * 366
 
 
+# Planned average crew on site; the risk model compares reported crews with it.
+PlannedCrew = Annotated[int, Field(ge=1, le=5000)]
+
+
 class ProjectCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -38,6 +42,7 @@ class ProjectCreate(BaseModel):
     start_date: date
     planned_end: date
     description: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)] | None = None
+    planned_crew: PlannedCrew | None = None
 
     @model_validator(mode="after")
     def _dates_in_order(self) -> "ProjectCreate":
@@ -61,6 +66,7 @@ class ProjectUpdate(BaseModel):
     start_date: date | None = None
     planned_end: date | None = None
     description: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)] | None = None
+    planned_crew: PlannedCrew | None = None
 
 
 # Each response comes in two shapes. The base classes carry no rates or amounts and are what site
@@ -109,6 +115,7 @@ class TeamMember(BaseModel):
 
 class ProjectDetailBasics(ProjectCard):
     description: str | None
+    planned_crew: int | None
     sections: list[SectionBasics]
     team: list[TeamMember]
     created_at: datetime
@@ -117,6 +124,7 @@ class ProjectDetailBasics(ProjectCard):
 
 class ProjectDetail(ProjectSummary):
     description: str | None
+    planned_crew: int | None
     sections: list[SectionTotals]
     team: list[TeamMember]
     created_at: datetime
