@@ -97,7 +97,7 @@ describe("DashboardPage", () => {
 
     const api = await screen.findByRole("group", { name: "API" });
     expect(await within(api).findByText("Online")).toBeInTheDocument();
-    expect(await within(api).findByText(/v0\.0\.1/)).toBeInTheDocument();
+    expect(await within(api).findByText(/v0\.1\.0/)).toBeInTheDocument();
     const db = screen.getByRole("group", { name: "Database" });
     expect(await within(db).findByText("Ready")).toBeInTheDocument();
     expect(await screen.findByText("All systems are working.")).toBeInTheDocument();
