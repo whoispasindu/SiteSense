@@ -4,7 +4,7 @@ Thanks for helping. This guide covers local setup, the workflow, and what a pull
 
 ## Local setup
 
-Follow the [Quick start](README.md#quick-start). `docker compose up --build` gives you the
+Follow [Run it locally](README.md#run-it-locally). `docker compose up --build` gives you the
 database, API and web app with hot reload.
 
 ## Workflow

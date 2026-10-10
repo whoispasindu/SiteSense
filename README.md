@@ -12,8 +12,12 @@ SiteSense tells a construction company which site will slip before it does, and 
 
 </div>
 
-> **Status: Phase 3 of 14 (schedule and S-curve).** Product features arrive phase by phase
-> (see [Roadmap](#roadmap)). Nothing here is production-ready yet.
+![The project manager's dashboard ranks projects by risk; the project page shows the forecast and what moved it](docs/media/pm-risk-dashboard.gif)
+
+> **Status: v0.1 MVP (Phases 0 to 6 of 14).** Projects, BOQ and budgets, schedules, daily site
+> reports, materials and approvals, and the first AI feature: a daily delay and cost-overrun risk
+> score. More arrives phase by phase (see [Roadmap](#roadmap)). Not production-ready yet. The risk
+> model is trained on simulated projects (see the [model card](docs/model-card-risk.md)).
 
 ## What it will do
 
@@ -32,17 +36,41 @@ them, and clients see honest progress without internal costs.
 - Cost control, progress claims with retention, and variation orders
 - Client portal with progress and variation approval
 
-## Quick start
+## Run it locally
 
-You need **Docker Desktop** (or Docker Engine with Compose v2) and Git.
+There is no public demo yet; everything below runs on your machine. You need **Docker Desktop**
+(or Docker Engine with Compose v2) and **Git**.
+
+**1. Get the code and the local settings**
 
 ```bash
 git clone https://github.com/whoispasindu/SiteSense.git
 cd SiteSense
-docker compose up --build
+cp .env.example .env
 ```
 
-Then open:
+The values in `.env` are for local development only. Change the database passwords there
+**before the first start** if you want to (the roles are created once, when the database is first
+initialised).
+
+**2. Start the database, API and web app**
+
+```bash
+docker compose up --build -d
+```
+
+The first build takes a few minutes. The API runs its migrations on start.
+
+**3. Load the demo data**
+
+```bash
+docker compose exec backend python -m app.cli seed-dev
+```
+
+This creates three sites, one account per role, three demo projects with BOQs, programmes,
+daily reports, suppliers, material requests at every stage, and a risk score for every open project.
+
+**4. Open the app**
 
 | What | URL |
 | --- | --- |
@@ -50,33 +78,33 @@ Then open:
 | API health | http://localhost:8000/api/v1/health |
 | API docs (development only) | http://localhost:8000/api/docs |
 
-The first start creates the database and its two roles, runs migrations, and starts the API
-and the web app with hot reload. Stop with `Ctrl+C`; `docker compose down -v` also deletes the
-local database.
+### Demo accounts
 
-### Sign in
+Every account uses the password in `SITESENSE_DEMO_PASSWORD` in your `.env`
+(`SiteSense-Demo-2026!` unless you changed it).
 
-Create demo sites and one account per role (local development only):
+| Role | Email | Try this |
+| --- | --- | --- |
+| Project Manager | `pm@sitesense.example` | Dashboard ranked by risk; open Havelock Residences for the forecast and its drivers; approve requests sent to the PM |
+| Quantity Surveyor | `qs@sitesense.example` | Enter the quoted price at the QS check and watch BR-01 and BR-13 decide who approves; BOQ and budget |
+| Site Engineer | `engineer@sitesense.example` | File today's daily report for Havelock; raise a material request |
+| Procurement Officer | `procurement@sitesense.example` | Order approved requests, record deliveries, manage suppliers |
+| Company Admin | `admin@sitesense.example` | Users, sites and the audit log |
+| Client | `client@sitesense.example` | Client portal (arrives in Phase 12) |
 
-```bash
-docker compose exec backend python -m app.cli seed-dev
-```
+<p>
+  <img src="docs/media/engineer-daily-report.gif" alt="A site engineer files today's report: weather filled in from the forecast, work done, problems and task progress" width="49%">
+  <img src="docs/media/request-routing-br01.gif" alt="An engineer requests material without a price; the QS enters a quote 6.2% above the budgeted rate and BR-01 sends it to the project manager" width="49%">
+</p>
 
-| Role | Email |
-| --- | --- |
-| Company Admin | `admin@sitesense.example` |
-| Project Manager | `pm@sitesense.example` |
-| Quantity Surveyor | `qs@sitesense.example` |
-| Site Engineer | `engineer@sitesense.example` |
-| Procurement Officer | `procurement@sitesense.example` |
-| Client | `client@sitesense.example` |
+Stop with `docker compose down`; `docker compose down -v` also deletes the local database.
 
-`seed-dev` also creates three demo projects; Havelock Residences comes with a full BOQ
-(`backend/app/seed_data/boq-havelock-residences.csv`, also a good file to try the import with),
-a programme, a week of daily reports, five suppliers and material requests at every stage
-(QS check, PM approval, ready to order, ordered, delivered, change requested). Sign in as the
-site engineer to file today's report or raise a request, as the QS or PM to approve, and as
-procurement to order and receive.
+### More about the demo data
+
+Havelock Residences comes with a full BOQ (`backend/app/seed_data/boq-havelock-residences.csv`,
+also a good file to try the import with), a programme, a few weeks of daily reports, five suppliers
+and material requests at every stage (QS check, PM approval, ready to order, ordered, delivered,
+change requested).
 
 Every open demo project is also given a risk score by the model, and the PM and QS dashboards rank
 the projects by it. Havelock runs short-handed with a few missed reports and late deliveries;
@@ -96,8 +124,9 @@ docker compose exec backend python -m app.cli refresh-weather
 docker compose exec backend python -m app.cli score-risk
 ```
 
-The password is the value of `SITESENSE_DEMO_PASSWORD` (see `.env.example`). For a real
-company, create the first admin instead; it prints a one-time password:
+Run `refresh-weather` once after seeding to fill in the 14-day forecast (weather in reports and
+the risk model's rain input); it is also refreshed every morning. For a real company, create the
+first admin instead of seeding; it prints a one-time password:
 
 ```bash
 docker compose exec backend python -m app.cli create-admin --email you@company.lk --name "Your Name"
@@ -110,9 +139,6 @@ volume (otherwise the web container keeps its old packages):
 docker compose up --build -V
 ```
 
-The defaults are for local development only. To change the database passwords, copy
-`.env.example` to `.env` and edit it **before the first start** (the roles are created once,
-when the database volume is first initialised).
 
 ## Running without Docker
 
@@ -221,7 +247,7 @@ docs/           architecture, decision records, security reviews, model cards
 | 3 | Schedule basics | Done |
 | 4 | Daily site reports | Done |
 | 5 | Materials, approvals and rules engine | Done |
-| 6 | Demo data and risk model v1 → **v0.1 MVP** | In progress |
+| 6 | Demo data and risk model v1 → **v0.1 MVP** | Done |
 | 7 | Report NLP classifier | Planned |
 | 8 | Cost control, claims and variations | Planned |
 | 9 | Advanced schedule | Planned |
@@ -230,6 +256,7 @@ docs/           architecture, decision records, security reviews, model cards
 | 12 | Client portal | Planned |
 | 13 | Hardening and deployment | Planned |
 | 14 | Testing, UAT and evaluation → **v1.0** | Planned |
+| Later | Public demo: a hosted instance with seeded data | Planned |
 
 After v1.0: an offline-first mobile app for site engineers and voice input in Sinhala, Tamil
 and English.

@@ -135,7 +135,7 @@ function PortfolioOverview() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-[repeat(auto-fit,minmax(13rem,1fr))]">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))]">
         <KpiTile icon="projects" label="Active projects" value={projects.isPending ? "—" : String(active)} note={`${String(list.length)} in total`} />
         {priced ? (
           <KpiTile icon="cost" label="Contract value" value={projects.isPending ? "—" : formatCompactLKR(contract)} note="All visible projects" />
@@ -267,7 +267,7 @@ function SystemStatus() {
         </div>
         <p className="mt-3 text-sm text-ink-soft" aria-live="polite">
           {health.isError
-            ? "The API is not answering. Is the backend running? See the README quick start."
+            ? "The API is not answering. Is the backend running? See “Run it locally” in the README."
             : readiness.isSuccess && !dbOk
               ? "The API is up but cannot reach PostgreSQL."
               : "All systems are working."}
