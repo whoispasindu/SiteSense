@@ -56,6 +56,7 @@ from app.schemas.materials import (
 from app.services import audit, notification_service, project_service
 from app.services.audit import AuditAction, RequestMeta
 from app.services.notification_service import NewNotification
+from app.services.visibility import sees_rates
 
 ZERO = Decimal(0)
 OPEN_PROJECT_STATUSES = {ProjectStatus.ACTIVE.value, ProjectStatus.ON_HOLD.value}
@@ -194,23 +195,43 @@ def evaluate(facts: ItemFacts, quantity: Decimal, unit_price: Decimal) -> RuleCh
     quantity_result = rules.check_quantity(
         boq_quantity=facts.item.quantity, already_requested=facts.already_requested, requested=quantity
     )
-    level, price_result = rules.route_approval(
+    level, routing, fired = rules.route_approval(
         unit_price=unit_price,
         budget_rate=facts.budget_rate,
         request_amount=amount,
         line_budget=facts.line_budget,
-        line_used=facts.line_used,
+        line_committed=facts.line_used,
     )
-    results = [quantity_result, price_result]
+    results = [quantity_result, *routing]
     return RuleCheckOut(
         approval_level=level,
         blocked=any(r.blocks for r in results),
         results=[
             RuleResultOut(rule=r.rule, severity=r.severity, message=r.message, facts=r.facts) for r in results
         ],
+        routed_by=fired,
         budget_rate=rules.money(facts.budget_rate),
         amount=amount,
     )
+
+
+def default_price(facts: ItemFacts) -> Decimal:
+    """The starting price for a request raised without one (site engineers do not see rates):
+    the item's budgeted rate, or its contract rate when the section has no budget yet."""
+    for candidate in (rules.money(facts.budget_rate), facts.item.rate):
+        if candidate > 0:
+            return candidate
+    raise BusinessRuleError("This BOQ item has no rate yet. Ask the quantity surveyor to raise the request.")
+
+
+def _no_prices_from(user: User, price: Decimal | None) -> None:
+    """Roles that do not see rates cannot set them either: the QS prices their requests."""
+    if price is not None and not sees_rates(user):
+        error = BusinessRuleError(
+            "Prices are set by the quantity surveyor at the QS check; leave the price out."
+        )
+        error.code = "price_not_allowed"
+        raise error
 
 
 def _blocked(check: RuleCheckOut) -> BusinessRuleError:
@@ -409,6 +430,7 @@ def boq_options(db: Session, project: Project) -> list[BoqItemOption]:
                 section_name=section.name,
                 boq_quantity=item.quantity,
                 requested_quantity=Decimal(requested.get(item.id) or 0),
+                remaining_quantity=max(item.quantity - Decimal(requested.get(item.id) or 0), ZERO),
                 budget_rate=rules.money(
                     rules.item_budget_rate(
                         item_rate=item.rate, section_amount=section_amount, line_budget=budget
@@ -435,9 +457,11 @@ def _check_needed_by(needed_by: date) -> None:
         raise BusinessRuleError("The needed-by date must be within two years.")
 
 
-def check_request(db: Session, project: Project, data: RequestCheck) -> RuleCheckOut:
+def check_request(db: Session, user: User, project: Project, data: RequestCheck) -> RuleCheckOut:
+    _no_prices_from(user, data.unit_price)
     item = _item(db, project, data.boq_item_id)
-    return evaluate(item_facts(db, project, item), data.quantity, data.unit_price)
+    facts = item_facts(db, project, item)
+    return evaluate(facts, data.quantity, data.unit_price or default_price(facts))
 
 
 def _history(
@@ -485,9 +509,12 @@ def create_request(db: Session, user: User, data: RequestCreate, *, meta: Reques
     project = project_service.get_project(db, user, data.project_id)
     _check_project_open(project)
     _check_needed_by(data.needed_by)
+    _no_prices_from(user, data.unit_price)
     # Lock the BOQ item: concurrent requests for it are checked one after another (BR-02).
     item = _item(db, project, data.boq_item_id, lock=True)
-    check = evaluate(item_facts(db, project, item), data.quantity, data.unit_price)
+    facts = item_facts(db, project, item)
+    unit_price = data.unit_price or default_price(facts)
+    check = evaluate(facts, data.quantity, unit_price)
     if check.blocked:
         raise _blocked(check)
 
@@ -497,7 +524,7 @@ def create_request(db: Session, user: User, data: RequestCreate, *, meta: Reques
         boq_item_id=item.id,
         requested_by=user.id,
         quantity=data.quantity,
-        unit_price=data.unit_price,
+        unit_price=unit_price,
         needed_by=data.needed_by,
         notes=data.notes,
         status=RequestStatus.REQUESTED.value,
@@ -540,6 +567,7 @@ def update_request(
         raise ConflictError("A request can only be changed after a change has been requested.")
     project = request.project
     _check_project_open(project)
+    _no_prices_from(user, data.unit_price)
     changes = data.model_dump(exclude_unset=True, exclude={"comment"})
     for required in ("quantity", "unit_price", "needed_by"):
         if required in changes and changes[required] is None:
@@ -618,9 +646,15 @@ def decide(
         if data.decision in ("reject", "request_change") and not data.comment:
             raise BusinessRuleError("Add a comment so the requester knows why.")
 
+    if data.unit_price is not None:
+        if not (stage == "qs" and data.decision == "approve"):
+            raise BusinessRuleError(
+                "A price can only be set by the quantity surveyor when approving at the QS check."
+            )
+        request.unit_price = data.unit_price
     level = request.approval_level
     if stage == "qs" and data.decision == "approve":
-        # Re-check routing with today's figures: commitments may have changed since submission.
+        # Re-check routing with today's figures (and the QS's price): commitments may have changed.
         facts = item_facts(db, project, request.boq_item, exclude=request)
         level = evaluate(facts, request.quantity, request.unit_price).approval_level
         request.approval_level = level
@@ -646,7 +680,13 @@ def decide(
         actor_id=user.id,
         target_type="material_request",
         target_id=request.id,
-        details={"number": request.number, "decision": data.decision, "from": previous, "to": target},
+        details={
+            "number": request.number,
+            "decision": data.decision,
+            "from": previous,
+            "to": target,
+            **({"unit_price": str(data.unit_price)} if data.unit_price is not None else {}),
+        },
     )
 
     notes: list[NewNotification] = []

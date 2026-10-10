@@ -95,7 +95,7 @@ export function ProjectsPage() {
       ) : (
         <ol aria-label="Projects" className="space-y-3">
           {list.map((p) => {
-            const coverage = percent(p.boq_total, p.contract_value);
+            const coverage = p.boq_total !== undefined && p.contract_value !== undefined ? percent(p.boq_total, p.contract_value) : null;
             return (
               <li key={p.id}>
                 <Link
@@ -117,11 +117,15 @@ export function ProjectsPage() {
                       </p>
                     </div>
                     <div>
-                      <p className="tabular text-lg font-semibold text-ink">{formatCompactLKR(p.contract_value)}</p>
+                      {p.contract_value !== undefined ? (
+                        <p className="tabular text-lg font-semibold text-ink">{formatCompactLKR(p.contract_value)}</p>
+                      ) : null}
                       <p className="mt-0.5 text-xs text-ink-faint">
-                        {p.item_count > 0
-                          ? `BOQ ${String(p.item_count)} items · ${coverage.toFixed(1)}% of contract`
-                          : "No BOQ yet"}
+                        {p.item_count === 0
+                          ? "No BOQ yet"
+                          : coverage === null
+                            ? `BOQ: ${String(p.item_count)} items`
+                            : `BOQ ${String(p.item_count)} items · ${coverage.toFixed(1)}% of contract`}
                       </p>
                     </div>
                     <div>

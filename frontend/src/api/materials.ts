@@ -48,8 +48,11 @@ export const ruleCheckSchema = z.object({
   approval_level: z.enum(["qs", "pm"]),
   blocked: z.boolean(),
   results: z.array(ruleResultSchema),
-  budget_rate: decimal,
-  amount: decimal,
+  // The rules that sent the request to the project manager (BR-01, BR-13).
+  routed_by: z.array(z.string()),
+  // Absent for roles without "rates:read", which also never receive the BR-01 / BR-13 results.
+  budget_rate: decimal.optional(),
+  amount: decimal.optional(),
 });
 export type RuleCheck = z.infer<typeof ruleCheckSchema>;
 
@@ -65,8 +68,8 @@ const requestSummarySchema = z.object({
     section_code: z.string(),
   }),
   quantity: decimal,
-  unit_price: decimal,
-  amount: decimal,
+  unit_price: decimal.optional(),
+  amount: decimal.optional(),
   needed_by: z.iso.date(),
   status: z.enum(REQUEST_STATUSES),
   approval_level: z.enum(["qs", "pm"]),
@@ -112,8 +115,8 @@ export const requestDetailSchema = requestSummarySchema.extend({
       id: z.uuid(),
       number: z.string(),
       supplier_name: z.string(),
-      unit_price: decimal,
-      amount: decimal,
+      unit_price: decimal.optional(),
+      amount: decimal.optional(),
       expected_delivery: z.iso.date(),
       delivered_quantity: decimal,
       deliveries: z.array(deliverySchema),
@@ -132,7 +135,8 @@ const boqOptionSchema = z.object({
   section_name: z.string(),
   boq_quantity: decimal,
   requested_quantity: decimal,
-  budget_rate: decimal,
+  remaining_quantity: decimal,
+  budget_rate: decimal.optional(),
 });
 export type BoqOption = z.infer<typeof boqOptionSchema>;
 
@@ -161,7 +165,7 @@ const poSummarySchema = z.object({
   project: projectRefSchema,
   supplier: supplierSchema,
   status: z.enum(PO_STATUSES),
-  total: decimal,
+  total: decimal.optional(),
   issued_at: timestamp,
   expected_delivery: z.iso.date(),
   issued_by: personSchema,
@@ -179,8 +183,8 @@ const poDetailSchema = poSummarySchema.extend({
       description: z.string(),
       unit: z.string(),
       quantity: decimal,
-      unit_price: decimal,
-      amount: decimal,
+      unit_price: decimal.optional(),
+      amount: decimal.optional(),
       delivered_quantity: decimal,
     }),
   ),
@@ -266,7 +270,8 @@ export interface RequestCheckInput {
   project_id: string;
   boq_item_id: string;
   quantity: string;
-  unit_price: string;
+  /** Left out by roles that do not see rates: the request starts at the budgeted rate. */
+  unit_price?: string;
 }
 
 export function checkRequest(body: RequestCheckInput, signal?: AbortSignal): Promise<RuleCheck> {
@@ -318,7 +323,12 @@ export function useUpdateRequest(id: string) {
 export function useDecide(id: string) {
   const invalidate = useInvalidateMaterials();
   return useMutation({
-    mutationFn: (body: { decision: "approve" | "reject" | "request_change" | "cancel"; comment?: string | null }) =>
+    mutationFn: (body: {
+      decision: "approve" | "reject" | "request_change" | "cancel";
+      comment?: string | null;
+      /** The QS may price the request when approving at the QS check. */
+      unit_price?: string;
+    }) =>
       apiRequest(`/material-requests/${encodeURIComponent(id)}/decision`, requestDetailSchema, { method: "POST", body }).then(
         (r) => r.data,
       ),

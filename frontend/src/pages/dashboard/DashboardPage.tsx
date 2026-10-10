@@ -127,19 +127,25 @@ function PortfolioOverview() {
   const projects = useProjects();
   const list = projects.data ?? [];
   const active = list.filter((p) => p.status === "active").length;
-  const contract = list.reduce((sum, p) => sum + toNumber(p.contract_value), 0);
+  // Contract values arrive only for roles that see rates (not site engineers).
+  const priced = can("rates:read");
+  const contract = list.reduce((sum, p) => sum + toNumber(p.contract_value ?? 0), 0);
 
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiTile icon="projects" label="Active projects" value={projects.isPending ? "—" : String(active)} note={`${String(list.length)} in total`} />
-        <KpiTile icon="cost" label="Contract value" value={projects.isPending ? "—" : formatCompactLKR(contract)} note="All visible projects" />
+        {priced ? (
+          <KpiTile icon="cost" label="Contract value" value={projects.isPending ? "—" : formatCompactLKR(contract)} note="All visible projects" />
+        ) : null}
         {can("schedule:read") ? <ScheduleKpis /> : null}
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         {can("schedule:read") ? <ScheduleHealth /> : null}
-        {list.length > 0 ? <ValueChart data={list.map((p) => ({ name: p.name, value: toNumber(p.contract_value) }))} /> : null}
+        {priced && list.length > 0 ? (
+          <ValueChart data={list.map((p) => ({ name: p.name, value: toNumber(p.contract_value ?? 0) }))} />
+        ) : null}
       </div>
     </div>
   );

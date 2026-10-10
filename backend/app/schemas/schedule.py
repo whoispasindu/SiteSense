@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints, model_validator
 
-from app.schemas.project import ProjectSummary
+from app.schemas.project import ProjectCard, ProjectSummary
 
 
 def _upper(value: object) -> object:
@@ -97,9 +97,15 @@ class ProgressOut(BaseModel):
     points: list[CurvePointOut]
 
 
-class ScheduleSummary(BaseModel):
-    project: ProjectSummary
+class ScheduleSummaryBasics(BaseModel):
+    """For viewers without ``rates:read``: the project without its contract value or totals."""
+
+    project: ProjectCard
     planned_percent: float
     actual_percent: float
     variance: float
     task_count: int
+
+
+class ScheduleSummary(ScheduleSummaryBasics):
+    project: ProjectSummary

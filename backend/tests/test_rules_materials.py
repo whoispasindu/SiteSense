@@ -50,48 +50,106 @@ def test_an_approved_variation_raises_the_allowance() -> None:
     assert not allowed.blocks
 
 
-# --- BR-01: routing --------------------------------------------------------------------------------
+# --- BR-01: unit price against the item's budgeted rate -------------------------------------------
 
 
-def route(unit_price: str, *, budget_rate: str = "100", line_budget: str = "100000", line_used: str = "0"):  # type: ignore[no-untyped-def]
+@pytest.mark.parametrize(
+    ("price", "severity"),
+    [("90", "pass"), ("100", "pass"), ("105", "pass"), ("105.01", "warn"), ("106", "warn")],
+)
+def test_br01_fires_only_above_five_percent_over_the_budgeted_rate(price: str, severity: str) -> None:
+    """TC-02: 6% over the budgeted rate needs the project manager."""
+    result = rules.check_price(unit_price=D(price), budget_rate=D(100))
+
+    assert result.rule == "BR-01"
+    assert result.severity == severity
+    assert result.facts["budget_rate"] == "100.00"
+
+
+def test_br01_messages_are_in_words() -> None:
+    assert rules.check_price(unit_price=D(103), budget_rate=D(100)).message == (
+        "3.0% above the budgeted rate: within the 5% limit."
+    )
+    assert rules.check_price(unit_price=D(95), budget_rate=D(100)).message == "At or below the budgeted rate."
+    assert "6.0% above the budgeted rate" in rules.check_price(unit_price=D(106), budget_rate=D(100)).message
+    assert rules.check_price(unit_price=D(10), budget_rate=D(0)).severity == "warn"
+
+
+def test_br01_ignores_the_section_budget() -> None:
+    """A price on budget passes BR-01 however full the section is: that is BR-13's job."""
+    assert rules.check_price(unit_price=D(100), budget_rate=D(100)).severity == "pass"
+
+
+# --- BR-13: the section's committed cost against its budget line ----------------------------------
+
+
+@pytest.mark.parametrize(
+    ("committed", "amount", "severity"),
+    [
+        ("0", "1000", "pass"),
+        ("99000", "1000", "pass"),  # exactly the budget line: still fine
+        ("99000", "1000.01", "warn"),  # one cent over
+        ("150000", "1", "warn"),  # already over before this request
+    ],
+)
+def test_br13_fires_when_committed_cost_plus_the_request_exceeds_the_budget_line(
+    committed: str, amount: str, severity: str
+) -> None:
+    result = rules.check_section_budget(
+        line_budget=D(100000), line_committed=D(committed), request_amount=D(amount)
+    )
+
+    assert result.rule == "BR-13"
+    assert result.severity == severity
+
+
+def test_br13_has_no_tolerance_and_says_by_how_much() -> None:
+    result = rules.check_section_budget(
+        line_budget=D(100000), line_committed=D(99000), request_amount=D(2000)
+    )
+
+    assert result.facts["line_after_request"] == "101000.00"
+    assert result.facts["line_over"] == "1000.00"
+    assert "LKR 101,000.00 against a budget line of LKR 100,000.00" in result.message
+
+
+# --- Routing: who approves --------------------------------------------------------------------------
+
+
+def route(unit_price: str, *, budget_rate: str = "100", line_budget: str = "100000", committed: str = "0"):  # type: ignore[no-untyped-def]
     return rules.route_approval(
         unit_price=D(unit_price),
         budget_rate=D(budget_rate),
         request_amount=D(unit_price) * 10,
         line_budget=D(line_budget),
-        line_used=D(line_used),
+        line_committed=D(committed),
     )
 
 
-@pytest.mark.parametrize(
-    ("price", "level"),
-    [("90", "qs"), ("100", "qs"), ("105", "qs"), ("105.01", "pm"), ("106", "pm")],
-)
-def test_qs_approves_up_to_five_percent_over_the_budgeted_rate(price: str, level: str) -> None:
-    """TC-02: a request 6% over goes to the project manager."""
-    chosen, result = route(price)
+def test_qs_approves_when_neither_rule_fires() -> None:
+    level, results, fired = route("104")
 
-    assert chosen == level
-    assert result.rule == "BR-01"
-    assert result.facts["budget_rate"] == "100.00"
+    assert level == "qs"
+    assert [r.rule for r in results] == ["BR-01", "BR-13"]
+    assert fired == []
 
 
-def test_a_budget_line_that_would_end_over_five_percent_needs_the_pm() -> None:
-    # Price on budget, but the line is nearly used up: 100,000 budget, 104,500 already used, +1,000.
-    level, result = route("100", line_used="104500")
+def test_br01_alone_sends_to_the_pm() -> None:
+    level, _, fired = route("106")
 
-    assert level == "pm"
-    assert "budget line would end 5.5% over" in result.message
+    assert (level, fired) == ("pm", ["BR-01"])
 
 
-def test_within_tolerance_is_said_in_words() -> None:
-    assert route("103")[1].message == "Within the 5% tolerance: the QS can approve."
-    assert route("95")[1].message == "Within budget: the QS can approve."
+def test_br13_alone_sends_to_the_pm() -> None:
+    level, _, fired = route("100", committed="99500")  # price on budget, section full
+
+    assert (level, fired) == ("pm", ["BR-13"])
 
 
-def test_no_budget_means_the_pm_decides() -> None:
-    assert route("10", budget_rate="0")[0] == "pm"
-    assert route("10", line_budget="0")[0] == "pm"
+def test_both_rules_can_fire() -> None:
+    level, _, fired = route("110", committed="99500")
+
+    assert (level, fired) == ("pm", ["BR-01", "BR-13"])
 
 
 def test_item_budget_rate_is_its_share_of_the_line() -> None:

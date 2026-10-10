@@ -1,6 +1,6 @@
 # ADR 0008: Material requests, approvals and cost control
 
-- Status: accepted
+- Status: accepted (amended 2026-10-10: BR-01 split into BR-01 and BR-13; cost visibility)
 - Date: 2026-10-10
 
 ## Context
@@ -17,6 +17,18 @@ functions over plain values. Services collect the facts (BOQ quantity, budget li
 and apply the results. Every boundary is unit-tested without a database, and the API returns the
 rule results with their figures, so the screen can show exactly why a request goes to the PM.
 [docs/business-rules.md](../business-rules.md) records which figures each rule compares.
+
+**BR-01 and BR-13 are separate rules.** BR-01 compares only the unit price with the BOQ item's
+budgeted rate (more than 5% above: the PM approves). BR-13 compares the section's committed cost
+plus the request with the budget line (any excess: the PM approves). The response lists the rules
+that fired (`routed_by`), so the request page can say why a request went to the PM. This was split
+at the project owner's request; it was first built as one rule with both checks.
+
+**Rates and amounts only for PM, QS and procurement.** A `rates:read` permission and role-specific
+response schemas: every response that carries money has a cost-free base schema, and
+`app/services/visibility.py` returns that base version to site engineers. Engineers therefore
+cannot set prices either. Their requests start at the budgeted rate and the QS prices them at the
+QS check, which matches Workflow B ("QS check: price against the budget line").
 
 **Costs are derived, never stored.**
 - Approved cost comes from approved requests (at the request price).

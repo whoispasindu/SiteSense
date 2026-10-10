@@ -10,7 +10,17 @@ from sqlalchemy.orm import Session
 from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.core.permissions import ROLE_LABELS, Role
 from app.core.scoping import accessible_site_ids, ensure_site_access, scope_to_user_sites
-from app.models import BoqItem, BoqSection, BudgetLine, MaterialRequest, Project, ProjectStatus, Site, User
+from app.models import (
+    BoqItem,
+    BoqSection,
+    BudgetLine,
+    MaterialRequest,
+    Project,
+    ProjectStatus,
+    RequestStatus,
+    Site,
+    User,
+)
 from app.models.user import user_site_assignments
 from app.schemas.auth import SiteSummary
 from app.schemas.project import (
@@ -250,11 +260,33 @@ def get_boq(db: Session, project: Project) -> BoqOut:
     sections = db.scalars(
         select(BoqSection).where(BoqSection.project_id == project.id).order_by(BoqSection.position)
     ).all()
-    out = [
-        BoqSectionOut(
-            **totals[s.id].model_dump(),
-            items=[BoqItemOut.model_validate(item) for item in s.items],
+    requested = dict(
+        db.execute(
+            select(MaterialRequest.boq_item_id, func.sum(MaterialRequest.quantity))
+            .where(
+                MaterialRequest.project_id == project.id,
+                MaterialRequest.status.not_in((RequestStatus.REJECTED.value, RequestStatus.CANCELLED.value)),
+            )
+            .group_by(MaterialRequest.boq_item_id)
+        ).all()
+    )
+
+    def item_out(item: BoqItem) -> BoqItemOut:
+        asked = Decimal(requested.get(item.id) or 0)
+        return BoqItemOut(
+            id=item.id,
+            item_code=item.item_code,
+            description=item.description,
+            unit=item.unit,
+            quantity=item.quantity,
+            requested_quantity=asked,
+            remaining_quantity=max(item.quantity - asked, ZERO),
+            rate=item.rate,
+            amount=item.amount,
         )
+
+    out = [
+        BoqSectionOut(**totals[s.id].model_dump(), items=[item_out(item) for item in s.items])
         for s in sections
     ]
     return BoqOut(

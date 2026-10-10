@@ -55,6 +55,9 @@ class Permission(StrEnum):
     RISK_READ = "risk:read"
     RISK_WHAT_IF = "risk:what_if"
     COST_READ = "cost:read"
+    # Rates and amounts (contract values, BOQ rates, prices, totals). Site engineers and clients
+    # never receive them: their API responses use cost-free schemas (``app.services.visibility``).
+    RATES_READ = "rates:read"
     CLAIMS_MANAGE = "claims:manage"
     CLAIMS_APPROVE = "claims:approve"
     VARIATIONS_MANAGE = "variations:manage"
@@ -83,6 +86,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             P.RISK_READ,
             P.RISK_WHAT_IF,
             P.COST_READ,
+            P.RATES_READ,
             P.CLAIMS_APPROVE,
             P.VARIATIONS_MANAGE,
         }
@@ -99,6 +103,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             P.MATERIALS_APPROVE_QS,
             P.RISK_READ,
             P.COST_READ,
+            P.RATES_READ,
             P.CLAIMS_MANAGE,
             P.VARIATIONS_MANAGE,
         }
@@ -122,6 +127,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             P.MATERIALS_READ,
             P.PURCHASE_ORDERS_MANAGE,
             P.SUPPLIERS_MANAGE,
+            P.RATES_READ,
         }
     ),
     # Read-only portal. Never receives internal cost permissions.

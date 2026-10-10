@@ -16,12 +16,12 @@ type Section = Boq["sections"][number];
 
 function BudgetEditor({ projectId, section, onDone }: { projectId: string; section: Section; onDone: () => void }) {
   const update = useUpdateBudgetLine(projectId);
-  const [value, setValue] = useState(section.budget_amount);
+  const [value, setValue] = useState(section.budget_amount ?? "");
   const valid = /^\d{1,14}(\.\d{1,2})?$/.test(value.replace(/,/g, ""));
 
   function onSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!valid) return;
+    if (!valid || !section.budget_line_id) return;
     update.mutate({ lineId: section.budget_line_id, amount: value.replace(/,/g, "") }, { onSuccess: onDone });
   }
 
@@ -54,8 +54,10 @@ function BudgetEditor({ projectId, section, onDone }: { projectId: string; secti
 function SectionSheet({ projectId, section, canEdit }: { projectId: string; section: Section; canEdit: boolean }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
-  const amount = toNumber(section.amount);
-  const margin = amount > 0 ? ((amount - toNumber(section.budget_amount)) / amount) * 100 : 0;
+  // Rates and amounts arrive only for roles with "rates:read" (not site engineers).
+  const priced = section.amount !== undefined;
+  const amount = toNumber(section.amount ?? 0);
+  const margin = amount > 0 ? ((amount - toNumber(section.budget_amount ?? 0)) / amount) * 100 : 0;
   const panelId = `section-${section.id}`;
 
   return (
@@ -82,16 +84,17 @@ function SectionSheet({ projectId, section, canEdit }: { projectId: string; sect
           </span>
         </button>
 
+        {priced ? (
         <div className="grid grid-cols-3 gap-4 text-right md:min-w-[30rem]">
           <p>
             <span className="block text-xs text-ink-faint">BOQ value</span>
-            <span className="tabular text-sm font-medium text-ink">{formatAmount(section.amount)}</span>
+            <span className="tabular text-sm font-medium text-ink">{formatAmount(section.amount ?? 0)}</span>
           </p>
           <div>
             <span className="block text-xs text-ink-faint">Budget</span>
             {editing ? null : (
               <span className="tabular text-sm font-medium text-ink">
-                {formatAmount(section.budget_amount)}
+                {formatAmount(section.budget_amount ?? 0)}
                 {canEdit ? (
                   <button
                     type="button"
@@ -112,6 +115,7 @@ function SectionSheet({ projectId, section, canEdit }: { projectId: string; sect
             <span className={`tabular text-sm font-medium ${margin < 0 ? "text-signal-high" : "text-ink"}`}>{margin.toFixed(1)}%</span>
           </p>
         </div>
+        ) : null}
         {editing ? (
           <div className="md:col-span-2">
             <BudgetEditor
@@ -133,9 +137,15 @@ function SectionSheet({ projectId, section, canEdit }: { projectId: string; sect
               <th scope="col" className="px-4 py-2 text-left font-medium">Item</th>
               <th scope="col" className="px-4 py-2 text-left font-medium">Description</th>
               <th scope="col" className="px-4 py-2 text-left font-medium">Unit</th>
-              <th scope="col" className="px-4 py-2 text-right font-medium">Qty</th>
-              <th scope="col" className="px-4 py-2 text-right font-medium">Rate</th>
-              <th scope="col" className="px-4 py-2 text-right font-medium">Amount</th>
+              <th scope="col" className="px-4 py-2 text-right font-medium">BOQ qty</th>
+              <th scope="col" className="px-4 py-2 text-right font-medium">Requested</th>
+              <th scope="col" className="px-4 py-2 text-right font-medium">Remaining</th>
+              {priced ? (
+                <>
+                  <th scope="col" className="px-4 py-2 text-right font-medium">Rate</th>
+                  <th scope="col" className="px-4 py-2 text-right font-medium">Amount</th>
+                </>
+              ) : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-rule">
@@ -145,8 +155,14 @@ function SectionSheet({ projectId, section, canEdit }: { projectId: string; sect
                 <td className="min-w-64 px-4 py-2.5">{item.description}</td>
                 <td className="px-4 py-2.5 text-ink-soft">{item.unit}</td>
                 <td className="tabular px-4 py-2.5 text-right whitespace-nowrap">{formatQuantity(item.quantity)}</td>
-                <td className="tabular px-4 py-2.5 text-right whitespace-nowrap">{formatAmount(item.rate)}</td>
-                <td className="tabular px-4 py-2.5 text-right whitespace-nowrap">{formatAmount(item.amount)}</td>
+                <td className="tabular px-4 py-2.5 text-right whitespace-nowrap text-ink-soft">{formatQuantity(item.requested_quantity)}</td>
+                <td className="tabular px-4 py-2.5 text-right whitespace-nowrap">{formatQuantity(item.remaining_quantity)}</td>
+                {item.rate !== undefined && item.amount !== undefined ? (
+                  <>
+                    <td className="tabular px-4 py-2.5 text-right whitespace-nowrap">{formatAmount(item.rate)}</td>
+                    <td className="tabular px-4 py-2.5 text-right whitespace-nowrap">{formatAmount(item.amount)}</td>
+                  </>
+                ) : null}
               </tr>
             ))}
           </tbody>
@@ -175,8 +191,20 @@ export function BoqPage() {
   if (boq.isPending) return <p className="py-10 text-center text-ink-faint">Loading BOQ…</p>;
   if (boq.isError) return <Alert tone="error">{errorText(boq.error)}</Alert>;
   const data = boq.data;
-  const total = toNumber(data.boq_total);
-  const margin = total > 0 ? ((total - toNumber(data.budget_total)) / total) * 100 : 0;
+  const total = toNumber(data.boq_total ?? 0);
+  const margin = total > 0 ? ((total - toNumber(data.budget_total ?? 0)) / total) * 100 : 0;
+  const figures: [string, string][] =
+    data.boq_total !== undefined && data.budget_total !== undefined
+      ? [
+          ["Items", String(data.item_count)],
+          ["BOQ value (LKR)", formatAmount(data.boq_total)],
+          ["Cost budget (LKR)", formatAmount(data.budget_total)],
+          ["Margin", `${margin.toFixed(1)}%`],
+        ]
+      : [
+          ["Items", String(data.item_count)],
+          ["Sections", String(data.sections.length)],
+        ];
 
   return (
     <div className="space-y-6">
@@ -188,12 +216,7 @@ export function BoqPage() {
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <dl className="flex flex-wrap gap-x-10 gap-y-3">
-          {[
-            ["Items", String(data.item_count)],
-            ["BOQ value (LKR)", formatAmount(data.boq_total)],
-            ["Cost budget (LKR)", formatAmount(data.budget_total)],
-            ["Margin", `${margin.toFixed(1)}%`],
-          ].map(([label, value]) => (
+          {figures.map(([label, value]) => (
             <div key={label}>
               <dt className="text-sm text-ink-faint">{label}</dt>
               <dd className="tabular mt-1 text-xl font-semibold text-ink">{value}</dd>

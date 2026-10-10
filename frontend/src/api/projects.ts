@@ -36,12 +36,14 @@ export const projectSummarySchema = z.object({
   client_name: z.string(),
   project_type: z.enum(PROJECT_TYPES),
   status: z.enum(PROJECT_STATUSES),
-  contract_value: decimal,
   start_date: z.iso.date(),
   planned_end: z.iso.date(),
-  boq_total: decimal,
-  budget_total: decimal,
   item_count: z.number().int(),
+  // Rates and amounts: present only for roles with "rates:read" (PM, QS, procurement). Site
+  // engineers receive a response without them, so every screen must cope with their absence.
+  contract_value: decimal.optional(),
+  boq_total: decimal.optional(),
+  budget_total: decimal.optional(),
 });
 export type ProjectSummary = z.infer<typeof projectSummarySchema>;
 
@@ -50,9 +52,9 @@ const sectionTotalsSchema = z.object({
   code: z.string(),
   name: z.string(),
   item_count: z.number().int(),
-  amount: decimal,
-  budget_line_id: z.uuid(),
-  budget_amount: decimal,
+  amount: decimal.optional(),
+  budget_line_id: z.uuid().optional(),
+  budget_amount: decimal.optional(),
 });
 export type SectionTotals = z.infer<typeof sectionTotalsSchema>;
 
@@ -71,16 +73,18 @@ const boqItemSchema = z.object({
   description: z.string(),
   unit: z.string(),
   quantity: decimal,
-  rate: decimal,
-  amount: decimal,
+  requested_quantity: decimal,
+  remaining_quantity: decimal,
+  rate: decimal.optional(),
+  amount: decimal.optional(),
 });
 export type BoqItem = z.infer<typeof boqItemSchema>;
 
 export const boqSchema = z.object({
   project_id: z.uuid(),
   sections: z.array(sectionTotalsSchema.extend({ items: z.array(boqItemSchema) })),
-  boq_total: decimal,
-  budget_total: decimal,
+  boq_total: decimal.optional(),
+  budget_total: decimal.optional(),
   item_count: z.number().int(),
 });
 export type Boq = z.infer<typeof boqSchema>;

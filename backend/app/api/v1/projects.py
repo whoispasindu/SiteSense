@@ -8,17 +8,21 @@ from app.core.errors import BusinessRuleError, PayloadTooLargeError
 from app.core.permissions import Permission
 from app.models import ProjectStatus, User
 from app.schemas.project import (
+    BoqBasics,
     BoqOut,
     BudgetLineUpdate,
     ImportReport,
+    ProjectCard,
     ProjectCreate,
     ProjectDetail,
+    ProjectDetailBasics,
     ProjectSummary,
     ProjectUpdate,
     SectionTotals,
 )
 from app.services import project_service
 from app.services.boq_import import MAX_FILE_BYTES, BoqFileError, parse_boq
+from app.services.visibility import shape, shape_all
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -29,39 +33,46 @@ BoqManager = Annotated[User, Depends(require_permission(Permission.PROJECTS_READ
 ALLOWED_UPLOAD_SUFFIXES = (".xlsx", ".csv")
 
 
-@router.get("", response_model=list[ProjectSummary])
+# Responses with rates and amounts have a cost-free twin for viewers without ``rates:read``.
+AnyProjectDetail = ProjectDetail | ProjectDetailBasics
+
+
+@router.get("", response_model=list[ProjectSummary] | list[ProjectCard])
 def list_projects(
     user: Reader,
     db: DbSession,
     status: ProjectStatus | None = None,
     q: Annotated[str | None, Query(max_length=80)] = None,
-) -> list[ProjectSummary]:
-    return project_service.list_projects(db, user, status=status, query=q)
+) -> list[ProjectSummary] | list[ProjectCard]:
+    return shape_all(user, project_service.list_projects(db, user, status=status, query=q), ProjectCard)
 
 
-@router.post("", response_model=ProjectDetail, status_code=status.HTTP_201_CREATED)
-def create_project(body: ProjectCreate, user: Manager, db: DbSession, meta: Meta) -> ProjectDetail:
+@router.post("", response_model=AnyProjectDetail, status_code=status.HTTP_201_CREATED)
+def create_project(body: ProjectCreate, user: Manager, db: DbSession, meta: Meta) -> AnyProjectDetail:
     project = project_service.create_project(db, body, actor=user, meta=meta)
-    return project_service.project_detail(db, project)
+    return shape(user, project_service.project_detail(db, project), ProjectDetailBasics)
 
 
-@router.get("/{project_id}", response_model=ProjectDetail)
-def get_project(project_id: uuid.UUID, user: Reader, db: DbSession) -> ProjectDetail:
-    return project_service.project_detail(db, project_service.get_project(db, user, project_id))
+@router.get("/{project_id}", response_model=AnyProjectDetail)
+def get_project(project_id: uuid.UUID, user: Reader, db: DbSession) -> AnyProjectDetail:
+    detail = project_service.project_detail(db, project_service.get_project(db, user, project_id))
+    return shape(user, detail, ProjectDetailBasics)
 
 
-@router.patch("/{project_id}", response_model=ProjectDetail)
+@router.patch("/{project_id}", response_model=AnyProjectDetail)
 def update_project(
     project_id: uuid.UUID, body: ProjectUpdate, user: Manager, db: DbSession, meta: Meta
-) -> ProjectDetail:
+) -> AnyProjectDetail:
     project = project_service.get_project(db, user, project_id)
     project = project_service.update_project(db, project, body, actor=user, meta=meta)
-    return project_service.project_detail(db, project)
+    return shape(user, project_service.project_detail(db, project), ProjectDetailBasics)
 
 
-@router.get("/{project_id}/boq", response_model=BoqOut)
-def get_boq(project_id: uuid.UUID, user: Reader, db: DbSession) -> BoqOut:
-    return project_service.get_boq(db, project_service.get_project(db, user, project_id))
+@router.get("/{project_id}/boq", response_model=BoqOut | BoqBasics)
+def get_boq(project_id: uuid.UUID, user: Reader, db: DbSession) -> BoqOut | BoqBasics:
+    return shape(
+        user, project_service.get_boq(db, project_service.get_project(db, user, project_id)), BoqBasics
+    )
 
 
 @router.post(

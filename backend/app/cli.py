@@ -370,7 +370,9 @@ def _seed_materials(db: Session) -> None:
                 project_id=project.id,
                 boq_item_id=item.id,
                 quantity=Decimal(quantity),
-                unit_price=Decimal(price),
+                # Engineers do not see rates: the request starts at the budgeted rate and the QS
+                # prices it at the QS check below.
+                unit_price=None,
                 needed_by=today + timedelta(days=days),
                 notes=None,
             ),
@@ -387,7 +389,9 @@ def _seed_materials(db: Session) -> None:
                 meta=meta,
             )
             continue
-        materials_service.decide(db, qs, request.id, DecisionIn(decision="approve"), meta=meta)
+        materials_service.decide(
+            db, qs, request.id, DecisionIn(decision="approve", unit_price=Decimal(price)), meta=meta
+        )
         if stage == "pm_approval":
             continue
         if request.status == "pm_approval":

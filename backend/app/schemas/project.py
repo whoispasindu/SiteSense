@@ -63,7 +63,12 @@ class ProjectUpdate(BaseModel):
     description: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)] | None = None
 
 
-class ProjectSummary(BaseModel):
+# Each response comes in two shapes. The base classes carry no rates or amounts and are what site
+# engineers receive; the subclasses add the cost fields for roles with ``rates:read`` (PM, QS,
+# procurement). See ``app.services.visibility``.
+
+
+class ProjectCard(BaseModel):
     id: uuid.UUID
     code: str
     name: str
@@ -71,19 +76,25 @@ class ProjectSummary(BaseModel):
     client_name: str
     project_type: ProjectType
     status: ProjectStatus
-    contract_value: Decimal
     start_date: date
     planned_end: date
-    boq_total: Decimal
-    budget_total: Decimal
     item_count: int
 
 
-class SectionTotals(BaseModel):
+class ProjectSummary(ProjectCard):
+    contract_value: Decimal
+    boq_total: Decimal
+    budget_total: Decimal
+
+
+class SectionBasics(BaseModel):
     id: uuid.UUID
     code: str
     name: str
     item_count: int
+
+
+class SectionTotals(SectionBasics):
     amount: Decimal
     budget_line_id: uuid.UUID
     budget_amount: Decimal
@@ -96,6 +107,14 @@ class TeamMember(BaseModel):
     role_label: str
 
 
+class ProjectDetailBasics(ProjectCard):
+    description: str | None
+    sections: list[SectionBasics]
+    team: list[TeamMember]
+    created_at: datetime
+    updated_at: datetime
+
+
 class ProjectDetail(ProjectSummary):
     description: str | None
     sections: list[SectionTotals]
@@ -104,20 +123,34 @@ class ProjectDetail(ProjectSummary):
     updated_at: datetime
 
 
-class BoqItemOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class BoqItemBasics(BaseModel):
     id: uuid.UUID
     item_code: str
     description: str
     unit: str
     quantity: Decimal
+    # Live material requests for the item (everything except rejected and cancelled).
+    requested_quantity: Decimal
+    remaining_quantity: Decimal
+
+
+class BoqItemOut(BoqItemBasics):
     rate: Decimal
     amount: Decimal
 
 
+class BoqSectionBasics(SectionBasics):
+    items: list[BoqItemBasics]
+
+
 class BoqSectionOut(SectionTotals):
     items: list[BoqItemOut]
+
+
+class BoqBasics(BaseModel):
+    project_id: uuid.UUID
+    sections: list[BoqSectionBasics]
+    item_count: int
 
 
 class BoqOut(BaseModel):

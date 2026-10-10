@@ -13,8 +13,9 @@ if (!("ResizeObserver" in globalThis)) {
   Object.defineProperty(globalThis, "ResizeObserver", { value: ResizeObserverStub, writable: true });
 }
 
-// Parallel test files on a cold start (and slower CI machines) can exceed the 1 s default.
-configure({ asyncUtilTimeout: 3000 });
+// Parallel test files on a cold start, under coverage instrumentation or on a slow CI machine, can
+// take more than 3 s to render a route the first time; 5 s keeps the suite reliable.
+configure({ asyncUtilTimeout: 5000 });
 
 afterEach(() => {
   cleanup();

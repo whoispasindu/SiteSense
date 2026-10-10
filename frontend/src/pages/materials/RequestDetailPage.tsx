@@ -70,6 +70,9 @@ function DecisionDialog({ request, decision, onClose }: { request: RequestDetail
   const decide = useDecide(request.id);
   const [comment, setComment] = useState("");
   const needsComment = decision === "reject" || decision === "request_change";
+  // At the QS check the QS prices the request (site engineers raise requests without prices).
+  const pricing = decision === "approve" && request.status === "requested" && request.unit_price !== undefined;
+  const [price, setPrice] = useState(request.unit_price ?? "");
   const [error, setError] = useState<string | null>(null);
 
   function onSubmit(event: SubmitEvent<HTMLFormElement>) {
@@ -78,22 +81,49 @@ function DecisionDialog({ request, decision, onClose }: { request: RequestDetail
       setError("Add a comment so the requester knows why.");
       return;
     }
-    decide.mutate({ decision, comment: comment.trim() || null }, { onSuccess: onClose });
+    if (pricing && !(/^\d{1,12}(\.\d{1,2})?$/.test(price.trim()) && Number(price) > 0)) {
+      setError("Enter the expected unit price, greater than zero.");
+      return;
+    }
+    const priceChanged = pricing && Number(price) !== Number(request.unit_price);
+    decide.mutate(
+      { decision, comment: comment.trim() || null, ...(priceChanged ? { unit_price: price.trim() } : {}) },
+      { onSuccess: onClose },
+    );
   }
 
-  const routedToPm = decision === "approve" && request.status === "requested" && request.rules.approval_level === "pm";
+  const routing = request.rules.routed_by;
+  const routedToPm = decision === "approve" && request.status === "requested" && routing.length > 0;
   return (
     <Dialog open onClose={onClose} title={DECISION_TITLE[decision]}>
       <form noValidate onSubmit={onSubmit} className="space-y-4">
         {decide.isError ? <Alert tone="error">{errorText(decide.error)}</Alert> : null}
         {error ? <Alert tone="error">{error}</Alert> : null}
         {routedToPm ? (
-          <Alert tone="info">This request is above the 5% limit (BR-01): approving it passes it to the project manager.</Alert>
+          <Alert tone="info">
+            {routing.join(" and ")} {routing.length > 1 ? "send" : "sends"} this request to the project manager: approving
+            passes it on.
+          </Alert>
         ) : null}
         <p className="text-sm text-ink-soft">
-          {request.number}: {formatQuantity(request.quantity)} {request.boq_item.unit} of {request.boq_item.description}, LKR{" "}
-          {formatAmount(request.amount)}.
+          {request.number}: {formatQuantity(request.quantity)} {request.boq_item.unit} of {request.boq_item.description}
+          {request.amount !== undefined ? `, LKR ${formatAmount(request.amount)}` : ""}.
         </p>
+        {pricing ? (
+          <TextField
+            label={`Expected unit price (LKR / ${request.boq_item.unit})`}
+            inputMode="decimal"
+            value={price}
+            hint={
+              request.rules.budget_rate !== undefined
+                ? `Budgeted ${formatAmount(request.rules.budget_rate)}. The rules are checked again with this price when you approve.`
+                : undefined
+            }
+            onChange={(e) => {
+              setPrice(e.target.value);
+            }}
+          />
+        ) : null}
         <TextAreaField
           label={needsComment ? "Comment" : "Comment (optional)"}
           rows={3}
@@ -117,7 +147,9 @@ function DecisionDialog({ request, decision, onClose }: { request: RequestDetail
 function EditDialog({ request, onClose }: { request: RequestDetail; onClose: () => void }) {
   const update = useUpdateRequest(request.id);
   const [quantity, setQuantity] = useState(String(Number(request.quantity)));
-  const [price, setPrice] = useState(request.unit_price);
+  // Roles without rates (site engineers) change quantity and dates only; the QS prices the request.
+  const pricing = request.unit_price !== undefined;
+  const [price, setPrice] = useState(request.unit_price ?? "");
   const [neededBy, setNeededBy] = useState(request.needed_by);
   const [notes, setNotes] = useState(request.notes ?? "");
   const [comment, setComment] = useState("");
@@ -125,8 +157,8 @@ function EditDialog({ request, onClose }: { request: RequestDetail; onClose: () 
 
   function onSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!(Number(quantity) > 0) || !(Number(price) > 0)) {
-      setError("Quantity and price must be greater than zero.");
+    if (!(Number(quantity) > 0) || (pricing && !(Number(price) > 0))) {
+      setError(pricing ? "Quantity and price must be greater than zero." : "The quantity must be greater than zero.");
       return;
     }
     if (neededBy < siteTodayIso()) {
@@ -135,7 +167,13 @@ function EditDialog({ request, onClose }: { request: RequestDetail; onClose: () 
     }
     setError(null);
     update.mutate(
-      { quantity: quantity.trim(), unit_price: price.trim(), needed_by: neededBy, notes: notes.trim() || null, comment: comment.trim() || null },
+      {
+        quantity: quantity.trim(),
+        ...(pricing ? { unit_price: price.trim() } : {}),
+        needed_by: neededBy,
+        notes: notes.trim() || null,
+        comment: comment.trim() || null,
+      },
       { onSuccess: onClose },
     );
   }
@@ -147,7 +185,9 @@ function EditDialog({ request, onClose }: { request: RequestDetail; onClose: () 
         {error ? <Alert tone="error">{error}</Alert> : null}
         <div className="grid gap-4 sm:grid-cols-3">
           <TextField label={`Quantity (${request.boq_item.unit})`} inputMode="decimal" value={quantity} onChange={(e) => { setQuantity(e.target.value); }} />
-          <TextField label="Unit price (LKR)" inputMode="decimal" value={price} onChange={(e) => { setPrice(e.target.value); }} />
+          {pricing ? (
+            <TextField label="Unit price (LKR)" inputMode="decimal" value={price} onChange={(e) => { setPrice(e.target.value); }} />
+          ) : null}
           <TextField label="Needed by" type="date" value={neededBy} onChange={(e) => { setNeededBy(e.target.value); }} />
         </div>
         <TextAreaField label="Notes" rows={2} maxLength={2000} value={notes} onChange={(e) => { setNotes(e.target.value); }} />
@@ -204,7 +244,7 @@ export function RequestDetailPage() {
         <div className="flex flex-wrap gap-2">
           {decisions.includes("approve") ? (
             <Button variant="primary" onClick={() => { setPending("approve"); }}>
-              {r.status === "requested" && r.rules.approval_level === "pm" ? "Pass to PM" : "Approve"}
+              {r.status === "requested" && r.rules.routed_by.length > 0 ? "Pass to PM" : "Approve"}
             </Button>
           ) : null}
           {decisions.includes("request_change") ? <Button onClick={() => { setPending("request_change"); }}>Ask for a change</Button> : null}
@@ -244,14 +284,18 @@ export function RequestDetailPage() {
                   <span className="block text-xs font-normal text-ink-faint">BOQ {formatQuantity(r.boq_quantity)}</span>
                 </dd>
               </div>
-              <div>
-                <dt className="text-ink-faint">Unit price</dt>
-                <dd className="tabular font-medium text-ink">LKR {formatAmount(r.unit_price)}</dd>
-              </div>
-              <div>
-                <dt className="text-ink-faint">Value</dt>
-                <dd className="tabular font-medium text-ink">LKR {formatAmount(r.amount)}</dd>
-              </div>
+              {r.unit_price !== undefined ? (
+                <div>
+                  <dt className="text-ink-faint">Unit price</dt>
+                  <dd className="tabular font-medium text-ink">LKR {formatAmount(r.unit_price)}</dd>
+                </div>
+              ) : null}
+              {r.amount !== undefined ? (
+                <div>
+                  <dt className="text-ink-faint">Value</dt>
+                  <dd className="tabular font-medium text-ink">LKR {formatAmount(r.amount)}</dd>
+                </div>
+              ) : null}
             </dl>
             {r.notes ? <p className="mt-4 text-sm whitespace-pre-line text-ink-soft">{r.notes}</p> : null}
           </Sheet>
@@ -268,7 +312,9 @@ export function RequestDetailPage() {
                 Order and delivery
               </SectionHeading>
               <p className="text-sm text-ink-soft">
-                {r.order.supplier_name} · LKR {formatAmount(r.order.unit_price)} / {r.boq_item.unit} · expected {formatDate(r.order.expected_delivery)}
+                {r.order.supplier_name}
+                {r.order.unit_price !== undefined ? ` · LKR ${formatAmount(r.order.unit_price)} / ${r.boq_item.unit}` : ""} · expected{" "}
+                {formatDate(r.order.expected_delivery)}
               </p>
               <div aria-hidden="true" className="mt-3 h-2 rounded-full bg-paper-sunk">
                 <div

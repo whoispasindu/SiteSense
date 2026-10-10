@@ -43,7 +43,9 @@ class RequestCreate(BaseModel):
     project_id: uuid.UUID
     boq_item_id: uuid.UUID
     quantity: Quantity
-    unit_price: Price
+    # Expected unit price. Only roles that see rates may give one; otherwise (site engineers) the
+    # request starts at the item's budgeted rate and the QS prices it at the QS check.
+    unit_price: Price | None = None
     needed_by: date
     notes: Notes | None = None
 
@@ -58,7 +60,7 @@ class RequestCheck(BaseModel):
     project_id: uuid.UUID
     boq_item_id: uuid.UUID
     quantity: Quantity
-    unit_price: Price
+    unit_price: Price | None = None
 
 
 class RequestUpdate(BaseModel):
@@ -80,6 +82,8 @@ class DecisionIn(BaseModel):
 
     decision: Decision
     comment: Comment | None = None
+    # The QS check may set the expected unit price when approving (the requester may not see rates).
+    unit_price: Price | None = None
 
     _comment = field_validator("comment")(_blank_to_none)
 
@@ -91,12 +95,31 @@ class RuleResultOut(BaseModel):
     facts: dict[str, str]
 
 
-class RuleCheckOut(BaseModel):
+# Rules whose results carry prices or amounts. Viewers without ``rates:read`` never receive them.
+COST_RULES = frozenset({"BR-01", "BR-13"})
+
+
+class RuleCheckBasics(BaseModel):
     approval_level: Literal["qs", "pm"]
     blocked: bool
     results: list[RuleResultOut]
+    # The rules that sent the request to the project manager (BR-01, BR-13), if any.
+    routed_by: list[str]
+
+    @field_validator("results")
+    @classmethod
+    def _no_cost_rules(cls, value: list[RuleResultOut]) -> list[RuleResultOut]:
+        return [r for r in value if r.rule not in COST_RULES]
+
+
+class RuleCheckOut(RuleCheckBasics):
     budget_rate: Decimal
     amount: Decimal
+
+    @field_validator("results")
+    @classmethod
+    def _no_cost_rules(cls, value: list[RuleResultOut]) -> list[RuleResultOut]:
+        return value  # full results for viewers who see rates
 
 
 class PersonOut(BaseModel):
@@ -119,14 +142,16 @@ class ProjectRef(BaseModel):
     site_code: str
 
 
-class RequestSummary(BaseModel):
+# Responses come in two shapes: the base classes carry no rates or amounts (site engineers); the
+# subclasses add them for roles with ``rates:read``. See ``app.services.visibility``.
+
+
+class RequestSummaryBasics(BaseModel):
     id: uuid.UUID
     number: str
     project: ProjectRef
     boq_item: BoqItemRef
     quantity: Decimal
-    unit_price: Decimal
-    amount: Decimal
     needed_by: date
     status: Status
     approval_level: Literal["qs", "pm"]
@@ -135,10 +160,21 @@ class RequestSummary(BaseModel):
     updated_at: datetime
 
 
+class RequestSummary(RequestSummaryBasics):
+    unit_price: Decimal
+    amount: Decimal
+
+
+class RequestListBasics(BaseModel):
+    items: list[RequestSummaryBasics]
+    total: int
+    # Pipeline counts for the caller's scope (and project filter), by status.
+    counts: dict[str, int]
+
+
 class RequestList(BaseModel):
     items: list[RequestSummary]
     total: int
-    # Pipeline counts for the caller's scope (and project filter), by status.
     counts: dict[str, int]
 
 
@@ -162,15 +198,28 @@ class DeliveryOut(BaseModel):
     unit: str | None = None
 
 
-class OrderRef(BaseModel):
+class OrderRefBasics(BaseModel):
     id: uuid.UUID
     number: str
     supplier_name: str
-    unit_price: Decimal
-    amount: Decimal
     expected_delivery: date
     delivered_quantity: Decimal
     deliveries: list[DeliveryOut]
+
+
+class OrderRef(OrderRefBasics):
+    unit_price: Decimal
+    amount: Decimal
+
+
+class RequestDetailBasics(RequestSummaryBasics):
+    notes: str | None
+    boq_quantity: Decimal
+    rules: RuleCheckBasics
+    history: list[HistoryEntry]
+    order: OrderRefBasics | None
+    # What the caller may do now, e.g. ["approve", "reject", "request_change"].
+    actions: list[Action]
 
 
 class RequestDetail(RequestSummary):
@@ -179,11 +228,10 @@ class RequestDetail(RequestSummary):
     rules: RuleCheckOut
     history: list[HistoryEntry]
     order: OrderRef | None
-    # What the caller may do now, e.g. ["approve", "reject", "request_change"].
     actions: list[Action]
 
 
-class BoqItemOption(BaseModel):
+class BoqItemOptionBasics(BaseModel):
     """A BOQ item in the request form's picker, with what is left to request."""
 
     id: uuid.UUID
@@ -194,6 +242,10 @@ class BoqItemOption(BaseModel):
     section_name: str
     boq_quantity: Decimal
     requested_quantity: Decimal
+    remaining_quantity: Decimal
+
+
+class BoqItemOption(BoqItemOptionBasics):
     budget_rate: Decimal
 
 
@@ -268,7 +320,7 @@ class DeliveryIn(BaseModel):
     notes: Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)] | None = None
 
 
-class OrderLineOut(BaseModel):
+class OrderLineBasics(BaseModel):
     id: uuid.UUID
     request_id: uuid.UUID
     request_number: str
@@ -276,21 +328,33 @@ class OrderLineOut(BaseModel):
     description: str
     unit: str
     quantity: Decimal
-    unit_price: Decimal
-    amount: Decimal
     delivered_quantity: Decimal
 
 
-class PurchaseOrderSummary(BaseModel):
+class OrderLineOut(OrderLineBasics):
+    unit_price: Decimal
+    amount: Decimal
+
+
+class PurchaseOrderSummaryBasics(BaseModel):
     id: uuid.UUID
     number: str
     project: ProjectRef
     supplier: SupplierOut
     status: Literal["issued", "part_delivered", "delivered"]
-    total: Decimal
     issued_at: datetime
     expected_delivery: date
     issued_by: PersonOut
+
+
+class PurchaseOrderSummary(PurchaseOrderSummaryBasics):
+    total: Decimal
+
+
+class PurchaseOrderDetailBasics(PurchaseOrderSummaryBasics):
+    notes: str | None
+    lines: list[OrderLineBasics]
+    deliveries: list[DeliveryOut]
 
 
 class PurchaseOrderDetail(PurchaseOrderSummary):

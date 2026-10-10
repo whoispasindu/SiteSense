@@ -54,8 +54,8 @@ const BOQ: Boq = {
     {
       ...SECTION,
       items: [
-        { id: "2e3f4a5b-6c7d-4e8f-9a0b-1c2d3e4f5a6b", item_code: "B.01", description: "Excavation for pile caps", unit: "m3", quantity: "2850.000", rate: "1450.00", amount: "4132500.00" },
-        { id: "3f4a5b6c-7d8e-4f9a-8b1c-2d3e4f5a6b7c", item_code: "B.02", description: "Bored piles 600 mm", unit: "m", quantity: "1920.000", rate: "18500.00", amount: "35520000.00" },
+        { id: "2e3f4a5b-6c7d-4e8f-9a0b-1c2d3e4f5a6b", item_code: "B.01", description: "Excavation for pile caps", unit: "m3", quantity: "2850.000", requested_quantity: "850.000", remaining_quantity: "2000.000", rate: "1450.00", amount: "4132500.00" },
+        { id: "3f4a5b6c-7d8e-4f9a-8b1c-2d3e4f5a6b7c", item_code: "B.02", description: "Bored piles 600 mm", unit: "m", quantity: "1920.000", requested_quantity: "0.000", remaining_quantity: "1920.000", rate: "18500.00", amount: "35520000.00" },
       ],
     },
   ],

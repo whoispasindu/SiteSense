@@ -88,6 +88,8 @@ export function PurchaseOrderDetailPage() {
     return <Alert tone="error">{errorText(order.error)}</Alert>;
   }
   const po = order.data;
+  // Prices and amounts arrive only for roles that see rates (not site engineers).
+  const priced = po.total !== undefined;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -110,9 +112,11 @@ export function PurchaseOrderDetailPage() {
             Issued by {po.issued_by.full_name} on {formatDate(po.issued_at.slice(0, 10))} · expected {formatDate(po.expected_delivery)}
           </p>
         </div>
-        <p className="tabular text-right text-2xl font-semibold text-ink">
-          <span className="block text-sm font-normal text-ink-faint">Total</span>LKR {formatAmount(po.total)}
-        </p>
+        {po.total !== undefined ? (
+          <p className="tabular text-right text-2xl font-semibold text-ink">
+            <span className="block text-sm font-normal text-ink-faint">Total</span>LKR {formatAmount(po.total)}
+          </p>
+        ) : null}
       </header>
 
       <Sheet className="relative overflow-x-auto">
@@ -122,8 +126,12 @@ export function PurchaseOrderDetailPage() {
             <tr>
               <th scope="col" className="px-4 py-2.5 text-left font-medium">Line</th>
               <th scope="col" className="px-4 py-2.5 text-right font-medium">Ordered</th>
-              <th scope="col" className="px-4 py-2.5 text-right font-medium">Price</th>
-              <th scope="col" className="px-4 py-2.5 text-right font-medium">Amount</th>
+              {priced ? (
+                <>
+                  <th scope="col" className="px-4 py-2.5 text-right font-medium">Price</th>
+                  <th scope="col" className="px-4 py-2.5 text-right font-medium">Amount</th>
+                </>
+              ) : null}
               <th scope="col" className="px-4 py-2.5 text-left font-medium">Delivered</th>
             </tr>
           </thead>
@@ -140,8 +148,12 @@ export function PurchaseOrderDetailPage() {
                     </p>
                   </th>
                   <td className="tabular px-4 py-3 text-right whitespace-nowrap">{formatQuantity(l.quantity)} {l.unit}</td>
-                  <td className="tabular px-4 py-3 text-right whitespace-nowrap text-ink-soft">{formatAmount(l.unit_price)}</td>
-                  <td className="tabular px-4 py-3 text-right font-medium whitespace-nowrap">{formatAmount(l.amount)}</td>
+                  {l.unit_price !== undefined && l.amount !== undefined ? (
+                    <>
+                      <td className="tabular px-4 py-3 text-right whitespace-nowrap text-ink-soft">{formatAmount(l.unit_price)}</td>
+                      <td className="tabular px-4 py-3 text-right font-medium whitespace-nowrap">{formatAmount(l.amount)}</td>
+                    </>
+                  ) : null}
                   <td className="min-w-40 px-4 py-3">
                     <div aria-hidden="true" className="h-2 rounded-full bg-paper-sunk">
                       <div className="h-full rounded-full bg-signal-low" style={{ width: `${String(share)}%` }} />

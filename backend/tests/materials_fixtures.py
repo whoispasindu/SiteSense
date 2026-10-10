@@ -107,7 +107,8 @@ def request_body(boq: Boq, **overrides: object) -> dict[str, object]:
         "project_id": str(boq.project.id),
         "boq_item_id": str(boq.cement.id),
         "quantity": "100",
-        "unit_price": "2000",
+        # No price: site engineers do not see rates, so their requests start at the budgeted rate
+        # (LKR 2,000 for cement) and the QS prices them at the QS check.
         "needed_by": needed_by(),
         "notes": "For the level 4 slab.",
     }
@@ -122,8 +123,17 @@ def raise_request(api: TestClient, boq: Boq, who: Who, **overrides: object) -> d
     return result
 
 
-def decide(api: TestClient, request_id: object, who: Who, decision: str, comment: str | None = None):  # type: ignore[no-untyped-def]
+def decide(  # type: ignore[no-untyped-def]
+    api: TestClient,
+    request_id: object,
+    who: Who,
+    decision: str,
+    comment: str | None = None,
+    unit_price: str | None = None,
+):
     body: dict[str, object] = {"decision": decision}
     if comment is not None:
         body["comment"] = comment
+    if unit_price is not None:
+        body["unit_price"] = unit_price
     return api.post(f"/api/v1/material-requests/{request_id}/decision", json=body, headers=who.headers)

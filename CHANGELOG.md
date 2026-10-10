@@ -21,9 +21,16 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 - **Phase 5: materials, approvals and rules engine.**
-  - Material requests against BOQ items, with a rules engine of pure functions: BR-01 (the QS
-    approves up to 5% over budget, the PM above that), BR-02 (quantity blocked beyond the BOQ plus
-    3%), BR-04 (no approving your own request) and BR-05 (no purchase order before approval).
+  - Material requests against BOQ items, with a rules engine of pure functions:
+    - BR-01: a unit price more than 5% above the budgeted rate needs the PM.
+    - BR-13: the section's committed cost plus the request exceeding its budget line needs the PM.
+    - BR-02: quantity is blocked beyond the BOQ plus 3%.
+    - BR-04: no approving your own request.
+    - BR-05: no purchase order before approval.
+    - The request page names the rule that sent a request to the PM.
+  - Rates and amounts only for the PM, QS and procurement. Site engineers get cost-free API
+    responses (role-specific schemas) and see item, unit, BOQ quantity, requested and remaining.
+    They raise requests without prices, and the QS prices them at the QS check.
   - Approval state machine: QS check, PM approval, approved, ordered and delivered, plus rejected,
     change requested and cancelled. Invalid transitions are refused, and every step is audited
     and notified.

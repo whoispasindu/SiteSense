@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 
 import { checkRequest, useBoqOptions, useCreateRequest, type BoqOption } from "../../api/materials";
 import { useProjects } from "../../api/projects";
+import { useAuth } from "../../auth/context";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { SelectField, TextAreaField, TextField } from "../../components/ui/Field";
@@ -55,7 +56,6 @@ function ItemPicker({
         {shown.length === 0 ? <p className="px-3 py-6 text-center text-sm text-ink-faint">No items match.</p> : null}
         <ul className="divide-y divide-rule">
           {shown.map((o) => {
-            const left = Number(o.boq_quantity) - Number(o.requested_quantity);
             return (
               <li key={o.id}>
                 <label
@@ -75,8 +75,9 @@ function ItemPicker({
                     <span className="mr-1.5 font-mono text-xs text-ink-faint">{o.item_code}</span>
                     {o.description}
                     <span className="tabular block text-xs text-ink-faint">
-                      {formatQuantity(left)} of {formatQuantity(o.boq_quantity)} {o.unit} left · budget LKR{" "}
-                      {formatAmount(o.budget_rate)} / {o.unit}
+                      {formatQuantity(o.remaining_quantity)} of {formatQuantity(o.boq_quantity)} {o.unit} left ·{" "}
+                      {formatQuantity(o.requested_quantity)} requested so far
+                      {o.budget_rate !== undefined ? ` · budget LKR ${formatAmount(o.budget_rate)} / ${o.unit}` : ""}
                     </span>
                   </span>
                 </label>
@@ -90,6 +91,9 @@ function ItemPicker({
 }
 
 export function RequestFormPage() {
+  const { can } = useAuth();
+  // Site engineers do not see rates: they enter no price and the QS prices the request.
+  const pricing = can("rates:read");
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const projects = useProjects();
@@ -106,12 +110,17 @@ export function RequestFormPage() {
   const options = useBoqOptions(projectId);
 
   const draft = useMemo(
-    () => ({ project_id: projectId, boq_item_id: item?.id ?? "", quantity: quantity.trim(), unit_price: price.trim() }),
-    [projectId, item, quantity, price],
+    () => ({
+      project_id: projectId,
+      boq_item_id: item?.id ?? "",
+      quantity: quantity.trim(),
+      ...(pricing ? { unit_price: price.trim() } : {}),
+    }),
+    [projectId, item, quantity, price, pricing],
   );
   const settled = useDebounced(draft);
-  const ready =
-    settled.boq_item_id !== "" && QUANTITY.test(settled.quantity) && Number(settled.quantity) > 0 && PRICE.test(settled.unit_price) && Number(settled.unit_price) > 0;
+  const priceReady = !pricing || (PRICE.test(settled.unit_price ?? "") && Number(settled.unit_price) > 0);
+  const ready = settled.boq_item_id !== "" && QUANTITY.test(settled.quantity) && Number(settled.quantity) > 0 && priceReady;
   const check = useQuery({
     queryKey: ["materials", "check", settled],
     queryFn: ({ signal }) => checkRequest(settled, signal),
@@ -125,7 +134,7 @@ export function RequestFormPage() {
     if (!projectId) next.project = "Choose the project.";
     if (!item) next.item = "Choose the BOQ item you need.";
     if (!QUANTITY.test(quantity.trim()) || Number(quantity) <= 0) next.quantity = "Enter a quantity greater than zero.";
-    if (!PRICE.test(price.trim()) || Number(price) <= 0) next.price = "Enter the expected unit price, greater than zero.";
+    if (pricing && (!PRICE.test(price.trim()) || Number(price) <= 0)) next.price = "Enter the expected unit price, greater than zero.";
     if (!neededBy || neededBy < siteTodayIso()) next.neededBy = "The needed-by date cannot be in the past.";
     setErrors(next);
     if (Object.keys(next).length || !item) return;
@@ -144,7 +153,7 @@ export function RequestFormPage() {
       <PageHeader
         eyebrow={<Link to="/materials" className="hover:text-ink hover:underline">Materials</Link>}
         title="New material request"
-        description="Requests are checked against the BOQ quantity (BR-02, 3% tolerance) and the budget line (BR-01). Within 5% of budget the QS approves; above that the project manager."
+        description="Requests are checked against the BOQ quantity (BR-02, 3% tolerance). The QS approves, unless the unit price is more than 5% above the budgeted rate (BR-01) or the section's committed cost would exceed its budget line (BR-13): then the project manager approves."
       />
 
       {create.isError ? <Alert tone="error">{errorText(create.error)}</Alert> : null}
@@ -181,7 +190,7 @@ export function RequestFormPage() {
                 disabled={create.isPending}
                 onSelect={(o) => {
                   setItem(o);
-                  if (!price) setPrice(o.budget_rate);
+                  if (!price && o.budget_rate !== undefined) setPrice(o.budget_rate);
                 }}
               />
             )
@@ -199,17 +208,19 @@ export function RequestFormPage() {
                 setQuantity(e.target.value);
               }}
             />
+{pricing ? (
             <TextField
               label="Unit price (LKR)"
               inputMode="decimal"
               value={price}
               error={errors.price}
               disabled={create.isPending}
-              hint={item ? `Budgeted ${formatAmount(item.budget_rate)}` : undefined}
+              hint={item?.budget_rate !== undefined ? `Budgeted ${formatAmount(item.budget_rate)}` : undefined}
               onChange={(e) => {
                 setPrice(e.target.value);
               }}
             />
+            ) : null}
             <TextField
               label="Needed by"
               type="date"
@@ -239,7 +250,11 @@ export function RequestFormPage() {
           <Sheet className="p-5" aria-live="polite">
             <SectionHeading annotation={check.isFetching ? "checking…" : undefined}>Rules check</SectionHeading>
             {!ready ? (
-              <p className="text-sm text-ink-faint">Choose an item and enter a quantity and price to see how the rules apply.</p>
+              <p className="text-sm text-ink-faint">
+                {pricing
+                  ? "Choose an item and enter a quantity and price to see how the rules apply."
+                  : "Choose an item and enter a quantity to check it against the BOQ. The quantity surveyor prices the request at the QS check."}
+              </p>
             ) : check.data ? (
               <RuleChecks check={check.data} />
             ) : check.isError ? (

@@ -1,4 +1,4 @@
-"""Business rules for material requests (BR-01, BR-02, BR-04, BR-05) and the approval state machine.
+"""Business rules for material requests (BR-01, BR-02, BR-04, BR-05, BR-13) and the approval states.
 
 Pure functions over plain values: no database, no clock, no request. Services gather the facts and
 call these, so every rule is tested on its own (``tests/test_rules_materials.py``) and documented in
@@ -103,43 +103,79 @@ def item_budget_rate(*, item_rate: Decimal, section_amount: Decimal, line_budget
     return item_rate * line_budget / section_amount
 
 
+def check_price(*, unit_price: Decimal, budget_rate: Decimal) -> RuleResult:
+    """BR-01: a unit price more than 5% above the item's budgeted rate needs the project manager.
+
+    Only the price is compared here; the section's budget as a whole is BR-13.
+    """
+    price_over = (unit_price - budget_rate) / budget_rate if budget_rate > 0 else Decimal(1)
+    facts = {
+        "unit_price": str(unit_price),
+        "budget_rate": str(money(budget_rate)),
+        "price_over": _pct(price_over),
+    }
+    if budget_rate <= 0:
+        return RuleResult(
+            "BR-01", "warn", "Needs project manager approval: the item has no budgeted rate.", facts
+        )
+    if price_over > PRICE_TOLERANCE:
+        message = (
+            f"Needs project manager approval: the price is {_pct(price_over)} above the budgeted rate "
+            "(limit 5%)."
+        )
+        return RuleResult("BR-01", "warn", message, facts)
+    if price_over > 0:
+        return RuleResult(
+            "BR-01", "pass", f"{_pct(price_over)} above the budgeted rate: within the 5% limit.", facts
+        )
+    return RuleResult("BR-01", "pass", "At or below the budgeted rate.", facts)
+
+
+# --- BR-13: the section's budget line ----------------------------------------------------------------
+
+
+def check_section_budget(
+    *, line_budget: Decimal, line_committed: Decimal, request_amount: Decimal
+) -> RuleResult:
+    """BR-13: if the section's committed cost plus this request exceeds its budget line, the PM approves.
+
+    ``line_committed`` is everything already committed against the line: approved requests, open
+    purchase orders and deliveries. There is no tolerance: any excess needs the project manager.
+    """
+    after = line_committed + request_amount
+    facts = {
+        "line_budget": str(money(line_budget)),
+        "line_committed": str(money(line_committed)),
+        "line_after_request": str(money(after)),
+        "line_over": str(money(max(after - line_budget, ZERO))),
+    }
+    if after > line_budget:
+        message = (
+            f"Needs project manager approval: with this request the section's committed cost would be "
+            f"LKR {money(after):,} against a budget line of LKR {money(line_budget):,}."
+        )
+        return RuleResult("BR-13", "warn", message, facts)
+    return RuleResult("BR-13", "pass", "The section stays within its budget line.", facts)
+
+
 def route_approval(
     *,
     unit_price: Decimal,
     budget_rate: Decimal,
     request_amount: Decimal,
     line_budget: Decimal,
-    line_used: Decimal,
-) -> tuple[ApprovalLevel, RuleResult]:
-    """BR-01: up to 5% over budget the QS approves; above that the project manager.
-
-    Two checks, either of which sends the request to the PM:
-    - the unit price is more than 5% above the item's budgeted rate, or
-    - the budget line, with this request added to what is already committed and spent
-      (``line_used``), would end more than 5% over.
-    """
-    price_over = (unit_price - budget_rate) / budget_rate if budget_rate > 0 else Decimal(1)
-    after = line_used + request_amount
-    line_over = (after - line_budget) / line_budget if line_budget > 0 else Decimal(1)
-    facts = {
-        "unit_price": str(unit_price),
-        "budget_rate": str(money(budget_rate)),
-        "price_over": _pct(price_over),
-        "line_budget": str(money(line_budget)),
-        "line_after_request": str(money(after)),
-        "line_over": _pct(line_over),
-    }
-    if price_over > PRICE_TOLERANCE or line_over > PRICE_TOLERANCE:
-        reason = (
-            f"the price is {_pct(price_over)} above the budgeted rate"
-            if price_over > PRICE_TOLERANCE
-            else f"the budget line would end {_pct(line_over)} over"
-        )
-        message = f"Needs project manager approval: {reason} (limit 5%)."
-        return "pm", RuleResult("BR-01", "warn", message, facts)
-    if price_over > 0 or line_over > 0:
-        return "qs", RuleResult("BR-01", "pass", "Within the 5% tolerance: the QS can approve.", facts)
-    return "qs", RuleResult("BR-01", "pass", "Within budget: the QS can approve.", facts)
+    line_committed: Decimal,
+) -> tuple[ApprovalLevel, list[RuleResult], list[str]]:
+    """Who approves: the QS, unless BR-01 or BR-13 fires. Returns the level, both results and the
+    ids of the rules that sent the request to the project manager."""
+    results = [
+        check_price(unit_price=unit_price, budget_rate=budget_rate),
+        check_section_budget(
+            line_budget=line_budget, line_committed=line_committed, request_amount=request_amount
+        ),
+    ]
+    fired = [r.rule for r in results if r.severity == "warn"]
+    return ("pm" if fired else "qs"), results, fired
 
 
 # --- BR-04: segregation of duties ------------------------------------------------------------------

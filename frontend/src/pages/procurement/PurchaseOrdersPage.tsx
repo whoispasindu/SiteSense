@@ -37,16 +37,16 @@ function OrderDialog({ requests, onClose }: { requests: RequestSummary[]; onClos
   const navigate = useNavigate();
   const [supplierId, setSupplierId] = useState("");
   const [expected, setExpected] = useState(requests.reduce((min, r) => (r.needed_by < min ? r.needed_by : min), addDaysIso(siteTodayIso(), 365)));
-  const [prices, setPrices] = useState<Record<string, string>>(Object.fromEntries(requests.map((r) => [r.id, r.unit_price])));
+  const [prices, setPrices] = useState<Record<string, string>>(Object.fromEntries(requests.map((r) => [r.id, r.unit_price ?? ""])));
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const total = requests.reduce((sum, r) => sum + Number(r.quantity) * Number(prices[r.id] ?? r.unit_price), 0);
+  const total = requests.reduce((sum, r) => sum + Number(r.quantity) * Number(prices[r.id] ?? r.unit_price ?? 0), 0);
 
   function onSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supplierId) { setError("Choose the supplier."); return; }
     const over = requests.find((r) => !(Number(prices[r.id]) > 0) || Number(prices[r.id]) > Number(r.unit_price));
-    if (over) { setError(`${over.number}: the price must be above zero and not above the approved LKR ${formatAmount(over.unit_price)}.`); return; }
+    if (over) { setError(`${over.number}: the price must be above zero and not above the approved LKR ${formatAmount(over.unit_price ?? 0)}.`); return; }
     if (expected < siteTodayIso()) { setError("The expected delivery date cannot be in the past."); return; }
     setError(null);
     create.mutate(
@@ -183,7 +183,9 @@ function ReadyToOrder() {
                       {r.boq_item.description}
                       <p className="tabular text-xs text-ink-faint">{formatQuantity(r.quantity)} {r.boq_item.unit}</p>
                     </td>
-                    <td className="tabular px-4 py-3 text-right font-medium whitespace-nowrap text-ink">{formatCompactLKR(r.amount)}</td>
+                    <td className="tabular px-4 py-3 text-right font-medium whitespace-nowrap text-ink">
+                      {r.amount !== undefined ? formatCompactLKR(r.amount) : "—"}
+                    </td>
                     <td className="tabular px-4 py-3 whitespace-nowrap text-ink-soft">{formatDate(r.needed_by)}</td>
                   </tr>
                 );
@@ -253,7 +255,7 @@ export function PurchaseOrdersPage() {
                     {po.project.name} · expected {formatDate(po.expected_delivery)}
                   </span>
                 </span>
-                <span className="tabular font-medium text-ink">{formatCompactLKR(po.total)}</span>
+                {po.total !== undefined ? <span className="tabular font-medium text-ink">{formatCompactLKR(po.total)}</span> : null}
                 <PoStatusBadge status={po.status} />
               </Link>
             </li>

@@ -66,11 +66,18 @@ def test_engineer_raises_a_request_routed_to_the_qs(
     assert created["number"] == "MR-0001"
     assert created["status"] == "requested"
     assert created["approval_level"] == "qs"
-    assert created["amount"] == "200000.00"
+    # The engineer's response carries no prices or amounts, and only the quantity rule.
+    assert "amount" not in created
+    assert "unit_price" not in created
     assert created["rules"]["blocked"] is False  # type: ignore[index]
-    assert [r["rule"] for r in created["rules"]["results"]] == ["BR-02", "BR-01"]  # type: ignore[index]
-    assert created["rules"]["budget_rate"] == "2000.00"  # type: ignore[index]
+    assert [r["rule"] for r in created["rules"]["results"]] == ["BR-02"]  # type: ignore[index]
+    assert "budget_rate" not in created["rules"]  # type: ignore[operator]
     assert created["history"][0]["action"] == "submit"  # type: ignore[index]
+    # The QS sees the request priced at the item's budgeted rate, with all three rules.
+    for_qs = api.get(f"{URL}/{created['id']}", headers=qs.headers).json()
+    assert (for_qs["unit_price"], for_qs["amount"]) == ("2000.00", "200000.00")
+    assert [r["rule"] for r in for_qs["rules"]["results"]] == ["BR-02", "BR-01", "BR-13"]
+    assert for_qs["rules"]["routed_by"] == []
     assert created["actions"] == ["cancel"]  # the requester can only cancel
     [note] = notes_for(db, qs.user)
     assert note.kind == "request_pending"
@@ -82,14 +89,16 @@ def test_engineer_raises_a_request_routed_to_the_qs(
 def test_request_six_percent_over_budget_goes_to_the_pm(
     api: TestClient, boq: Boq, se: Who, qs: Who, pm: Who
 ) -> None:
-    """TC-02 (BR-01)."""
-    created = raise_request(api, boq, se, unit_price="2120")
+    """TC-02 (BR-01): the QS prices the request 6% over the budgeted rate at the QS check."""
+    created = raise_request(api, boq, se)
 
-    assert created["approval_level"] == "pm"
-    assert "Needs project manager approval" in created["rules"]["results"][1]["message"]  # type: ignore[index]
-
-    approved = decide(api, created["id"], qs, "approve")
-    assert approved.json()["status"] == "pm_approval"  # the QS check passes it on, it does not approve it
+    approved = decide(api, created["id"], qs, "approve", unit_price="2120")
+    body = approved.json()
+    assert body["status"] == "pm_approval"  # the QS check passes it on, it does not approve it
+    assert body["unit_price"] == "2120.00"
+    assert body["rules"]["routed_by"] == ["BR-01"]
+    br01 = next(r for r in body["rules"]["results"] if r["rule"] == "BR-01")
+    assert "6.0% above the budgeted rate" in br01["message"]
     assert decide(api, created["id"], qs, "approve").status_code == 403  # nor can the QS finish it
     assert decide(api, created["id"], pm, "approve").json()["status"] == "approved"
 
@@ -146,7 +155,7 @@ def test_rejected_and_cancelled_requests_free_their_quantity(
 
 
 def test_check_endpoint_previews_the_rules_without_saving(
-    api: TestClient, boq: Boq, se: Who, db: Session
+    api: TestClient, boq: Boq, qs: Who, db: Session
 ) -> None:
     response = api.post(
         f"{URL}/check",
@@ -156,13 +165,14 @@ def test_check_endpoint_previews_the_rules_without_saving(
             "quantity": "2000",
             "unit_price": "2500",
         },
-        headers=se.headers,
+        headers=qs.headers,
     )
 
     assert response.status_code == 200
     body = response.json()
     assert body["blocked"] is True
     assert body["approval_level"] == "pm"
+    assert body["routed_by"] == ["BR-01", "BR-13"]
     assert body["amount"] == "5000000.00"
     assert db.scalar(select(func.count(MaterialRequest.id))) == 0
 
@@ -318,18 +328,19 @@ def test_qs_approval_rechecks_routing_with_current_figures(
     api: TestClient, boq: Boq, se: Who, qs: Who, buyer: Who, supplier: Supplier, team: Callable[..., Who]
 ) -> None:
     """Approval uses today's commitments: a request that fitted at submission can need the PM later."""
-    late = raise_request(api, boq, se, quantity="20", unit_price="2000")  # fits the budget today
-    # Meanwhile steel is bought far over budget, so the line will end more than 5% over.
-    big = raise_request(
-        api, boq, team(Role.SITE_ENGINEER), boq_item_id=str(boq.steel.id), quantity="10", unit_price="460000"
-    )
-    decide(api, big["id"], qs, "approve")
+    late = raise_request(api, boq, se, quantity="20")  # fits the budget today
+    # Meanwhile steel is priced far over budget and approved, filling the section's budget line.
+    big = raise_request(api, boq, team(Role.SITE_ENGINEER), boq_item_id=str(boq.steel.id), quantity="10")
+    decide(api, big["id"], qs, "approve", unit_price="460000")
     decide(api, big["id"], team(Role.PROJECT_MANAGER), "approve")
 
     response = decide(api, late["id"], qs, "approve")
 
-    assert response.json()["status"] == "pm_approval"
-    assert response.json()["approval_level"] == "pm"
+    body = response.json()
+    assert body["status"] == "pm_approval"
+    assert body["approval_level"] == "pm"
+    # The price is on budget (BR-01 passes); the section's committed cost is the reason (BR-13).
+    assert body["rules"]["routed_by"] == ["BR-13"]
 
 
 # --- Ordering and delivery ----------------------------------------------------------------------------
@@ -340,7 +351,7 @@ def test_full_flow_from_site_to_delivery_updates_the_budget(
 ) -> None:
     """Phase 5 "Done when": correct routing, and the budget figures update by themselves."""
     budget_url = f"/api/v1/projects/{boq.project.id}/budget"
-    created = raise_request(api, boq, se, quantity="100", unit_price="2000")
+    created = raise_request(api, boq, se, quantity="100")
     decide(api, created["id"], qs, "approve")
 
     after_approval = api.get(budget_url, headers=pm.headers).json()["totals"]
@@ -501,7 +512,7 @@ def test_list_has_pipeline_counts_and_filters(
 ) -> None:
     first = raise_request(api, boq, se, quantity="10")
     raise_request(api, boq, se, quantity="10")
-    raise_request(api, boq, se, quantity="10", unit_price="3000")
+    raise_request(api, boq, se, quantity="10")
     decide(api, first["id"], qs, "approve")
 
     everything = api.get(URL, headers=qs.headers).json()
@@ -518,17 +529,19 @@ def test_list_has_pipeline_counts_and_filters(
     assert api.get(URL, params={"status": "lost"}, headers=qs.headers).status_code == 422
 
 
-def test_boq_item_picker_shows_what_is_left(api: TestClient, boq: Boq, se: Who) -> None:
+def test_boq_item_picker_shows_what_is_left(api: TestClient, boq: Boq, se: Who, qs: Who) -> None:
     raise_request(api, boq, se, quantity="250")
+    url = f"/api/v1/projects/{boq.project.id}/boq-items"
 
-    options = api.get(f"/api/v1/projects/{boq.project.id}/boq-items", headers=se.headers).json()
+    for_engineer = next(o for o in api.get(url, headers=se.headers).json() if o["item_code"] == "A.1")
+    for_qs = next(o for o in api.get(url, headers=qs.headers).json() if o["item_code"] == "A.1")
 
-    cement = next(o for o in options if o["item_code"] == "A.1")
-    assert (cement["boq_quantity"], cement["requested_quantity"], cement["budget_rate"]) == (
-        "1000.000",
-        "250.000",
-        "2000.00",
-    )
+    assert for_engineer == {
+        "id": str(boq.cement.id), "item_code": "A.1", "description": "Cement, 50 kg bags", "unit": "bag",
+        "section_code": "A", "section_name": "Materials", "boq_quantity": "1000.000",
+        "requested_quantity": "250.000", "remaining_quantity": "750.000",
+    }  # fmt: skip
+    assert for_qs["budget_rate"] == "2000.00"
 
 
 def test_budget_is_internal(api: TestClient, boq: Boq, team: Callable[..., Who], se: Who, buyer: Who) -> None:
@@ -633,7 +646,76 @@ def test_document_numbers_keep_counting(api: TestClient, boq: Boq, se: Who) -> N
     assert numbers == ["MR-0001", "MR-0002", "MR-0003"]
 
 
-def test_amounts_are_exact(api: TestClient, boq: Boq, se: Who) -> None:
-    created = raise_request(api, boq, se, quantity="3.333", unit_price="1999.99")
+def test_amounts_are_exact(api: TestClient, boq: Boq, team: Callable[..., Who]) -> None:
+    created = raise_request(api, boq, team(Role.PROJECT_MANAGER), quantity="3.333", unit_price="1999.99")
 
     assert Decimal(created["amount"]) == Decimal("6665.97")  # type: ignore[arg-type]
+
+
+# --- Prices: only roles that see rates set them ------------------------------------------------------
+
+
+def test_engineers_cannot_send_prices(api: TestClient, boq: Boq, se: Who, qs: Who, db: Session) -> None:
+    with_price = api.post(URL, json=request_body(boq, unit_price="1500"), headers=se.headers)
+    check = api.post(
+        f"{URL}/check",
+        json={
+            "project_id": str(boq.project.id),
+            "boq_item_id": str(boq.cement.id),
+            "quantity": "1",
+            "unit_price": "9",
+        },
+        headers=se.headers,
+    )
+
+    assert with_price.status_code == 422
+    assert with_price.json()["error"]["code"] == "price_not_allowed"
+    assert check.json()["error"]["code"] == "price_not_allowed"
+    assert db.scalar(select(func.count(MaterialRequest.id))) == 0
+
+    created = raise_request(api, boq, se)
+    decide(api, created["id"], qs, "request_change", "Fewer, please.")
+    edit = api.patch(f"{URL}/{created['id']}", json={"unit_price": "1"}, headers=se.headers)
+    assert edit.json()["error"]["code"] == "price_not_allowed"
+
+
+def test_engineer_check_shows_the_quantity_rule_only(api: TestClient, boq: Boq, se: Who) -> None:
+    response = api.post(
+        f"{URL}/check",
+        json={"project_id": str(boq.project.id), "boq_item_id": str(boq.cement.id), "quantity": "10"},
+        headers=se.headers,
+    )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert [r["rule"] for r in body["results"]] == ["BR-02"]
+    assert set(body) == {"approval_level", "blocked", "results", "routed_by"}
+
+
+def test_only_the_qs_sets_a_price_and_only_when_approving(
+    api: TestClient, boq: Boq, se: Who, qs: Who, pm: Who
+) -> None:
+    created = raise_request(api, boq, se)
+
+    rejecting = decide(api, created["id"], qs, "reject", "No.", unit_price="1900")
+    assert rejecting.status_code == 422
+    priced = decide(api, created["id"], qs, "approve", unit_price="1900")
+    assert priced.json()["unit_price"] == "1900.00"
+    assert priced.json()["status"] == "approved"
+
+    second = raise_request(api, boq, se)
+    decide(api, second["id"], qs, "approve", unit_price="2500")  # 25% over: PM approval
+    assert decide(api, second["id"], pm, "approve", unit_price="2000").status_code == 422
+
+
+def test_items_without_any_rate_cannot_be_requested_by_engineers(
+    api: TestClient, boq: Boq, se: Who, db: Session
+) -> None:
+    boq.line.budget_amount = Decimal(0)
+    boq.cement.rate = Decimal(0)
+    db.commit()
+
+    response = api.post(URL, json=request_body(boq), headers=se.headers)
+
+    assert response.status_code == 422
+    assert "no rate yet" in response.json()["error"]["message"]

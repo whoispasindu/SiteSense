@@ -53,9 +53,18 @@ purchase orders, deliveries, the rules engine and the budget view). Design decis
 | A08 Data integrity | Committed and spent cost are derived from order lines and deliveries, so no stored totals can drift. Money is NUMERIC with check constraints (quantities and prices > 0) and exact decimals end to end. |
 | A09 Logging and monitoring failures | New audit events: `material_request.created`, `.updated` and `.decided` (from/to status), `purchase_order.issued`, `delivery.recorded`, `supplier.created` and `.updated`. Every decision also notifies the people concerned. |
 
-**Budget visibility.** Section budgets have been visible to internal project roles on the BOQ tab
-since Phase 2. Phase 5 adds committed and spent cost only for `cost:read` (PM, QS). Clients see
-none of it.
+**Cost visibility (amended at the project owner's request).** Rates and amounts are now limited
+to the PM, QS and procurement (`rates:read`). This reverses the earlier choice that let every
+internal project role see section budgets.
+
+- **Enforcement.** Site engineers receive role-specific response schemas that do not declare any
+  cost field: projects, BOQ, schedule summary, item picker, requests and rule checks, and purchase
+  orders. The BR-01 and BR-13 results are filtered out of their rule checks.
+- **Prices.** Engineers cannot send a price (`422 price_not_allowed`); the QS prices their requests.
+- **Tests.** `test_cost_visibility.py` walks every endpoint an engineer can call and fails on any
+  cost field at any depth. Mutation-checked: making the visibility helper return everything makes
+  it fail. It also confirms that PM, QS and procurement still receive the cost fields, and that
+  clients are refused all of these endpoints.
 
 ### Verification beyond unit tests
 
@@ -91,6 +100,10 @@ none of it.
    and heavy rain is BR-06 (was BR-08). Corrected in code and docs, using the build guide's rule
    table.
 5. **Rule messages showed raw decimals** ("400.000 of 1650.000"). They now read "400 of 1,650".
+6. **Rates and amounts reached site engineers** (contract values, BOQ rates, request prices, order
+   totals). They are now limited to `rates:read` by role-specific schemas, as described above.
+7. **The schedule summary embedded the full project summary**, including its contract value and
+   totals. It now uses the cost-free project card for engineers.
 
 ## Phase 4 review: 2026-10-10
 

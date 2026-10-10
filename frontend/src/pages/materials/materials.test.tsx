@@ -25,10 +25,11 @@ const PROJECT: ProjectSummary = {
 };
 
 const CHECK: RuleCheck = {
-  approval_level: "qs", blocked: false, budget_rate: "2000.00", amount: "200000.00",
+  approval_level: "qs", blocked: false, budget_rate: "2000.00", amount: "200000.00", routed_by: [],
   results: [
     { rule: "BR-02", severity: "pass", message: "100 of 1,000 requested so far for this item, including this one.", facts: {} },
-    { rule: "BR-01", severity: "pass", message: "Within budget: the QS can approve.", facts: {} },
+    { rule: "BR-01", severity: "pass", message: "At or below the budgeted rate.", facts: {} },
+    { rule: "BR-13", severity: "pass", message: "The section stays within its budget line.", facts: {} },
   ],
 };
 
@@ -82,9 +83,9 @@ function materialsApi(role: Role, extra: Record<string, Handler> = {}) {
     [`/api/v1/projects/${PID}/boq-items`]: () =>
       jsonResponse([
         { id: ITEM, item_code: "A.1", description: "Cement, 50 kg bags", unit: "bag", section_code: "A", section_name: "Materials",
-          boq_quantity: "1000.000", requested_quantity: "250.000", budget_rate: "2000.00" },
+          boq_quantity: "1000.000", requested_quantity: "250.000", remaining_quantity: "750.000", budget_rate: "2000.00" },
         { id: "8b9c0d1e-2f3a-4b4c-9d5e-7f8a9b0c1d2e", item_code: "A.2", description: "Reinforcement steel", unit: "t",
-          section_code: "A", section_name: "Materials", boq_quantity: "10.000", requested_quantity: "0.000", budget_rate: "240000.00" },
+          section_code: "A", section_name: "Materials", boq_quantity: "10.000", requested_quantity: "0.000", remaining_quantity: "10.000", budget_rate: "240000.00" },
       ]),
     "/api/v1/suppliers": (_url, init) => (init?.method === "POST" ? jsonResponse(SUPPLIER, 201) : jsonResponse([SUPPLIER])),
     [`/api/v1/suppliers/${SUP}`]: () => jsonResponse({ ...SUPPLIER, is_active: false }),
@@ -147,17 +148,20 @@ describe("New request form", () => {
     await user.selectOptions(screen.getByLabelText("Project"), PID);
     await user.click(await screen.findByRole("radio", { name: /Cement, 50 kg bags/ }));
     expect(screen.getByText(/750 of 1,000 bag left/)).toBeInTheDocument();
-    expect(screen.getByLabelText("Unit price (LKR)")).toHaveValue("2000.00"); // pre-filled with the budget rate
+    // Site engineers do not see rates: no price field, the QS prices the request.
+    expect(screen.queryByLabelText("Unit price (LKR)")).not.toBeInTheDocument();
     await user.type(screen.getByLabelText("Quantity (bag)"), "100");
 
-    expect(await screen.findByText("Within budget: the QS can approve.", {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(await screen.findByText(/100 of 1,000 requested so far/, {}, { timeout: 6000 })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Submit request" }));
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(`/materials/${RID}`);
     });
     const post = fetchMock.mock.calls.find(([input, init]) => urlOf(input).endsWith("/material-requests") && init?.method === "POST");
-    expect(bodyOf(post?.[1])).toMatchObject({ project_id: PID, boq_item_id: ITEM, quantity: "100", unit_price: "2000.00", notes: null });
+    const sent = bodyOf(post?.[1]);
+    expect(sent).toMatchObject({ project_id: PID, boq_item_id: ITEM, quantity: "100", notes: null });
+    expect(sent).not.toHaveProperty("unit_price");
   });
 
   it("validates before sending and cannot submit a blocked request", async () => {
@@ -176,7 +180,7 @@ describe("New request form", () => {
     await user.selectOptions(screen.getByLabelText("Project"), PID);
     await user.click(await screen.findByRole("radio", { name: /Cement/ }));
     await user.type(screen.getByLabelText("Quantity (bag)"), "5000");
-    expect(await screen.findByText("An approved variation is needed first.", {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(await screen.findByText("An approved variation is needed first.", {}, { timeout: 6000 })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Submit request" })).toBeDisabled();
     expect(fetchMock.mock.calls.some(([input, init]) => urlOf(input).endsWith("/material-requests") && init?.method === "POST")).toBe(false);
   });
@@ -200,7 +204,7 @@ describe("Request detail", () => {
     renderRoute(`/materials/${RID}`);
 
     expect(await screen.findByRole("heading", { level: 1, name: /MR-0001: Cement/ })).toBeInTheDocument();
-    expect(within(screen.getByRole("list", { name: "Rule checks" })).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(screen.getByRole("list", { name: "Rule checks" })).getAllByRole("listitem")).toHaveLength(3);
     expect(within(screen.getByRole("list", { name: "Request history" })).getByText(/Submitted/)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Approve" }));
@@ -237,7 +241,8 @@ describe("Request detail", () => {
   it("explains a PM routing and shows refusals from the server", async () => {
     const user = userEvent.setup();
     materialsApi("quantity_surveyor", {
-      [`/api/v1/material-requests/${RID}`]: () => jsonResponse({ ...DETAIL, rules: { ...CHECK, approval_level: "pm" } }),
+      [`/api/v1/material-requests/${RID}`]: () =>
+        jsonResponse({ ...DETAIL, rules: { ...CHECK, approval_level: "pm", routed_by: ["BR-01"] } }),
       [`/api/v1/material-requests/${RID}/decision`]: () =>
         jsonResponse({ error: { code: "own_request", message: "You cannot approve or reject a request you raised yourself.", request_id: "r", details: [] } }, 403),
     });
@@ -245,7 +250,7 @@ describe("Request detail", () => {
 
     await user.click(await screen.findByRole("button", { name: "Pass to PM" }));
     const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByText(/passes it to the project manager/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/BR-01 sends this request to the project manager/)).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "Approve" }));
     expect(await within(dialog).findByText("You cannot approve or reject a request you raised yourself.")).toBeInTheDocument();
   });
@@ -257,7 +262,8 @@ describe("Request detail", () => {
         init?.method === "PATCH"
           ? jsonResponse({ ...DETAIL, status: "requested", actions: ["cancel"] })
           : jsonResponse({
-              ...DETAIL, status: "change_requested", actions: ["edit", "cancel"],
+              // As the API sends it to a site engineer: no price, no amount.
+              ...DETAIL, unit_price: undefined, amount: undefined, status: "change_requested", actions: ["edit", "cancel"],
               history: [...DETAIL.history, { action: "request_change", from_status: "requested", to_status: "change_requested",
                 comment: "Split by floor.", actor: { id: ME, full_name: "Shalini" }, created_at: "2026-10-10T04:00:00+00:00" }],
             }),
@@ -276,7 +282,9 @@ describe("Request detail", () => {
       expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PATCH")).toBe(true);
     });
     const patch = fetchMock.mock.calls.find(([, init]) => init?.method === "PATCH")?.[1];
-    expect(bodyOf(patch)).toMatchObject({ quantity: "50", unit_price: "2000.00" });
+    expect(bodyOf(patch)).toMatchObject({ quantity: "50" });
+    expect(bodyOf(patch)).not.toHaveProperty("unit_price");
+    expect(within(dialog).queryByLabelText("Unit price (LKR)")).not.toBeInTheDocument();
   });
 
   it("shows the order and delivery progress", async () => {
@@ -471,7 +479,7 @@ describe("Materials edge cases", () => {
   it("shows the PM step for requests routed above the limit", async () => {
     materialsApi("project_manager", {
       [`/api/v1/material-requests/${RID}`]: () =>
-        jsonResponse({ ...DETAIL, status: "pm_approval", approval_level: "pm", rules: { ...CHECK, approval_level: "pm" } }),
+        jsonResponse({ ...DETAIL, status: "pm_approval", approval_level: "pm", rules: { ...CHECK, approval_level: "pm", routed_by: ["BR-13"] } }),
     });
     renderRoute(`/materials/${RID}`);
 
@@ -537,5 +545,155 @@ describe("Materials edge cases", () => {
 
     expect(await screen.findByRole("group", { name: "Over budget" })).toHaveTextContent("LKR 30 k");
     expect(screen.getByRole("table", { name: /Cost budget, spent/ })).toHaveTextContent("LKR 30 k over");
+  });
+});
+
+
+describe("Prices and routing", () => {
+  const ENGINEER_DETAIL = {
+    ...DETAIL, unit_price: undefined, amount: undefined, actions: ["cancel"],
+    rules: { approval_level: "qs", blocked: false, routed_by: [], results: [CHECK.results[0]] },
+  };
+
+  it("shows a site engineer the request without any price or amount", async () => {
+    materialsApi("site_engineer", { [`/api/v1/material-requests/${RID}`]: () => jsonResponse(ENGINEER_DETAIL) });
+    renderRoute(`/materials/${RID}`);
+
+    expect(await screen.findByRole("heading", { level: 1, name: /MR-0001/ })).toBeInTheDocument();
+    expect(screen.queryByText("Unit price")).not.toBeInTheDocument();
+    expect(screen.queryByText("Value")).not.toBeInTheDocument();
+    expect(screen.queryByText("Request value")).not.toBeInTheDocument();
+    expect(screen.queryByText(/LKR/)).not.toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: "Rule checks" })).getAllByRole("listitem")).toHaveLength(1);
+  });
+
+  it("lets the QS price the request when approving", async () => {
+    const user = userEvent.setup();
+    const fetchMock = materialsApi("quantity_surveyor");
+    renderRoute(`/materials/${RID}`);
+
+    await user.click(await screen.findByRole("button", { name: "Approve" }));
+    const dialog = screen.getByRole("dialog", { name: "Approve this request" });
+    const price = within(dialog).getByLabelText("Expected unit price (LKR / bag)");
+    expect(price).toHaveValue("2000.00");
+    await user.clear(price);
+    await user.type(price, "2120");
+    await user.click(within(dialog).getByRole("button", { name: "Approve" }));
+
+    await waitFor(() => {
+      expect(bodyOf(requestTo(fetchMock, `/material-requests/${RID}/decision`))).toEqual({
+        decision: "approve",
+        comment: null,
+        unit_price: "2120",
+      });
+    });
+  });
+
+  it("names the rule that sent a request to the PM", async () => {
+    materialsApi("project_manager", {
+      [`/api/v1/material-requests/${RID}`]: () =>
+        jsonResponse({
+          ...DETAIL, status: "pm_approval", approval_level: "pm",
+          rules: {
+            ...CHECK, approval_level: "pm", routed_by: ["BR-13"],
+            results: [
+              ...CHECK.results.filter((x) => x.rule !== "BR-13"),
+              { rule: "BR-13", severity: "warn", message: "Needs project manager approval: the section would exceed its budget line.", facts: {} },
+            ],
+          },
+        }),
+    });
+    renderRoute(`/materials/${RID}`);
+
+    expect(await screen.findByText("Sent to the project manager by BR-13.")).toBeInTheDocument();
+    const rule = screen.getByText("Section cost against its budget line").closest("li");
+    expect(rule).toHaveTextContent("Sends to PM");
+    expect(screen.getByText("Unit price against the budgeted rate").closest("li")).not.toHaveTextContent("Sends to PM");
+  });
+
+  it("shows a site engineer the BOQ with quantities only", async () => {
+    const detail = {
+      ...PROJECT, contract_value: undefined, boq_total: undefined, budget_total: undefined, description: null, team: [],
+      created_at: "2026-10-01T08:00:00+00:00", updated_at: "2026-10-01T08:00:00+00:00",
+      sections: [{ id: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", code: "A", name: "Materials", item_count: 1 }],
+    };
+    const boq = {
+      project_id: PID, item_count: 1,
+      sections: [{ ...detail.sections[0], items: [{ id: ITEM, item_code: "A.1", description: "Cement, 50 kg bags", unit: "bag",
+        quantity: "1000.000", requested_quantity: "250.000", remaining_quantity: "750.000" }] }],
+    };
+    const user = userEvent.setup();
+    materialsApi("site_engineer", {
+      [`/api/v1/projects/${PID}`]: () => jsonResponse(detail),
+      [`/api/v1/projects/${PID}/boq`]: () => jsonResponse(boq),
+    });
+    renderRoute(`/projects/${PID}/boq`);
+
+    const section = await screen.findByRole("article", { name: /Section A/ });
+    await user.click(within(section).getByRole("button", { expanded: false }));
+    const table = within(section).getByRole("table", { name: "Items in section A" });
+    const headers = within(table).getAllByRole("columnheader").map((h) => h.textContent);
+    expect(headers).toEqual(["Item", "Description", "Unit", "BOQ qty", "Requested", "Remaining"]);
+    expect(within(table).getByRole("row", { name: /A.1/ })).toHaveTextContent("1,000250750");
+    expect(screen.queryByText(/LKR|Margin|BOQ value/)).not.toBeInTheDocument();
+  });
+});
+
+describe("Engineer views without costs", () => {
+  const card = { ...PROJECT, contract_value: undefined, boq_total: undefined, budget_total: undefined };
+  const detail = {
+    ...card, description: null, team: [], created_at: "2026-10-01T08:00:00+00:00", updated_at: "2026-10-01T08:00:00+00:00",
+    sections: [{ id: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", code: "A", name: "Materials", item_count: 2 }],
+  };
+  const engineerSummary = { ...SUMMARY, unit_price: undefined, amount: undefined };
+
+  function engineerApi() {
+    return materialsApi("site_engineer", {
+      "/api/v1/projects": () => jsonResponse([card]),
+      [`/api/v1/projects/${PID}`]: () => jsonResponse(detail),
+      "/api/v1/material-requests": () =>
+        jsonResponse({ items: [engineerSummary], total: 1, counts: { requested: 1 } }),
+      [`/api/v1/purchase-orders/${POID}`]: () =>
+        jsonResponse({ ...PO, total: undefined, lines: PO.lines.map((l) => ({ ...l, unit_price: undefined, amount: undefined })) }),
+    });
+  }
+
+  it("lists projects without contract values", async () => {
+    engineerApi();
+    renderRoute("/projects");
+
+    const list = await screen.findByRole("list", { name: "Projects" });
+    expect(within(list).getByText("BOQ: 2 items")).toBeInTheDocument();
+    expect(within(list).queryByText(/LKR/)).not.toBeInTheDocument();
+  });
+
+  it("shows the project overview with BOQ sections but no money", async () => {
+    engineerApi();
+    renderRoute(`/projects/${PID}`);
+
+    expect(await screen.findByRole("group", { name: "BOQ items" })).toHaveTextContent("2");
+    expect(screen.getByRole("list", { name: "BOQ sections" })).toHaveTextContent("Materials");
+    expect(screen.queryByRole("group", { name: "Contract value" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/LKR/)).not.toBeInTheDocument();
+  });
+
+  it("lists requests without a value column", async () => {
+    engineerApi();
+    renderRoute("/materials");
+
+    const table = await screen.findByRole("table", { name: "Material requests" });
+    await within(table).findByRole("link", { name: "MR-0001" });
+    expect(within(table).queryByRole("columnheader", { name: "Value" })).not.toBeInTheDocument();
+    expect(within(table).queryByText(/LKR/)).not.toBeInTheDocument();
+  });
+
+  it("shows a purchase order without prices", async () => {
+    engineerApi();
+    renderRoute(`/purchase-orders/${POID}`);
+
+    const table = await screen.findByRole("table", { name: "Order lines and delivered quantities" });
+    const headers = within(table).getAllByRole("columnheader").map((h) => h.textContent);
+    expect(headers).toEqual(["Line", "Ordered", "Delivered"]);
+    expect(screen.queryByText("Total")).not.toBeInTheDocument();
   });
 });
