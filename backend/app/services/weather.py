@@ -1,4 +1,7 @@
-"""Five-day site weather, cached per site so the app works when the provider is down.
+"""Site weather, cached per site so the app works when the provider is down.
+
+Five days are shown; fourteen are fetched and cached, because the risk model counts heavy-rain days
+over the next two weeks (Phase 6).
 
 The provider is an adapter (``app.integrations.weather``) chosen at startup.
 
@@ -22,7 +25,8 @@ from app.models import Site, WeatherForecast
 
 log = get_logger(__name__)
 
-FORECAST_DAYS = 5
+FORECAST_DAYS = 5  # shown on the weather strip
+FETCH_DAYS = 15  # today plus the 14 days ahead that the risk model counts (Open-Meteo allows 16)
 TENTH = Decimal("0.1")
 
 # WMO weather interpretation codes, as used by Open-Meteo.
@@ -111,7 +115,7 @@ def refresh(db: Session, site: Site, client: WeatherClient) -> None:
     """Fetch and cache the forecast. Raises WeatherUnavailableError on any provider failure."""
     if site.latitude is None or site.longitude is None:
         raise WeatherUnavailableError("The site has no coordinates.")
-    _store(db, site, client.daily(site.latitude, site.longitude, FORECAST_DAYS), clock.utcnow())
+    _store(db, site, client.daily(site.latitude, site.longitude, FETCH_DAYS), clock.utcnow())
 
 
 def forecast(db: Session, site: Site, client: WeatherClient, *, cache_hours: int) -> Forecast:

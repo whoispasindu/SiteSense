@@ -21,7 +21,7 @@ const TODAY = siteTodayIso();
 const PROJECT: ProjectDetail = {
   id: PID, code: "HR-2026-01", name: "Havelock Residences", site: SITE, client_name: "Havelock Developers",
   project_type: "residential", status: "active", contract_value: "1114000000.00", start_date: "2026-03-02",
-  planned_end: "2027-09-30", boq_total: "0.00", budget_total: "0.00", item_count: 0, description: null,
+  planned_end: "2027-09-30", boq_total: "0.00", budget_total: "0.00", item_count: 0, description: null, planned_crew: null,
   sections: [], team: [], created_at: "2026-10-01T08:00:00+00:00", updated_at: "2026-10-01T08:00:00+00:00",
 };
 
@@ -366,9 +366,11 @@ describe("Notifications", () => {
 
   it("shows the unread count and opens the linked page", async () => {
     const user = userEvent.setup();
+    // Stamped when the bell asks, not when the file loads: a slow run must still read "just now".
+    const fresh = () => ({ ...notes, items: [{ ...notes.items[0]!, created_at: new Date().toISOString() }, notes.items[1]!] });
     const fetchMock = reportsApi("site_engineer", {
-      "/api/v1/notifications": () => jsonResponse(notes),
-      "/read": () => jsonResponse({ ...notes.items[0], read_at: new Date().toISOString() }),
+      "/api/v1/notifications": () => jsonResponse(fresh()),
+      "/read": () => jsonResponse({ ...fresh().items[0], read_at: new Date().toISOString() }),
     });
     const { router } = renderRoute("/reports");
 

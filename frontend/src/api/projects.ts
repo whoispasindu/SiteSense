@@ -60,6 +60,8 @@ export type SectionTotals = z.infer<typeof sectionTotalsSchema>;
 
 export const projectDetailSchema = projectSummarySchema.extend({
   description: z.string().nullable(),
+  // Planned average crew on site; the risk model compares reported crews with it.
+  planned_crew: z.number().int().nullable(),
   sections: z.array(sectionTotalsSchema),
   team: z.array(z.object({ id: z.uuid(), full_name: z.string(), role: roleSchema, role_label: z.string() })),
   created_at: z.iso.datetime({ offset: true }),
@@ -162,6 +164,7 @@ export interface ProjectInput {
   start_date: string;
   planned_end: string;
   description: string | null;
+  planned_crew: number | null;
 }
 
 export function useSaveProject(id?: string) {

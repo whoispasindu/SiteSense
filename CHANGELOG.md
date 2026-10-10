@@ -20,6 +20,27 @@ uses [Semantic Versioning](https://semver.org/).
   - Sidebar icons, an avatar user menu and calmer error pages. The sign-in button now says "Sign in".
 
 ### Added
+
+- Phase 6, risk model v1 (the v0.1 MVP AI feature):
+  - A synthetic project simulator (`ml/data_generator`) with every assumption written down, using
+    real Open-Meteo rainfall for seven Sri Lankan towns; 300 projects of weekly snapshots.
+  - Training with a project-grouped split, a linear baseline and LightGBM with monotone
+    constraints. On held-out projects, delay MAE is 19.7 days (baseline 25.6) and F1 for High is
+    0.60. All the figures are in the model card, along with the limits of synthetic data.
+  - The backend scores exported JSON trees in pure Python: no pickle loading and no ML libraries in
+    the API.
+  - A feature builder from live data: progress gap and trend, late deliveries, heavy rain in the next
+    14 days, committed cost against budget, crew against plan and missing reports.
+  - Daily scoring at 06:00, again after each daily report, and `python -m app.cli score-risk`.
+    Scores are kept in `risk_scores` with their drivers, inputs and model version.
+  - BR-10: High (70+) alerts the site's project managers once when a project enters High.
+  - `GET /projects/{id}/risk` and `GET /risk/projects` for PMs and QSs.
+  - Dashboard: a High-risk KPI and projects ranked by risk with High, Medium and Low badges. The
+    project page shows the score, forecast, drivers and missing data, labelled as an estimate.
+  - Projects have a planned crew size; the weather cache holds 14 days; the demo seed adds the
+    history the model reads and scores every project.
+  - An exploration notebook, a model card, ADR 0009, an ML CI job (tests and a reproducibility
+    check), and ML dependencies in pip-audit and Dependabot.
 - **Phase 5: materials, approvals and rules engine.**
   - Material requests against BOQ items, with a rules engine of pure functions:
     - BR-01: a unit price more than 5% above the budgeted rate needs the PM.

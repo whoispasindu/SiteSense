@@ -49,7 +49,7 @@ assigned to. Every site-data endpoint uses the helpers in
 | `GET /api/v1/projects` | PM, QS, Site Engineer, Procurement | Filtered to the user's sites; `status` and `q` filters |
 | `POST /api/v1/projects` | Project Manager | Only on a site the PM is assigned to |
 | `GET /api/v1/projects/{id}` | PM, QS, Site Engineer, Procurement | 404 for projects on other sites |
-| `PATCH /api/v1/projects/{id}` | Project Manager | Code and site are fixed |
+| `PATCH /api/v1/projects/{id}` | Project Manager | Code and site are fixed. Includes the planned crew (a risk model input) |
 | `GET /api/v1/projects/{id}/boq` | PM, QS, Site Engineer, Procurement | Sections, items, totals |
 | `POST /api/v1/projects/{id}/boq/import?dry_run=` | Quantity Surveyor | Multipart file; dry run by default |
 | `PATCH /api/v1/projects/{id}/budget-lines/{line_id}` | Quantity Surveyor | Adjust a section's cost budget |
@@ -103,7 +103,17 @@ answers `404`, exactly like a missing record.
 | `POST /api/v1/purchase-orders` | Procurement | Approved requests only (BR-05). Lines failing BR-14 or BR-13 at the order price go back to PM approval; `201` with the order, or `200` with `order: null` if every line went back |
 | `POST /api/v1/purchase-orders/{id}/deliveries` | Procurement | Never more than ordered |
 
-`backend/tests/test_role_matrix.py` calls every endpoint as every role. New endpoints must be added there.
+## Phase 6 endpoints
+
+| Method and path | Who | Notes |
+| --- | --- | --- |
+| `GET /api/v1/projects/{id}/risk` | PM, QS | Latest forecast with drivers, missing-data notes and model version; 14-day history. 404 on other sites |
+| `GET /api/v1/risk/projects` | PM, QS | Open projects on the caller's sites, highest risk first |
+
+Scores are written only by the scheduler, after daily reports and by the CLI; no endpoint writes them.
+
+`backend/tests/test_role_matrix.py` calls every endpoint as every role. New endpoints must be added
+there, and `test_every_api_route_is_in_the_matrix` fails if one is missing.
 
 ## Rates and amounts
 

@@ -1,0 +1,71 @@
+# Simulator assumptions (risk model v1)
+
+The risk model is trained on **simulated projects**. Nothing here comes from a real contractor's
+records yet. Each assumption below is a number someone with site experience can check and correct.
+The code is `simulate.py`; every value here appears there with a comment.
+
+Weather is the exception: it is **real** daily rainfall for seven Sri Lankan towns from 2012 to 2025,
+from the Open-Meteo archive API (`rainfall.csv`, refreshed by `rainfall.py`).
+
+## Projects
+
+| What | Assumption | To validate |
+| --- | --- | --- |
+| Type | Residential 35%, commercial 25%, mixed use 15%, industrial 15%, institutional 10% | Mix of a typical mid-size contractor's work |
+| Contract value | Log-normal, median LKR 450 M, from LKR 60 M to 4 bn | |
+| Planned duration | 24 + 15 × ln(value / 60 M + 1) weeks; industrial × 0.85, institutional × 1.1; ± 10% | Duration against value on past jobs |
+| Location and start | One of the seven towns; a random Monday from 2013 to 2021 | |
+| Cost budget | 82% of the contract value (margin and contingency held back) | Typical budget share |
+| Planned crew | 10 + value / 12 M people, between 8 and 250 | Crew sizes against value |
+| Planned progress | An S-curve: slow start, fast middle, slow finish (`3f² − 2f³`) | Shape of real programmes |
+
+## What slows a project
+
+Each project has a hidden **site-management quality** between 0 and 1 (Beta(5, 2): most sites are
+run reasonably well, a tail is not). The model never sees it, only its symptoms.
+
+| Factor | Rule |
+| --- | --- |
+| Base productivity | 1.0 + 0.12 × (quality − 0.7), ± 3% a week |
+| Rain | A heavy-rain day (10 mm or more, as in BR-06) loses 70% of a day's work; a wet day (2–10 mm) loses 15%. Programmes already allow for the town's usual weather for the month, so only rain beyond that slows the job, and a dry spell helps. After 60% of the work the building is closed in and rain has half the effect. |
+| Crew | The crew drifts around 1 − 0.15 × (1 − quality) of the plan. Shortages start with a 4–8% chance a week (more on poorly run sites), last 2–6 weeks and cut the crew to 60–80%. Output scales with crew^0.7, capped at 110%. |
+| Deliveries | While 5–92% of the work is done, Poisson(0.6 + value / 800 M) deliveries a week. Each is on time with the project's supplier reliability (Beta(6, 2), better on well-run sites); otherwise it is 1 + Gamma(2, 3) × (1.5 − quality) days late. Each delivery still overdue holds up 4% of the week's work, up to 40%. |
+| Variations | 1.2% chance a week of extra scope: 2–8% more work and cost, not in the plan. (Variation counts are not a model input until Phase 8, so this is noise the model cannot see.) |
+| Noise | ± 4% of a week's progress |
+
+## Cost
+
+| Item | Rule |
+| --- | --- |
+| Price drift | Material prices move by N(2%, 3%) over the project, applied as work is done |
+| Rework | 4% × (1 − quality)^1.5 of the cost is redone on poorly run sites |
+| Overheads | Time-related costs are 10% of the budget over the planned duration; every week past the planned end costs another week of them |
+| Expediting | Each late delivery costs 0.02% of the budget per week late |
+
+## What the app would have recorded
+
+| Feature | How the simulator produces it |
+| --- | --- |
+| Progress gap and trend | Planned against actual S-curve position, with ± 1 point reporting noise; trend over the last three weeks |
+| Late deliveries | Deliveries due so far that arrived late or are still overdue, and their mean lateness |
+| Rain in the next 14 days | The real rainfall for the next 14 days, each day's heavy/not-heavy flipped with a 15% chance (a two-week forecast is often wrong) |
+| Cost variance | Committed cost against the budgeted value of the same work: price drift, rework and expediting so far, ± 1.5 points. Overheads are not visible (the app does not track them yet) |
+| Crew against plan | Average reported crew over the last 12 working days against the planned crew, each report ± 8% |
+| Missing reports | Each working day's report is missing with chance 0.02 + 0.30 × (1 − quality)² |
+
+## Outcomes
+
+The project runs until all the work is done (or three times the planned duration, which never
+happened in the training set). Final delay = actual minus planned completion, in days. Final overrun
+= final cost against the budget, in %. The default run (300 projects, seed 2026) gives a median delay
+of 10% of the planned duration and a median overrun of 6.5%. Final risk bands: 40% Low, 33% Medium,
+27% High. The longest delay was 45% of the planned duration.
+
+## Known limits
+
+- The relationships are the simulator's rules, so the model learns those rules, not reality.
+  A real contractor's history would show which of them are wrong.
+- Overruns depend mostly on things the app does not record yet (overheads, variations), so the
+  overrun model is much weaker than the delay model. That is stated in the model card.
+- One snapshot per project per week; consecutive weeks are strongly related, which is why the
+  train/test split is by project.

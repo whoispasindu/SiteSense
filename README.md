@@ -25,7 +25,9 @@ them, and clients see honest progress without internal costs.
 - Projects, BOQ import and budget lines, with planned against actual progress
 - Daily site reports with photos and weather filled in automatically
 - Materials workflow from request to delivery, driven by 12 business rules
-- AI risk forecasts with drivers, ranges and a what-if recovery planner
+- AI risk forecasts with drivers, ranges and a what-if recovery planner (v1 live: a daily delay and
+  cost-overrun score for every project, ranked on the dashboard; see the
+  [model card](docs/model-card-risk.md))
 - AI report reading that tags issues, always confirmed by a person
 - Cost control, progress claims with retention, and variation orders
 - Client portal with progress and variation approval
@@ -76,7 +78,11 @@ a programme, a week of daily reports, five suppliers and material requests at ev
 site engineer to file today's report or raise a request, as the QS or PM to approve, and as
 procurement to order and receive.
 
-Two operator commands run the scheduled jobs on demand:
+Every open demo project is also given a risk score by the model, and the PM and QS dashboards rank
+the projects by it. Havelock runs short-handed with a few missed reports and late deliveries;
+Peradeniya is ahead of plan. Scores are recalculated every morning and after each daily report.
+
+Three operator commands run the scheduled jobs on demand:
 
 ```bash
 docker compose exec backend python -m app.cli send-reminders
@@ -85,6 +91,11 @@ docker compose exec backend python -m app.cli send-reminders
 ```bash
 docker compose exec backend python -m app.cli refresh-weather
 ```
+
+```bash
+docker compose exec backend python -m app.cli score-risk
+```
+
 The password is the value of `SITESENSE_DEMO_PASSWORD` (see `.env.example`). For a real
 company, create the first admin instead; it prints a one-time password:
 
@@ -136,6 +147,10 @@ ruff check . && ruff format --check . && mypy app tests && pytest --cov
 # frontend: lint, types, tests, build
 cd frontend
 npm run lint && npm run typecheck && npm run coverage && npm run build
+
+# ml: simulator and export tests, and a check that retraining reproduces the shipped model
+cd ml
+ruff check . && pytest && python check_model.py
 ```
 
 Backend tests use a real PostgreSQL. Start it first with `docker compose up -d db`; the tests
@@ -190,7 +205,7 @@ Architecture notes, the [roles and access matrix](docs/roles-and-access.md) and 
 ```
 backend/        FastAPI app (api, models, schemas, services, ai, integrations, core) + Alembic
 frontend/       React + TypeScript web app
-ml/             synthetic data generator, notebooks, versioned models (from Phase 6)
+ml/             synthetic project simulator, training, notebooks, model metrics (see ml/README.md)
 infra/          database bootstrap scripts
 docs/           architecture, decision records, security reviews, model cards
 .github/        CI, CodeQL, Dependabot, issue and PR templates
@@ -205,8 +220,8 @@ docs/           architecture, decision records, security reviews, model cards
 | 2 | Projects, BOQ and budget | Done |
 | 3 | Schedule basics | Done |
 | 4 | Daily site reports | Done |
-| 5 | Materials, approvals and rules engine | In progress |
-| 6 | Demo data and risk model v1 → **v0.1 MVP** | Planned |
+| 5 | Materials, approvals and rules engine | Done |
+| 6 | Demo data and risk model v1 → **v0.1 MVP** | In progress |
 | 7 | Report NLP classifier | Planned |
 | 8 | Cost control, claims and variations | Planned |
 | 9 | Advanced schedule | Planned |

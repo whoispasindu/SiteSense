@@ -34,6 +34,11 @@ const baseSchema = z.object({
     .trim()
     .max(2000)
     .transform((v) => v || null),
+  planned_crew: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || (/^\d{1,4}$/.test(v) && Number(v) >= 1 && Number(v) <= 5000), "Enter a whole number of people, 1 to 5000.")
+    .transform((v) => (v === "" ? null : Number(v))),
 });
 
 const createSchema = baseSchema.extend({
@@ -147,6 +152,17 @@ export function ProjectFormDialog({ open, onClose, project }: ProjectFormDialogP
           <TextField label="Start date" name="start_date" type="date" defaultValue={project?.start_date} error={errors.start_date} />
           <TextField label="Planned end" name="planned_end" type="date" defaultValue={project?.planned_end} error={errors.planned_end} />
         </div>
+
+        <TextField
+          label="Planned crew (optional)"
+          name="planned_crew"
+          inputMode="numeric"
+          defaultValue={project?.planned_crew ?? ""}
+          placeholder="55"
+          className="tabular"
+          hint="Average people on site. The risk forecast compares daily report crews with it."
+          error={errors.planned_crew}
+        />
 
         <label className="block space-y-1.5">
           <span className="block text-sm font-medium text-ink">Notes (optional)</span>

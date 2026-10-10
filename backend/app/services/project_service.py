@@ -180,6 +180,7 @@ def project_detail(db: Session, project: Project) -> ProjectDetail:
         {
             **_summary(project, boq_total, budget_total, items),
             "description": project.description,
+            "planned_crew": project.planned_crew,
             "sections": sections,
             "team": _team(db, project),
             "created_at": project.created_at,

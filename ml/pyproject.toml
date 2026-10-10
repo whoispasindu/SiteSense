@@ -1,0 +1,16 @@
+[tool.ruff]
+line-length = 110
+target-version = "py313"
+extend-exclude = ["notebooks/*.ipynb"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
+ignore = ["S101"]  # assert is how checks are written here
+
+[tool.ruff.lint.per-file-ignores]
+# Notebook cells are written as strings; their lines follow the notebook, not this file.
+"notebooks/build_explore.py" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -13,10 +13,10 @@ boundaries can be tested directly; services gather the facts and apply the resul
 | BR-04 | A requester cannot approve their own request (segregation of duties) | Phase 5 | `rules/materials.py: check_not_own_request` | TC-05 `test_requester_cannot_approve_their_own_request` |
 | BR-05 | No purchase order until the approval chain is complete | Phase 5 | `rules/materials.py: check_can_order` | `test_unapproved_requests_cannot_be_ordered` |
 | BR-06 | Concrete pours on days with heavy rain forecast (over 10 mm) are flagged and the PM alerted | Partly: the weather strip flags heavy-rain days (Phase 4); pour flagging comes with the advanced schedule (Phase 9) | `api/v1/reports.py` (threshold) | `reports.test.tsx` |
-| BR-07 | Each active site submits a daily report by 18:00; missing reports trigger reminders and count as a risk factor | Reminders: Phase 4. Risk factor: Phase 6 | `services/report_service.py`, `core/scheduler.py` | `test_reminders_notifications.py` |
+| BR-07 | Each active site submits a daily report by 18:00; missing reports trigger reminders and count as a risk factor | Reminders: Phase 4. Risk factor: Phase 6 (`missing_reports_14`) | `services/report_service.py`, `core/scheduler.py`, `ai/risk/features.py` | `test_reminders_notifications.py`, `test_crew_and_missing_reports_over_the_last_14_days` |
 | BR-08 | Claim value cannot exceed certified progress × contract value, minus previous claims and 5% retention | Phase 8 | | |
 | BR-09 | Variations above a threshold, or with any time impact, need client approval before work starts | Phase 8 | | |
-| BR-10 | Risk score 70+ is High (automatic PM alert), 40–69 Medium, under 40 Low | Phase 6 | | |
+| BR-10 | Risk score 70+ is High (automatic PM alert), 40–69 Medium, under 40 Low | Phase 6 | `ai/risk/scoring.py: level`, `services/risk_service.py` | `test_br10_bands`, `test_br10_alerts_the_project_managers_when_a_project_enters_high`, `test_br10_does_not_repeat_while_the_project_stays_high` |
 | BR-11 | A safety issue marked stop-work blocks related tasks until the PM clears it | Phase 7/9 | | |
 | BR-12 | If a supplier's predicted on-time chance is under 50% for a critical-path item, suggest an alternative | Phase 10 | | |
 | BR-13 | If the section's committed cost plus this request exceeds its budget line, the project manager approves. Checked at approval and again at purchase-order issue | Phase 5 (added at the project owner's request: the section check that was part of BR-01) | `rules/materials.py: check_section_budget`, `services/procurement_service.py: create_order` | `test_rules_materials.py` (`test_br13_*`), `test_qs_approval_rechecks_routing_with_current_figures`, `test_two_requests_that_fit_alone_exceed_the_line_together_at_approval`, `test_two_lines_that_fit_alone_exceed_the_line_together_at_po_issue` |
@@ -100,6 +100,29 @@ because site engineers can read the history.
 | Order price 5.01% over (BR-14) | Sent back for PM approval, nothing ordered | `test_order_price_more_than_five_percent_above_approval_goes_back_to_the_pm` |
 | Two lines fit alone, not together, at PO issue | First ordered, second sent back (BR-13) | `test_two_lines_that_fit_alone_exceed_the_line_together_at_po_issue`, `test_two_requests_ordered_on_separate_orders_are_checked_together` |
 | PM already approved the excess | Ordered at the approved price without going back | `test_pm_approved_requests_are_not_returned_for_the_same_excess` |
+
+## BR-10: the risk score and its alert
+
+The risk model (see the [model card](model-card-risk.md)) forecasts each open project's delay at
+completion and cost overrun at completion every morning, and again after a daily report.
+
+- **Score:** the worse of the two forecasts, from 0 to 100. A delay of 25% of the planned duration,
+  or a 20% overrun, scores 100. So 10% late scores 40 and 17.5% late (or 14% over) scores 70.
+- **Bands:** 70 or more is High, 40 to 69 Medium, under 40 Low. Shown in words, never by colour alone.
+- **Alert:** when a project *enters* High, the project managers on its site get one notification.
+  Re-scoring the same day, or staying High the next day, does not repeat it; dropping out of High
+  and coming back does.
+- **Never automatic:** a score changes nothing in the project by itself.
+
+| Case | Expected | Test |
+| --- | --- | --- |
+| Score 69 / 70 | Medium / High | `test_br10_bands[69-medium]`, `[70-high]` |
+| Score 39 / 40 | Low / Medium | `test_br10_bands[39-low]`, `[40-medium]` |
+| 17.5% late, or 14% over budget | 70 | `test_risk_score[70-0-400-70]`, `[0-14-400-70]` |
+| A project becomes High | One notification per site PM, none for the QS or other sites | `test_br10_alerts_the_project_managers_when_a_project_enters_high` |
+| Re-scored the same day, or still High tomorrow | No new alert | `test_br10_does_not_repeat_while_the_project_stays_high` |
+| Back to Low, then High again | Alerts again | `test_br10_alerts_again_after_the_project_recovers` |
+| Medium | No alert | `test_medium_risk_does_not_alert` |
 
 ## BR-02 in detail
 

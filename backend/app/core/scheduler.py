@@ -2,6 +2,7 @@
 
 - 18:00 site time: remind sites that have not filed today's report (BR-07).
 - 05:30 site time: refresh the weather forecast for every active site.
+- 06:00 site time: re-score every open project's risk (Phase 6), after the weather is fresh.
 
 Jobs are safe to run more than once (several API workers, a restart, the CLI): reminders are
 de-duplicated in the database and weather refresh is an upsert. Each job opens its own session
@@ -21,7 +22,7 @@ from app.core.database import Database
 from app.core.logging import get_logger
 from app.integrations.weather import WeatherClient, WeatherUnavailableError
 from app.models import Site
-from app.services import report_service, weather
+from app.services import report_service, risk_service, weather
 
 log = get_logger(__name__)
 
@@ -49,6 +50,12 @@ def refresh_weather(session_factory: Callable[[], Session], client: WeatherClien
     return refreshed
 
 
+def run_risk_scoring(session_factory: Callable[[], Session]) -> int:
+    with session_factory() as db:
+        scored = risk_service.score_all(db)
+    return len(scored)
+
+
 def _guarded(name: str, job: Callable[[], object]) -> Callable[[], None]:
     def run() -> None:
         try:
@@ -72,6 +79,12 @@ def build_scheduler(settings: Settings, database: Database, client: WeatherClien
         _guarded("weather_refresh", lambda: refresh_weather(database.session_factory, client)),
         CronTrigger(hour=5, minute=30, timezone=clock.SITE_TIME_ZONE),
         id="weather_refresh",
+        **common,
+    )
+    scheduler.add_job(
+        _guarded("risk_scoring", lambda: run_risk_scoring(database.session_factory)),
+        CronTrigger(hour=6, minute=0, timezone=clock.SITE_TIME_ZONE),
+        id="risk_scoring",
         **common,
     )
     return scheduler

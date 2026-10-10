@@ -8,6 +8,7 @@ import { SectionHeading } from "../../components/ui/SectionHeading";
 import { Sheet } from "../../components/ui/Sheet";
 import { durationWeeks, formatDate } from "../../features/projects/dates";
 import { KpiTile, ProgrammeBar } from "../../features/projects/ProjectBits";
+import { ProjectRiskPanel } from "../../features/risk/ProjectRiskPanel";
 import { formatAmount, formatCompactLKR, percent, toNumber } from "../../lib/money";
 import { useCurrentProject } from "./projectContext";
 
@@ -91,6 +92,8 @@ export function ProjectOverview() {
           </div>
         )}
       </div>
+
+      {can("risk:read") ? <ProjectRiskPanel projectId={p.id} /> : null}
 
       <section aria-labelledby="sections-heading">
         <SectionHeading id="sections-heading" annotation={p.sections.length ? `${String(p.sections.length)} sections` : undefined}>

@@ -22,7 +22,7 @@ from app.schemas.report import (
     WeatherDayOut,
     WeatherOut,
 )
-from app.services import project_service, report_service, weather
+from app.services import project_service, report_service, risk_service, weather
 
 router = APIRouter(tags=["reports"])
 log = get_logger(__name__)
@@ -73,6 +73,8 @@ def create_report(
 ) -> ReportDetail:
     project = project_service.get_project(db, user, project_id)
     report = report_service.create_report(db, project, body, actor=user, meta=meta)
+    # A new report changes the crew, progress and reporting inputs: re-score (best effort).
+    risk_service.rescore_after_report(db, project)
     return report_service.to_detail(report, project, user, settings.max_photos_per_report)
 
 

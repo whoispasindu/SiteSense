@@ -159,6 +159,66 @@ def section_costs(db: Session, project_id: uuid.UUID) -> dict[uuid.UUID, Section
     return costs
 
 
+def committed_against_budget(db: Session, project_id: uuid.UUID) -> tuple[Decimal, Decimal]:
+    """(committed cost, budgeted value of the same quantities) over the project's committed requests.
+
+    Each request counts once at its latest value, as in ``section_costs``. Its budgeted value is its
+    quantity at the item's budgeted rate (the item's share of the section's budget line). The risk
+    model uses the ratio as its cost-variance feature.
+    """
+    section_amounts = dict(
+        db.execute(
+            select(BoqItem.section_id, func.sum(BoqItem.amount))
+            .where(BoqItem.project_id == project_id)
+            .group_by(BoqItem.section_id)
+        ).all()
+    )
+    line_budgets = dict(
+        db.execute(
+            select(BudgetLine.section_id, BudgetLine.budget_amount).where(BudgetLine.project_id == project_id)
+        ).all()
+    )
+    delivered = (
+        select(Delivery.line_id, func.sum(Delivery.quantity).label("qty"))
+        .group_by(Delivery.line_id)
+        .subquery()
+    )
+    rows = db.execute(
+        select(
+            BoqItem.section_id,
+            BoqItem.rate,
+            MaterialRequest.quantity,
+            MaterialRequest.unit_price,
+            PurchaseOrderLine.quantity,
+            PurchaseOrderLine.unit_price,
+            PurchaseOrderLine.amount,
+            func.coalesce(delivered.c.qty, 0),
+        )
+        .join(BoqItem, BoqItem.id == MaterialRequest.boq_item_id)
+        .outerjoin(PurchaseOrderLine, PurchaseOrderLine.request_id == MaterialRequest.id)
+        .outerjoin(delivered, delivered.c.line_id == PurchaseOrderLine.id)
+        .where(MaterialRequest.project_id == project_id, MaterialRequest.status.in_(COMMITTED_STATUSES))
+    ).all()
+    committed = ZERO
+    budgeted = ZERO
+    for section_id, item_rate, quantity, price, ordered_qty, order_price, order_amount, done in rows:
+        rate = rules.item_budget_rate(
+            item_rate=item_rate,
+            section_amount=Decimal(section_amounts.get(section_id) or 0),
+            line_budget=Decimal(line_budgets.get(section_id) or 0),
+        )
+        budgeted += rules.money(quantity * rate)
+        if order_amount is None:
+            committed += rules.money(quantity * (price or ZERO))
+            continue
+        spent = rules.money(Decimal(done) * order_price)
+        fully = Decimal(done) >= ordered_qty
+        committed += latest_value(
+            approved_amount=None, order_amount=order_amount, delivered=spent if fully else None
+        )
+    return committed, budgeted
+
+
 # --- Facts for the rules -----------------------------------------------------------------------------
 
 

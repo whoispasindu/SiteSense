@@ -3,7 +3,8 @@
     python -m app.cli create-admin --email admin@company.lk --name "Nimal Perera"
     python -m app.cli seed-dev            # local development only
     python -m app.cli send-reminders      # missing daily report reminders now (BR-07)
-    python -m app.cli refresh-weather     # fetch the 5-day forecast for every active site
+    python -m app.cli refresh-weather     # fetch the 14-day forecast for every active site
+    python -m app.cli score-risk          # score every open project's risk now
 
 ``create-admin`` prints a one-time temporary password; the admin must change it at first sign-in.
 ``seed-dev`` creates demo sites and one account per role using SITESENSE_DEMO_PASSWORD, and
@@ -24,7 +25,7 @@ from app.core import clock
 from app.core.config import get_settings
 from app.core.database import Database
 from app.core.permissions import Role
-from app.core.scheduler import refresh_weather, run_report_reminders
+from app.core.scheduler import refresh_weather, run_report_reminders, run_risk_scoring
 from app.core.security import (
     PasswordPolicyError,
     generate_temporary_password,
@@ -39,13 +40,15 @@ from app.models import (
     MaterialRequest,
     ProgressSnapshot,
     Project,
+    PurchaseOrder,
+    PurchaseOrderLine,
     Site,
     Supplier,
     Task,
     User,
 )
 from app.schemas.materials import DecisionIn, DeliveryIn, OrderLineIn, PurchaseOrderCreate, RequestCreate
-from app.services import audit, materials_service, procurement_service
+from app.services import audit, materials_service, procurement_service, risk_service
 from app.services.audit import RequestMeta
 from app.services.auth_service import normalize_email
 from app.services.boq_import import parse_boq
@@ -87,6 +90,16 @@ DEMO_REQUESTS: list[tuple[str, str, str, int, str, str | None, str | None]] = [
     ("C.04", "2000", "2240", 10, "pm_approval", None, None),
     ("B.05", "400", "2600", 9, "requested", None, None),
     ("D.03", "3000", "1200", 20, "change_requested", None, None),
+]
+
+# Planned average crews (a risk model input) and the extra history the model reads (Phase 6).
+DEMO_CREWS = {"HR-2026-01": 55, "PRO-2026-02": 40, "FVA-2026-03": 45}
+# Havelock: two more weeks of reports, crews short of plan and three working days with no report.
+HR_EARLIER_REPORTS = {8: 44, 10: 41, 11: 43, 13: 39, 14: 42, 15: 45, 17: 40, 18: 38, 19: 44, 20: 41}
+WORKS = [
+    "Blockwork and plastering on the lower floors; formwork for the next slab.",
+    "Rebar fixing for the slab; scaffolding moved up one level.",
+    "Concrete pour for columns; curing of yesterday's slab section.",
 ]
 
 DEMO_SITES = [
@@ -260,6 +273,8 @@ def seed_dev() -> int:
             _seed_programme(db, target, programme, DEMO_PACE[code])
         _seed_reports(db)
         _seed_materials(db)
+        _seed_risk_inputs(db)
+        risk_service.score_all(db)
     database.dispose()
     print(
         f"Seeded {len(DEMO_SITES)} sites, {created} new demo users and {new_projects} new projects "
@@ -421,6 +436,55 @@ def _seed_materials(db: Session) -> None:
             )
 
 
+def _seed_risk_inputs(db: Session) -> None:
+    """What the risk model reads, so every demo project gets a meaningful score: planned crews, a few
+    weeks of reports (Havelock short-handed with gaps, Peradeniya fully staffed) and two late
+    Havelock deliveries. Safe to run again: each part checks whether it is already there."""
+    today = clock.site_today()
+    projects = {p.code: p for p in db.scalars(select(Project).where(Project.code.in_(DEMO_CREWS)))}
+    for code, crew in DEMO_CREWS.items():
+        if code in projects and projects[code].planned_crew is None:
+            projects[code].planned_crew = crew
+    engineer = db.scalar(select(User).where(User.email == "engineer@sitesense.example"))
+    pm = db.scalar(select(User).where(User.email == "pm@sitesense.example"))
+
+    def file(project: Project, author: User, days_ago: int, crew: int) -> None:
+        day = today - timedelta(days=days_ago)
+        if day.weekday() == 6 or day < project.start_date:
+            return
+        if db.scalar(
+            select(DailyReport).where(DailyReport.project_id == project.id, DailyReport.report_date == day)
+        ):
+            return
+        db.add(
+            DailyReport(
+                project_id=project.id, author_id=author.id, report_date=day, weather_summary="Partly cloudy",
+                rain_mm=Decimal("0.0"), weather_source="manual", crew_count=crew,
+                work_done=WORKS[days_ago % len(WORKS)],
+                submitted_at=clock.utcnow() - timedelta(days=days_ago),
+            )
+        )  # fmt: skip
+
+    havelock, peradeniya = projects.get("HR-2026-01"), projects.get("PRO-2026-02")
+    if havelock is not None and engineer is not None:
+        for days_ago, crew in HR_EARLIER_REPORTS.items():
+            file(havelock, engineer, days_ago, crew)
+        # Two orders turned up late (seed only: orders are normally placed with a future date).
+        for line in db.scalars(
+            select(PurchaseOrderLine).join(PurchaseOrder).where(PurchaseOrder.project_id == havelock.id)
+        ):
+            po = line.purchase_order
+            if po.expected_delivery < today:
+                continue
+            po.expected_delivery = today - timedelta(days=4 if line.deliveries else 9)
+            for delivery in line.deliveries:
+                delivery.delivered_on = today - timedelta(days=1)
+    if peradeniya is not None and pm is not None:
+        for days_ago in range(14):
+            file(peradeniya, pm, days_ago, 41 + days_ago % 4)
+    db.commit()
+
+
 def send_reminders() -> int:
     database = Database(get_settings())
     created = run_report_reminders(database.session_factory)
@@ -438,6 +502,14 @@ def refresh_site_weather() -> int:
     return 0
 
 
+def score_risk() -> int:
+    database = Database(get_settings())
+    scored = run_risk_scoring(database.session_factory)
+    database.dispose()
+    print(f"Scored {scored} projects.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -446,7 +518,8 @@ def main(argv: list[str] | None = None) -> int:
     admin.add_argument("--name", required=True)
     sub.add_parser("seed-dev", help="create demo sites and one user per role (not in production)")
     sub.add_parser("send-reminders", help="remind sites missing today's daily report")
-    sub.add_parser("refresh-weather", help="fetch the 5-day forecast for every active site")
+    sub.add_parser("refresh-weather", help="fetch the 14-day forecast for every active site")
+    sub.add_parser("score-risk", help="score every open project's risk now")
     args = parser.parse_args(argv)
 
     if args.command == "create-admin":
@@ -455,6 +528,8 @@ def main(argv: list[str] | None = None) -> int:
         return send_reminders()
     if args.command == "refresh-weather":
         return refresh_site_weather()
+    if args.command == "score-risk":
+        return score_risk()
     return seed_dev()
 
 

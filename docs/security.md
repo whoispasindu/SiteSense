@@ -30,9 +30,82 @@ here, newest first. The baseline design is in [ADR 0003](adr/0003-security-basel
 | Money | NUMERIC columns with check constraints; Decimal end to end; decimal strings in JSON | `models/project.py`, `schemas/project.py` | `test_projects_api.py` |
 | Photo uploads | Magic-byte check (JPEG/PNG/WebP), full decode under a 50 MP budget, re-encode to a fresh JPEG with no metadata (GPS removed); random server-generated storage keys checked against a pattern; 10 MB, 12 per report, per-IP rate limit; files outside any served folder; served only through an authenticated, site-scoped endpoint | `services/photos.py`, `integrations/storage.py`, `api/v1/reports.py` | `test_report_photos.py` |
 | Outbound calls (SSRF) | Weather: fixed https host, query built from stored coordinates only, redirects refused, 64 KB cap, response schema-validated, 5 s timeout; failures fall back to the cache | `integrations/weather.py`, `services/weather.py` | `test_weather.py` |
-| Approvals | Stage-and-role checks, segregation of duties (BR-04), state machine (invalid transitions 409), order price never above approved, row locks against double approval and quantity races | `rules/materials.py`, `services/materials_service.py`, `services/procurement_service.py` | `test_rules_materials.py`, `test_materials_api.py` |
+| Approvals | Stage-and-role checks, segregation of duties (BR-04), state machine (invalid transitions 409), order prices more than 5% over approval go back to the PM (BR-14), row locks against double approval and quantity races | `rules/materials.py`, `services/materials_service.py`, `services/procurement_service.py` | `test_rules_materials.py`, `test_materials_api.py` |
 | Notifications | Per-user only (others answer 404); links restricted to in-app paths by service and database constraint; de-duplicated reminders | `services/notification_service.py`, migration 0005 | `test_reminders_notifications.py`, `reports.test.tsx` |
+| AI models | Model files are JSON data validated before use (structure, feature indexes, finite numbers, children after parents, size limits); no pickle/joblib loading; golden predictions prove the scorer matches training; CI retrains and checks the shipped model is reproducible | `ai/risk/model.py`, `ml/check_model.py` | `test_risk_model.py`, CI ML job |
 | Supply chain | Pinned deps, Dependabot (pip, npm, actions, docker), pip-audit, npm audit, dependency review, CodeQL `security-extended`, actions pinned to SHAs, `permissions: contents: read`, `persist-credentials: false` | `.github/` | CI |
+
+## Phase 6 review: 2026-10-10
+
+Scope: the synthetic data generator and training code (`ml/`), the risk model scorer and feature
+builder (`app/ai/risk/`), daily scoring and the BR-10 alert, the risk endpoints, the dashboard and
+project risk panels, the planned-crew field, the 14-day weather fetch and the extended demo seed.
+
+### OWASP Top 10 (2021) walk-through
+
+- **A01 Broken access control.** Risk is `risk:read` only (PM, QS). The project endpoint uses the
+  same site check as every project route (404 elsewhere); the ranking lists only the caller's
+  projects. Both endpoints are in the role matrix for every role. A new test fails if any API route
+  is missing from the matrix. Mutation-checked: opening risk to `projects:read` fails the tests.
+- **A03 Injection.** Features come from ORM queries over stored data; no user input reaches the model
+  directly. Drivers are generated text over numbers, rendered as text.
+- **A04 Insecure design.** A score suggests, it never acts. Scoring after a report is best effort: a
+  failure is logged and the report is still saved. One failing project does not stop the daily job.
+  The High alert fires on entry only, so it cannot be turned into a notification flood.
+- **A05 Misconfiguration.** The weather client is unchanged (fixed host, no redirects, 64 KB cap);
+  14 days of daily data is a few kilobytes.
+- **A06 Vulnerable components.** The training stack (LightGBM, pandas, scikit-learn, Jupyter) lives
+  only in `ml/` and is not installed in the backend image. It is pinned, pip-audited in CI (0
+  findings) and covered by Dependabot.
+- **A08 Software and data integrity.** The backend never unpickles a model. The JSON model is
+  validated before use; a malformed file is refused (13 malformed variants tested). Golden rows
+  prove the scorer reproduces LightGBM exactly, and CI retrains from the committed code and data and
+  fails if the shipped model is not reproduced. The training data's SHA-256 is recorded in the model.
+- **A09 Logging.** Scoring failures log the project code and the exception, no personal data.
+- **Denial of service.** Model size is capped (5,000 trees, 65,536 nodes a tree). Scoring is a few
+  hundred tree walks plus a handful of queries per project; the risk endpoints only read.
+
+### Privacy and responsible AI
+
+- Training data is simulated; no personal data is used. Features describe projects, never people.
+- Every forecast shows its drivers, the inputs it was missing, the model version, and that it is an
+  estimate from a model trained on simulated projects.
+
+### Verification beyond unit tests
+
+- **Mutation checks: 12 of 12** deliberate faults fail a test. These cover the BR-10 thresholds,
+  the alert repeating, the alert reaching the QS, cost ignored in the score, the split direction,
+  accepting a child-before-parent tree, delivery lateness, Saturdays, heavy rain at exactly 10 mm,
+  scoring completed projects, and opening risk to engineers. The first run caught 11; the survivor
+  (an on-time delivery counted late) now has a test.
+- Retraining from scratch gives an identical model (trees, golden predictions and data hash).
+- Seeded the demo database and checked the scores end to end in the browser as a PM.
+
+### Findings fixed during the review
+
+1. **The cost feature could not mean the same in training and live use.** The simulator compared
+   all costs with progress; the app only tracks material commitments, so every live project would
+   have looked well under budget. It now compares committed cost with the budgeted value of the same
+   quantities, on both sides, and the model was retrained.
+2. **A same-day re-score of a High project reported a new alert.** The notification was suppressed by
+   its de-duplication key, but the logic was wrong. The comparison now includes the existing score
+   for the day; tested.
+3. **The ranking used a deprecated SQLAlchemy construct** that turns into a 500 under the test
+   settings; replaced with a plain latest-date subquery before it shipped.
+4. **The role matrix had drifted** (a path parameter renamed) and nothing checked that every route
+   was listed. Added the route-coverage test.
+5. **Drivers are relative to a typical project**, which could read as contradictory ("behind plan"
+   lowering the forecast). The panel now says what they are compared with.
+6. **A flaky frontend test** built its "just now" timestamp when the file loaded; it now stamps it
+   when the request is made.
+
+### Open items
+
+- Validate the simulator's assumptions with a contractor's real projects before trusting the
+  numbers (owner: product).
+- SHAP drivers, likely ranges and the what-if planner: risk model v2 (Phase 10).
+- Issue counts from report NLP (Phase 7) and variations (Phase 8) as model inputs.
+- Site overheads are not tracked, so the overrun forecast stays weak until they are.
 
 ## Phase 5 review: 2026-10-10
 

@@ -3,6 +3,7 @@
 When a new endpoint is added, add it to ENDPOINTS with the roles allowed to call it.
 """
 
+import re
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -10,6 +11,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -47,6 +49,7 @@ MATERIAL_READERS = frozenset(
 )
 REQUESTERS = frozenset({Role.PROJECT_MANAGER, Role.QUANTITY_SURVEYOR, Role.SITE_ENGINEER})
 COST_READERS = frozenset({Role.PROJECT_MANAGER, Role.QUANTITY_SURVEYOR})
+RISK_READERS = frozenset({Role.PROJECT_MANAGER, Role.QUANTITY_SURVEYOR})
 PROCUREMENT = frozenset({Role.PROCUREMENT_OFFICER})
 BOQ_CSV = (
     b"Section Code,Section Name,Item Code,Description,Unit,Quantity,Rate\nA,Prelims,A.1,Setup,item,1,100\n"
@@ -130,6 +133,8 @@ ENDPOINTS = [
     Endpoint("GET", "/api/v1/purchase-orders/{order_id}", MATERIAL_READERS),
     Endpoint("POST", "/api/v1/purchase-orders/{order_id}/deliveries", PROCUREMENT,
              {"request_id": "{request_id}", "quantity": "1", "delivered_on": "{today}"}),
+    Endpoint("GET", "/api/v1/projects/{project_id}/risk", RISK_READERS),
+    Endpoint("GET", "/api/v1/risk/projects", RISK_READERS),
     Endpoint("GET", "/api/v1/notifications", ALL_ROLES),
     Endpoint("POST", "/api/v1/notifications/{notification_id}/read", ALL_ROLES),
     Endpoint("POST", "/api/v1/notifications/read-all", ALL_ROLES),
@@ -278,3 +283,37 @@ def test_forbidden_request_changes_nothing(
     assert response.status_code == 403
     target = api.get(f"/api/v1/admin/users/{ids['user_id']}", headers=bearer(login(api, admin.email))).json()
     assert target["is_active"] is True
+
+
+# Sign-in, session and health routes: open to anyone or to every signed-in user, and tested in
+# test_auth.py and test_health.py instead.
+OUTSIDE_THE_MATRIX: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("GET", "/api/v1/health"),
+        ("GET", "/api/v1/health/ready"),
+        ("POST", "/api/v1/auth/login"),
+        ("POST", "/api/v1/auth/refresh"),
+        ("POST", "/api/v1/auth/logout"),
+        ("POST", "/api/v1/auth/change-password"),
+    }
+)
+
+
+def _shape(method: str, path: str) -> tuple[str, str]:
+    """Compare routes by shape: path parameter names do not matter."""
+    return method.upper(), re.sub(r"\{[^}]+\}", "{}", path)
+
+
+def test_every_api_route_is_in_the_matrix(app: FastAPI) -> None:
+    """A new endpoint cannot ship without being listed here with the roles allowed to call it."""
+    routes = {
+        _shape(method, path)
+        for path, operations in app.openapi()["paths"].items()
+        if path.startswith("/api/v1")
+        for method in operations
+    }
+    listed = {_shape(e.method, e.path) for e in ENDPOINTS}
+    outside = {_shape(m, p) for m, p in OUTSIDE_THE_MATRIX}
+
+    assert routes - listed - outside == set()
+    assert listed - routes == set()  # nothing listed that no longer exists
