@@ -91,7 +91,11 @@ describe("Project reports tab", () => {
     reportsApi("project_manager");
     renderRoute(`/projects/${PID}/reports`);
 
-    const strip = await screen.findByRole("list", { name: "Five-day forecast for site COL-07" });
+    // Wait on the forecast's own content with a text query, then check the list by role once. This page
+    // loads through three chained requests; a findByRole here re-runs a whole-page role query on every
+    // render while it loads, which made this test miss the 1 s default under coverage (issue #17).
+    await screen.findByText("Thunderstorm");
+    const strip = screen.getByRole("list", { name: "Five-day forecast for site COL-07" });
     const days = within(strip).getAllByRole("listitem");
     expect(days).toHaveLength(5);
     expect(days[0]).toHaveTextContent("Today");

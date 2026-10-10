@@ -41,3 +41,8 @@ Thumbs.db
 
 # Local Claude Code launch configs
 .claude/
+
+# Local profiling and backup files
+prof/
+*.bak
+*.cpuprofile

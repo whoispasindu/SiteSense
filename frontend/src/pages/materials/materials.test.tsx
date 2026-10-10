@@ -154,7 +154,7 @@ describe("New request form", () => {
     expect(screen.queryByLabelText("Unit price (LKR)")).not.toBeInTheDocument();
     await user.type(screen.getByLabelText("Quantity (bag)"), "100");
 
-    expect(await screen.findByText(/100 of 1,000 requested so far/, {}, { timeout: 6000 })).toBeInTheDocument();
+    expect(await screen.findByText(/100 of 1,000 requested so far/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Submit request" }));
 
     await waitFor(() => {
@@ -182,7 +182,7 @@ describe("New request form", () => {
     await user.selectOptions(screen.getByLabelText("Project"), PID);
     await user.click(await screen.findByRole("radio", { name: /Cement/ }));
     await user.type(screen.getByLabelText("Quantity (bag)"), "5000");
-    expect(await screen.findByText("An approved variation is needed first.", {}, { timeout: 6000 })).toBeInTheDocument();
+    expect(await screen.findByText("An approved variation is needed first.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Submit request" })).toBeDisabled();
     expect(fetchMock.mock.calls.some(([input, init]) => urlOf(input).endsWith("/material-requests") && init?.method === "POST")).toBe(false);
   });
