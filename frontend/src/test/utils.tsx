@@ -51,7 +51,7 @@ export function requestTo(fetchMock: FetchMock, suffix: string): RequestInit | u
 }
 
 export const healthyApi: Record<string, Handler> = {
-  "/api/v1/health": () => jsonResponse({ status: "ok", version: "0.0.1" }),
+  "/api/v1/health": () => jsonResponse({ status: "ok", version: "0.1.0" }),
   "/api/v1/health/ready": () => jsonResponse({ status: "ok", checks: { database: "ok" } }),
 };
 
