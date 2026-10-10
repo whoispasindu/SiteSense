@@ -68,7 +68,7 @@ export function ProjectOverview() {
             title={`LKR ${formatAmount(p.budget_total ?? 0)}`}
             note={
               costs.data
-                ? `Spent ${formatCompactLKR(costs.data.totals.spent)} · committed ${formatCompactLKR(costs.data.totals.committed)}`
+                ? `Committed ${formatCompactLKR(costs.data.totals.committed)} · spent ${formatCompactLKR(costs.data.totals.spent)}`
                 : "Cost to date is on the BOQ & budget tab"
             }
           />

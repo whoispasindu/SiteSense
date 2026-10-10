@@ -1,7 +1,8 @@
 import uuid
+from decimal import Decimal
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.api.deps import DbSession, Meta, require_permission
 from app.core.errors import ForbiddenError
@@ -13,6 +14,7 @@ from app.schemas.materials import (
     BudgetOut,
     DecisionIn,
     DeliveryIn,
+    OrderResult,
     PurchaseOrderCreate,
     PurchaseOrderDetail,
     PurchaseOrderDetailBasics,
@@ -26,8 +28,10 @@ from app.schemas.materials import (
     RequestListBasics,
     RequestSummary,
     RequestUpdate,
+    ReturnedLineOut,
     RuleCheckBasics,
     RuleCheckOut,
+    RuleResultOut,
     Status,
     SupplierIn,
     SupplierOut,
@@ -196,9 +200,31 @@ def list_orders(
     )
 
 
-@router.post("/purchase-orders", response_model=PurchaseOrderDetail, status_code=status.HTTP_201_CREATED)
-def create_order(body: PurchaseOrderCreate, user: Buyer, db: DbSession, meta: Meta) -> PurchaseOrderDetail:
-    return procurement_service.to_po_detail(procurement_service.create_order(db, user, body, meta=meta))
+@router.post("/purchase-orders", response_model=OrderResult, status_code=status.HTTP_201_CREATED)
+def create_order(
+    body: PurchaseOrderCreate, user: Buyer, db: DbSession, meta: Meta, response: Response
+) -> OrderResult:
+    """Issue an order for approved requests. Lines whose quote breaks BR-14 (more than 5% above the
+    approved price) or BR-13 (the section's budget line) go back to the PM instead. 201 when an
+    order was issued, 200 when every line went back."""
+    outcome = procurement_service.create_order(db, user, body, meta=meta)
+    if outcome.order is None:
+        response.status_code = status.HTTP_200_OK
+    return OrderResult(
+        order=procurement_service.to_po_detail(outcome.order) if outcome.order is not None else None,
+        returned=[
+            ReturnedLineOut(
+                request_id=item.request.id,
+                number=item.request.number,
+                unit_price=item.request.unit_price or Decimal(0),
+                rules=[
+                    RuleResultOut(rule=r.rule, severity=r.severity, message=r.message, facts=r.facts)
+                    for r in item.results
+                ],
+            )
+            for item in outcome.returned
+        ],
+    )
 
 
 @router.get("/purchase-orders/{order_id}", response_model=AnyOrderDetail)

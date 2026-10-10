@@ -91,7 +91,9 @@ function materialsApi(role: Role, extra: Record<string, Handler> = {}) {
     [`/api/v1/suppliers/${SUP}`]: () => jsonResponse({ ...SUPPLIER, is_active: false }),
     "/api/v1/purchase-orders/ready": () => jsonResponse([{ ...SUMMARY, status: "approved" }]),
     "/api/v1/purchase-orders": (_url, init) =>
-      init?.method === "POST" ? jsonResponse(PO, 201) : jsonResponse([{ ...PO, lines: undefined, deliveries: undefined, notes: undefined }]),
+      init?.method === "POST"
+        ? jsonResponse({ order: PO, returned: [] }, 201)
+        : jsonResponse([{ ...PO, lines: undefined, deliveries: undefined, notes: undefined }]),
     [`/api/v1/purchase-orders/${POID}`]: () => jsonResponse(PO),
     [`/api/v1/purchase-orders/${POID}/deliveries`]: () =>
       jsonResponse({ ...PO, status: "part_delivered", deliveries: [{ id: "9c0d1e2f-3a4b-4c5d-8e6f-8a9b0c1d2e3f", quantity: "10.000",
@@ -326,9 +328,15 @@ describe("Purchase orders", () => {
     await user.selectOptions(within(dialog).getByLabelText("Supplier"), SUP);
     const price = within(dialog).getByLabelText("Unit price for MR-0001");
     await user.clear(price);
-    await user.type(price, "2100");
+    await user.type(price, "0");
     await user.click(within(dialog).getByRole("button", { name: "Issue order" }));
-    expect(within(dialog).getByText(/not above the approved LKR 2,000.00/)).toBeInTheDocument();
+    expect(within(dialog).getByText("MR-0001: enter the quoted unit price, greater than zero.")).toBeInTheDocument();
+    await user.clear(price);
+    await user.type(price, "2100");
+    expect(within(dialog).getByText(/\+5\.0%/)).not.toHaveTextContent("goes back to the PM");
+    await user.clear(price);
+    await user.type(price, "2200");
+    expect(within(dialog).getByText(/\+10\.0%: over 5%, goes back to the PM \(BR-14\)/)).toBeInTheDocument();
 
     await user.clear(price);
     await user.type(price, "1950");
@@ -413,8 +421,8 @@ describe("Cost control on the BOQ tab", () => {
     project_id: PID, item_count: 2, boq_total: "5500000.00", budget_total: "4400000.00",
     sections: [{ ...detail.sections[0]!, items: [] }],
   };
-  const figures = { boq_amount: "5500000.00", budget: "4400000.00", approved: "100000.00", committed: "117000.00", spent: "78000.00",
-                    remaining: "4205000.00", forecast: "295000.00", variance: "4105000.00" };
+  const figures = { boq_amount: "5500000.00", budget: "4400000.00", approved: "100000.00", on_order: "117000.00", spent: "78000.00",
+                    committed: "295000.00", remaining: "4105000.00" };
 
   function boqApi(role: Role) {
     return materialsApi(role, {
@@ -430,8 +438,13 @@ describe("Cost control on the BOQ tab", () => {
     renderRoute(`/projects/${PID}/boq`);
 
     expect(await screen.findByRole("heading", { name: "Cost control" })).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Spent" })).toHaveTextContent("LKR 78 k");
+    expect(screen.getByRole("group", { name: "Committed" })).toHaveTextContent("LKR 295 k");
+    expect(screen.getByRole("group", { name: "Committed" })).toHaveTextContent("Spent + on order + approved");
+    expect(screen.getByRole("group", { name: "Spent" })).toHaveTextContent("On order LKR 117 k");
     expect(screen.getByRole("group", { name: "Left in budget" })).toHaveTextContent("LKR 4.11 M");
+    const table = screen.getByRole("table", { name: /Cost budget, spent/ });
+    expect(within(table).getByRole("columnheader", { name: "On order" })).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "Committed" })).toBeInTheDocument();
     expect(screen.getByRole("table", { name: /Cost budget, spent/ })).toHaveTextContent("Materials");
   });
 
@@ -527,8 +540,8 @@ describe("Materials edge cases", () => {
   });
 
   it("flags a section that will end over budget", async () => {
-    const over = { boq_amount: "5500000.00", budget: "100000.00", approved: "0.00", committed: "50000.00", spent: "80000.00",
-                   remaining: "-30000.00", forecast: "130000.00", variance: "-30000.00" };
+    const over = { boq_amount: "5500000.00", budget: "100000.00", approved: "0.00", on_order: "50000.00", spent: "80000.00",
+                   committed: "130000.00", remaining: "-30000.00" };
     const detail: ProjectDetail = {
       ...PROJECT, description: null, team: [], created_at: "2026-10-01T08:00:00+00:00", updated_at: "2026-10-01T08:00:00+00:00",
       sections: [{ id: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", code: "A", name: "Materials", item_count: 2, amount: "5500000.00",
@@ -574,7 +587,7 @@ describe("Prices and routing", () => {
 
     await user.click(await screen.findByRole("button", { name: "Approve" }));
     const dialog = screen.getByRole("dialog", { name: "Approve this request" });
-    const price = within(dialog).getByLabelText("Expected unit price (LKR / bag)");
+    const price = within(dialog).getByLabelText(/Quoted unit price \(LKR \/ bag\)/);
     expect(price).toHaveValue("2000.00");
     await user.clear(price);
     await user.type(price, "2120");
@@ -587,6 +600,122 @@ describe("Prices and routing", () => {
         unit_price: "2120",
       });
     });
+  });
+
+  it("requires the quoted price for a pending request, with the budgeted rate beside the field", async () => {
+    const user = userEvent.setup();
+    const waiting = "Price pending: the QS enters the quoted price at the QS check.";
+    const pending = {
+      ...DETAIL, unit_price: null, amount: null,
+      rules: { ...CHECK, amount: null, results: [CHECK.results[0]!,
+        { rule: "BR-01", severity: "pending", message: waiting, facts: {} },
+        { rule: "BR-13", severity: "pending", message: waiting, facts: {} }] },
+    };
+    const fetchMock = materialsApi("quantity_surveyor", { [`/api/v1/material-requests/${RID}`]: () => jsonResponse(pending) });
+    renderRoute(`/materials/${RID}`);
+
+    expect(await screen.findAllByText("Price pending")).toHaveLength(3); // unit price, value, request value
+    expect(screen.getAllByText(waiting)).toHaveLength(2);
+    await user.click(screen.getByRole("button", { name: "Approve" }));
+    const dialog = screen.getByRole("dialog", { name: "Approve this request" });
+    expect(within(dialog).getByText(/price pending\./)).toBeInTheDocument();
+    const reference = within(dialog).getByLabelText("Reference");
+    expect(reference).toHaveTextContent("Budgeted rate");
+    expect(reference).toHaveTextContent("LKR 2,000.00 / bag");
+    const price = within(dialog).getByLabelText(/Quoted unit price/);
+    expect(price).toHaveValue("");
+    expect(price).toBeRequired();
+    await user.click(within(dialog).getByRole("button", { name: "Approve" }));
+    expect(within(dialog).getByText("Enter the quoted unit price before approving: the price is pending.")).toBeInTheDocument();
+    expect(requestTo(fetchMock, `/material-requests/${RID}/decision`)).toBeUndefined();
+
+    await user.type(price, "1980");
+    await user.click(within(dialog).getByRole("button", { name: "Approve" }));
+    await waitFor(() => {
+      expect(bodyOf(requestTo(fetchMock, `/material-requests/${RID}/decision`))).toEqual({ decision: "approve", comment: null, unit_price: "1980" });
+    });
+  });
+
+  it("shows price pending in the request list", async () => {
+    materialsApi("quantity_surveyor", {
+      "/api/v1/material-requests": () =>
+        jsonResponse({ items: [{ ...SUMMARY, unit_price: null, amount: null }], total: 1, counts: { requested: 1 } }),
+    });
+    renderRoute("/materials");
+
+    const row = (await screen.findByText("MR-0001")).closest("tr");
+    expect(row).toHaveTextContent("Price pending");
+  });
+
+  it("explains a request sent back from ordering", async () => {
+    const reason = "Sent back for project manager approval: the quoted price is more than 5% above the approved price (BR-14).";
+    materialsApi("project_manager", {
+      [`/api/v1/material-requests/${RID}`]: () =>
+        jsonResponse({
+          ...DETAIL, status: "pm_approval", approval_level: "pm", unit_price: "2200.00", amount: "220000.00",
+          history: [...DETAIL.history, { action: "return_for_approval", from_status: "approved", to_status: "pm_approval",
+            comment: reason, actor: { id: ME, full_name: "Fathima Procurement" }, created_at: "2026-10-10T05:00:00+00:00" }],
+        }),
+    });
+    renderRoute(`/materials/${RID}`);
+
+    const alert = (await screen.findByText("Sent back from ordering")).closest("[role]");
+    expect(alert).toHaveTextContent(reason);
+    expect(screen.getByText("Sent back for PM approval")).toBeInTheDocument();
+  });
+
+  it("lists requests sent back when issuing an order", async () => {
+    const user = userEvent.setup();
+    const br14 = { rule: "BR-14", severity: "warn",
+                   message: "The order price is 10.0% above the approved price (limit 5%): sent back for project manager approval.", facts: {} };
+    materialsApi("procurement_officer", {
+      "/api/v1/purchase-orders": (_url, init) =>
+        init?.method === "POST"
+          ? jsonResponse({ order: null, returned: [{ request_id: RID, number: "MR-0001", unit_price: "2200.00", rules: [br14] }] })
+          : jsonResponse([]),
+    });
+    const { router } = renderRoute("/purchase-orders");
+
+    await user.click(await screen.findByRole("checkbox", { name: "Select MR-0001" }));
+    await user.click(screen.getByRole("button", { name: "Create purchase order (1)" }));
+    const form = screen.getByRole("dialog", { name: "Create purchase order" });
+    await user.selectOptions(within(form).getByLabelText("Supplier"), SUP);
+    await user.clear(within(form).getByLabelText("Unit price for MR-0001"));
+    await user.type(within(form).getByLabelText("Unit price for MR-0001"), "2200");
+    await user.click(within(form).getByRole("button", { name: "Issue order" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Nothing ordered" });
+    expect(within(dialog).getByText("1 request sent back for PM approval")).toBeInTheDocument();
+    const sentBack = within(dialog).getByRole("list", { name: "Sent back" });
+    expect(within(sentBack).getByRole("link", { name: "MR-0001" })).toHaveAttribute("href", `/materials/${RID}`);
+    expect(sentBack).toHaveTextContent("BR-14");
+    expect(sentBack).toHaveTextContent("LKR 2,200.00");
+    expect(within(dialog).queryByRole("link", { name: /Open PO/ })).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/purchase-orders");
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("links the order when only some lines were sent back", async () => {
+    const user = userEvent.setup();
+    const br13 = { rule: "BR-13", severity: "warn", message: "Needs project manager approval: the section would go over.", facts: {} };
+    materialsApi("procurement_officer", {
+      "/api/v1/purchase-orders": (_url, init) =>
+        init?.method === "POST"
+          ? jsonResponse({ order: PO, returned: [{ request_id: RID2, number: "MR-0002", unit_price: "2060.00", rules: [br13] }] }, 201)
+          : jsonResponse([]),
+    });
+    renderRoute("/purchase-orders");
+
+    await user.click(await screen.findByRole("checkbox", { name: "Select MR-0001" }));
+    await user.click(screen.getByRole("button", { name: "Create purchase order (1)" }));
+    const form = screen.getByRole("dialog", { name: "Create purchase order" });
+    await user.selectOptions(within(form).getByLabelText("Supplier"), SUP);
+    await user.click(within(form).getByRole("button", { name: "Issue order" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "PO-0001 issued" });
+    expect(within(dialog).getByRole("link", { name: "Open PO-0001" })).toHaveAttribute("href", `/purchase-orders/${POID}`);
+    expect(within(dialog).getByRole("list", { name: "Sent back" })).toHaveTextContent("BR-13");
   });
 
   it("names the rule that sent a request to the PM", async () => {

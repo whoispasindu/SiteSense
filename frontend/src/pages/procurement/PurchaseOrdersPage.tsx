@@ -8,12 +8,13 @@ import {
   useOrders,
   useReadyToOrder,
   useSuppliers,
+  type OrderResult,
   type PoStatus,
   type RequestSummary,
 } from "../../api/materials";
 import { useAuth } from "../../auth/context";
 import { Alert } from "../../components/ui/Alert";
-import { Button } from "../../components/ui/Button";
+import { Button, primaryLinkClass } from "../../components/ui/Button";
 import { Dialog } from "../../components/ui/Dialog";
 import { SelectField, TextAreaField, TextField } from "../../components/ui/Field";
 import { PageHeader } from "../../components/ui/PageHeader";
@@ -31,6 +32,59 @@ export function PoStatusBadge({ status }: { status: PoStatus }) {
   return <StatusBadge tone={PO_TONES[status]} label={PO_STATUS_LABELS[status]} />;
 }
 
+/** How far the quote is from the approved price, warning when it is beyond BR-14's 5%. */
+function PriceDrift({ approved, quoted }: { approved: string | null; quoted: string }) {
+  const a = Number(approved);
+  const q = Number(quoted);
+  if (!approved || !(a > 0) || !(q > 0) || q === a) return null;
+  const pct = ((q - a) / a) * 100;
+  const tooHigh = pct > 5;
+  return (
+    <p className={`text-xs ${tooHigh ? "font-medium text-signal-medium" : "text-ink-faint"}`}>
+      Approved LKR {formatAmount(approved)} · {pct > 0 ? "+" : ""}
+      {pct.toFixed(1)}%{tooHigh ? ": over 5%, goes back to the PM (BR-14)" : ""}
+    </p>
+  );
+}
+
+function OrderOutcome({ result, onClose }: { result: OrderResult; onClose: () => void }) {
+  return (
+    <Dialog open onClose={onClose} title={result.order ? `${result.order.number} issued` : "Nothing ordered"}>
+      <div className="space-y-4">
+        <Alert tone="warn" title={`${String(result.returned.length)} ${result.returned.length === 1 ? "request" : "requests"} sent back for PM approval`}>
+          These were not ordered. The project manager approves them again at the quoted price, then they come back here.
+        </Alert>
+        <ul aria-label="Sent back" className="divide-y divide-rule rounded-lg border border-rule">
+          {result.returned.map((line) => (
+            <li key={line.request_id} className="space-y-1 px-3 py-2.5 text-sm">
+              <p className="font-medium text-ink">
+                <Link to={`/materials/${line.request_id}`} className="hover:underline">
+                  {line.number}
+                </Link>{" "}
+                <span className="tabular font-normal text-ink-faint">at LKR {formatAmount(line.unit_price)}</span>
+              </p>
+              {line.rules.map((rule) => (
+                <p key={rule.rule} className="text-ink-soft">
+                  <span className="mr-2 font-mono text-xs text-ink-faint">{rule.rule}</span>
+                  {rule.message}
+                </p>
+              ))}
+            </li>
+          ))}
+        </ul>
+        <div className="flex justify-end gap-3 border-t border-rule pt-4">
+          <Button onClick={onClose}>Close</Button>
+          {result.order ? (
+            <Link to={`/purchase-orders/${result.order.id}`} className={primaryLinkClass}>
+              Open {result.order.number}
+            </Link>
+          ) : null}
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
 function OrderDialog({ requests, onClose }: { requests: RequestSummary[]; onClose: () => void }) {
   const suppliers = useSuppliers();
   const create = useCreateOrder();
@@ -40,13 +94,14 @@ function OrderDialog({ requests, onClose }: { requests: RequestSummary[]; onClos
   const [prices, setPrices] = useState<Record<string, string>>(Object.fromEntries(requests.map((r) => [r.id, r.unit_price ?? ""])));
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<OrderResult | null>(null);
   const total = requests.reduce((sum, r) => sum + Number(r.quantity) * Number(prices[r.id] ?? r.unit_price ?? 0), 0);
 
   function onSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supplierId) { setError("Choose the supplier."); return; }
-    const over = requests.find((r) => !(Number(prices[r.id]) > 0) || Number(prices[r.id]) > Number(r.unit_price));
-    if (over) { setError(`${over.number}: the price must be above zero and not above the approved LKR ${formatAmount(over.unit_price ?? 0)}.`); return; }
+    const unpriced = requests.find((r) => !/^\d{1,12}(\.\d{1,2})?$/.test((prices[r.id] ?? "").trim()) || !(Number(prices[r.id]) > 0));
+    if (unpriced) { setError(`${unpriced.number}: enter the quoted unit price, greater than zero.`); return; }
     if (expected < siteTodayIso()) { setError("The expected delivery date cannot be in the past."); return; }
     setError(null);
     create.mutate(
@@ -54,16 +109,22 @@ function OrderDialog({ requests, onClose }: { requests: RequestSummary[]; onClos
         supplier_id: supplierId,
         expected_delivery: expected,
         notes: notes.trim() || null,
-        lines: requests.map((r) => ({ request_id: r.id, unit_price: prices[r.id] ?? r.unit_price })),
+        lines: requests.map((r) => ({ request_id: r.id, unit_price: (prices[r.id] ?? "").trim() })),
       },
       {
-        onSuccess: (po) => {
-          onClose();
-          void navigate(`/purchase-orders/${po.id}`);
+        onSuccess: (outcome) => {
+          if (outcome.returned.length === 0 && outcome.order) {
+            onClose();
+            void navigate(`/purchase-orders/${outcome.order.id}`);
+            return;
+          }
+          setResult(outcome); // some lines went back to the PM: say which and why
         },
       },
     );
   }
+
+  if (result) return <OrderOutcome result={result} onClose={onClose} />;
 
   return (
     <Dialog open onClose={onClose} title="Create purchase order">
@@ -87,6 +148,7 @@ function OrderDialog({ requests, onClose }: { requests: RequestSummary[]; onClos
                   {r.number} · {formatQuantity(r.quantity)} {r.boq_item.unit}
                 </p>
                 <p className="truncate text-ink-faint">{r.boq_item.description}</p>
+                <PriceDrift approved={r.unit_price ?? null} quoted={prices[r.id] ?? ""} />
               </div>
               <label className="flex items-center gap-2 text-sm">
                 <span className="text-ink-faint">LKR / {r.boq_item.unit}</span>
@@ -103,7 +165,10 @@ function OrderDialog({ requests, onClose }: { requests: RequestSummary[]; onClos
             </li>
           ))}
         </ul>
-        <p className="text-xs text-ink-faint">Order prices can be lower than approved, never higher (that needs a new approval).</p>
+        <p className="text-xs text-ink-faint">
+          Each line is checked again at its order price. More than 5% above the approved price (BR-14), or a section going over its budget
+          line (BR-13), sends that request back for project manager approval; the other lines are still ordered.
+        </p>
         <TextField label="Expected delivery" type="date" min={siteTodayIso()} value={expected} onChange={(e) => { setExpected(e.target.value); }} />
         <TextAreaField label="Notes for the supplier (optional)" rows={2} maxLength={2000} value={notes} onChange={(e) => { setNotes(e.target.value); }} />
         <div className="flex items-center justify-between gap-3 border-t border-rule pt-4">
@@ -184,7 +249,7 @@ function ReadyToOrder() {
                       <p className="tabular text-xs text-ink-faint">{formatQuantity(r.quantity)} {r.boq_item.unit}</p>
                     </td>
                     <td className="tabular px-4 py-3 text-right font-medium whitespace-nowrap text-ink">
-                      {r.amount !== undefined ? formatCompactLKR(r.amount) : "—"}
+                      {r.amount ? formatCompactLKR(r.amount) : "—"}
                     </td>
                     <td className="tabular px-4 py-3 whitespace-nowrap text-ink-soft">{formatDate(r.needed_by)}</td>
                   </tr>
@@ -216,7 +281,7 @@ export function PurchaseOrdersPage() {
     <div className="mx-auto max-w-6xl space-y-8">
       <PageHeader
         title="Purchase orders"
-        description="Only approved requests can be ordered (BR-05). Committed cost updates when an order is issued, spent cost when deliveries are recorded."
+        description="Only approved requests can be ordered (BR-05). Each line is checked again at the order price: more than 5% above the approved price (BR-14), or a section that would go over its budget line (BR-13), sends the request back for project manager approval."
       />
       {can("purchase_orders:manage") ? <ReadyToOrder /> : null}
 

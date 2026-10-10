@@ -30,7 +30,13 @@ uses [Semantic Versioning](https://semver.org/).
     - The request page names the rule that sent a request to the PM.
   - Rates and amounts only for the PM, QS and procurement. Site engineers get cost-free API
     responses (role-specific schemas) and see item, unit, BOQ quantity, requested and remaining.
-    They raise requests without prices, and the QS prices them at the QS check.
+    They raise requests without prices: the price is pending until the QS enters the quoted price,
+    with the budgeted rate shown beside the field. Approval is refused until it is entered.
+  - BR-14: at purchase-order issue, an order price more than 5% above the approved price sends the
+    request back for PM approval. BR-13 is checked again at issue with the order prices, so lines
+    that fit alone but not together cannot both be ordered. The other lines are still ordered.
+  - Committed cost is cumulative: each approved, ordered or delivered request once at its latest
+    value; pending requests are excluded. The budget shows Committed, Spent, On order and Left.
   - Approval state machine: QS check, PM approval, approved, ordered and delivered, plus rejected,
     change requested and cancelled. Invalid transitions are refused, and every step is audited
     and notified.

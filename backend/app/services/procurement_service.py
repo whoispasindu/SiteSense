@@ -6,6 +6,7 @@ Committed and spent cost are derived from order lines and deliveries (``section_
 """
 
 import uuid
+from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
 
@@ -51,7 +52,7 @@ from app.schemas.materials import (
 )
 from app.services import audit, notification_service
 from app.services.audit import AuditAction, RequestMeta
-from app.services.materials_service import SectionCosts, next_number, section_costs
+from app.services.materials_service import SectionCosts, next_number, own_committed, section_costs
 from app.services.notification_service import NewNotification
 
 ZERO = Decimal(0)
@@ -220,7 +221,52 @@ def ready_to_order(db: Session) -> list[MaterialRequest]:
     )
 
 
-def create_order(db: Session, user: User, data: PurchaseOrderCreate, *, meta: RequestMeta) -> PurchaseOrder:
+@dataclass(frozen=True, slots=True)
+class ReturnedLine:
+    """A request that could not be ordered at the quoted price and went back to the PM."""
+
+    request: MaterialRequest
+    results: list[rules.RuleResult]
+
+
+@dataclass(frozen=True, slots=True)
+class OrderOutcome:
+    order: PurchaseOrder | None
+    returned: list[ReturnedLine]
+
+
+def _section_budgets(db: Session, project_id: uuid.UUID) -> dict[uuid.UUID, Decimal]:
+    rows = db.execute(
+        select(BudgetLine.section_id, BudgetLine.budget_amount).where(BudgetLine.project_id == project_id)
+    ).all()
+    return {section_id: Decimal(budget) for section_id, budget in rows}
+
+
+def _check_line(
+    request: MaterialRequest, price: Decimal, budget: Decimal, others: Decimal
+) -> list[rules.RuleResult]:
+    """The checks at order time. Returns the rules that send the line back to the PM.
+
+    BR-14: the order price may be at most 5% above the approved price.
+    BR-13: the section's committed cost plus this line (at the order price) may not exceed the
+    budget line, unless the PM has already approved this request at an amount at least as high.
+    """
+    approved_price = request.unit_price or ZERO
+    amount = rules.money(request.quantity * price)
+    fired = []
+    price_check = rules.check_order_price(approved_price=approved_price, order_price=price)
+    if price_check.severity == "warn":
+        fired.append(price_check)
+    section_check = rules.check_section_budget(
+        line_budget=budget, line_committed=others, request_amount=amount
+    )
+    pm_covered = request.approval_level == "pm" and amount <= rules.money(request.quantity * approved_price)
+    if section_check.severity == "warn" and not pm_covered:
+        fired.append(section_check)
+    return fired
+
+
+def create_order(db: Session, user: User, data: PurchaseOrderCreate, *, meta: RequestMeta) -> OrderOutcome:
     supplier = db.get(Supplier, data.supplier_id)
     if supplier is None or not supplier.is_active:
         raise BusinessRuleError("Choose an active supplier.")
@@ -247,84 +293,163 @@ def create_order(db: Session, user: User, data: PurchaseOrderCreate, *, meta: Re
             error = BusinessRuleError(f"{request.number}: {gate.message}", details=[{"rule": "BR-05"}])
             error.code = "rule_blocked"
             raise error
+    project_id = projects.pop()
 
-    po = PurchaseOrder(
-        number=next_number(db, "PO"),
-        project_id=projects.pop(),
-        supplier_id=supplier.id,
-        issued_by=user.id,
-        issued_at=clock.utcnow(),
-        expected_delivery=data.expected_delivery,
-        status=PurchaseOrderStatus.ISSUED.value,
-        notes=data.notes,
-    )
-    db.add(po)
-    for position, line_in in enumerate(data.lines, start=1):
+    # Re-check BR-13 and BR-14 line by line at the order price. Lines are taken in order and each
+    # accepted line is added to its section's committed cost, so two lines that fit alone but not
+    # together cannot both slip through.
+    committed = {sid: c.committed for sid, c in section_costs(db, project_id).items()}
+    budgets = _section_budgets(db, project_id)
+    accepted: list[tuple[MaterialRequest, Decimal]] = []
+    returned: list[ReturnedLine] = []
+    for line_in in data.lines:
         request = requests[line_in.request_id]
-        price = line_in.unit_price or request.unit_price
-        if price > request.unit_price:
-            raise BusinessRuleError(
-                f"{request.number}: the order price {price} is above the approved price "
-                f"{request.unit_price}. Ask for the request to be changed and approved again."
-            )
-        po.lines.append(
-            PurchaseOrderLine(
-                request_id=request.id,
-                quantity=request.quantity,
-                unit_price=price,
-                amount=rules.money(request.quantity * price),
-                position=position,
-            )
+        price = line_in.unit_price or request.unit_price or ZERO
+        section = request.boq_item.section_id
+        others = committed.get(section, ZERO) - own_committed(request)
+        fired = _check_line(request, price, budgets.get(section, ZERO), others)
+        if fired:
+            returned.append(ReturnedLine(request, fired))
+            committed[section] = others  # back to pending: no longer committed
+            _send_back(request, user, price, fired)
+        else:
+            accepted.append((request, price))
+            committed[section] = others + rules.money(request.quantity * price)
+
+    po = None
+    if accepted:
+        po = PurchaseOrder(
+            number=next_number(db, "PO"),
+            project_id=project_id,
+            supplier_id=supplier.id,
+            issued_by=user.id,
+            issued_at=clock.utcnow(),
+            expected_delivery=data.expected_delivery,
+            status=PurchaseOrderStatus.ISSUED.value,
+            notes=data.notes,
         )
-        request.approvals.append(
-            Approval(
-                actor_id=user.id,
-                action="order",
-                from_status=request.status,
-                to_status=RequestStatus.ORDERED.value,
-                comment=None,
-                created_at=clock.utcnow(),
+        db.add(po)
+        for position, (request, price) in enumerate(accepted, start=1):
+            po.lines.append(
+                PurchaseOrderLine(
+                    request_id=request.id,
+                    quantity=request.quantity,
+                    unit_price=price,
+                    amount=rules.money(request.quantity * price),
+                    position=position,
+                )
             )
-        )
-        request.status = RequestStatus.ORDERED.value
+            request.approvals.append(
+                Approval(
+                    actor_id=user.id,
+                    action="order",
+                    from_status=request.status,
+                    to_status=RequestStatus.ORDERED.value,
+                    comment=None,
+                    created_at=clock.utcnow(),
+                )
+            )
+            request.status = RequestStatus.ORDERED.value
     try:
         db.flush()
     except IntegrityError as exc:  # unique request_id on order lines: already ordered elsewhere
         db.rollback()
         raise ConflictError("One of the requests is already on a purchase order.") from exc
 
-    audit.record(
-        db,
-        AuditAction.PURCHASE_ORDER_ISSUED,
-        meta=meta,
-        actor_id=user.id,
-        target_type="purchase_order",
-        target_id=po.id,
-        details={
-            "number": po.number,
-            "supplier": supplier.name,
-            "requests": [requests[i].number for i in ids],
-            "total": str(sum((line.amount for line in po.lines), ZERO)),
-        },
-    )
-    notification_service.send(
-        db,
-        [
-            NewNotification(
-                user_id=r.requested_by,
-                kind="request_ordered",
-                title=f"{r.number} ordered on {po.number}",
-                body=f"From {supplier.name}, expected {data.expected_delivery.strftime('%d %b %Y')}.",
-                link=f"/materials/{r.id}",
-                project_id=r.project_id,
-                dedupe_key=f"request-ordered:{r.id}",
-            )
-            for r in requests.values()
-        ],
-    )
+    if po is not None:
+        audit.record(
+            db,
+            AuditAction.PURCHASE_ORDER_ISSUED,
+            meta=meta,
+            actor_id=user.id,
+            target_type="purchase_order",
+            target_id=po.id,
+            details={
+                "number": po.number,
+                "supplier": supplier.name,
+                "requests": [r.number for r, _ in accepted],
+                "total": str(sum((line.amount for line in po.lines), ZERO)),
+            },
+        )
+        notification_service.send(
+            db,
+            [
+                NewNotification(
+                    user_id=r.requested_by,
+                    kind="request_ordered",
+                    title=f"{r.number} ordered on {po.number}",
+                    body=f"From {supplier.name}, expected {data.expected_delivery.strftime('%d %b %Y')}.",
+                    link=f"/materials/{r.id}",
+                    project_id=r.project_id,
+                    dedupe_key=f"request-ordered:{r.id}",
+                )
+                for r, _ in accepted
+            ],
+        )
+    for item in returned:
+        request = item.request
+        audit.record(
+            db,
+            AuditAction.REQUEST_RETURNED,
+            meta=meta,
+            actor_id=user.id,
+            target_type="material_request",
+            target_id=request.id,
+            details={
+                "number": request.number,
+                "rules": [r.rule for r in item.results],
+                "messages": [r.message for r in item.results],
+                "quoted_price": str(request.unit_price),
+            },
+        )
+        notification_service.send(
+            db,
+            [
+                NewNotification(
+                    user_id=pm.id,
+                    kind="request_pending",
+                    title=f"{request.number} is back for your approval",
+                    body=f"The order quote needs a new approval ({', '.join(r.rule for r in item.results)}).",
+                    link=f"/materials/{request.id}",
+                    project_id=request.project_id,
+                    dedupe_key=f"request-returned:{request.id}:{len(request.approvals)}",
+                )
+                for pm in notification_service.site_people(
+                    db, request.project.site_id, {Role.PROJECT_MANAGER}
+                )
+            ],
+        )
     db.commit()
-    db.refresh(po)
-    return po
+    if po is not None:
+        db.refresh(po)
+    return OrderOutcome(po, returned)
+
+
+# Reasons written to the request history. The history is shown to everyone who can see the request,
+# site engineers included, so these name the rule but carry no prices or amounts. The full rule
+# messages go to procurement in the order response and to the audit log.
+_RETURN_REASONS = {
+    "BR-14": "the quoted price is more than 5% above the approved price (BR-14)",
+    "BR-13": "at the quoted price the section would go over its budget line (BR-13)",
+}
+
+
+def _send_back(request: MaterialRequest, user: User, price: Decimal, fired: list[rules.RuleResult]) -> None:
+    """Return a request to the PM at the quoted price: approval must be given again at that price."""
+    reasons = "; ".join(_RETURN_REASONS[r.rule] for r in fired)
+    request.approvals.append(
+        Approval(
+            actor_id=user.id,
+            action="return_for_approval",
+            from_status=request.status,
+            to_status=RequestStatus.PM_APPROVAL.value,
+            comment=f"Sent back for project manager approval: {reasons}.",
+            created_at=clock.utcnow(),
+        )
+    )
+    request.unit_price = price
+    request.approval_level = "pm"
+    request.status = RequestStatus.PM_APPROVAL.value
 
 
 def record_delivery(
@@ -414,16 +539,14 @@ def project_budget(db: Session, project: Project) -> BudgetOut:
     ).all()
 
     def figures(boq: Decimal, budget: Decimal, c: SectionCosts) -> dict[str, Decimal]:
-        forecast = c.spent + c.committed + c.approved
         return {
             "boq_amount": rules.money(boq),
             "budget": rules.money(budget),
             "approved": rules.money(c.approved),
-            "committed": rules.money(c.committed),
+            "on_order": rules.money(c.on_order),
             "spent": rules.money(c.spent),
-            "remaining": rules.money(budget - c.committed - c.spent),
-            "forecast": rules.money(forecast),
-            "variance": rules.money(budget - forecast),
+            "committed": rules.money(c.committed),
+            "remaining": rules.money(budget - c.committed),
         }
 
     lines = []
@@ -431,9 +554,7 @@ def project_budget(db: Session, project: Project) -> BudgetOut:
     total_boq = total_budget = ZERO
     for section, boq, budget in rows:
         c = costs.get(section.id, SectionCosts())
-        total.approved += c.approved
-        total.committed += c.committed
-        total.spent += c.spent
+        total.add(c)
         total_boq += Decimal(boq)
         total_budget += budget
         lines.append(

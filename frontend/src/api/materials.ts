@@ -38,7 +38,8 @@ const projectRefSchema = z.object({ id: z.uuid(), code: z.string(), name: z.stri
 
 const ruleResultSchema = z.object({
   rule: z.string(),
-  severity: z.enum(["pass", "warn", "block"]),
+  // "pending": a price rule that waits for the QS to enter the quoted price.
+  severity: z.enum(["pass", "warn", "block", "pending"]),
   message: z.string(),
   facts: z.record(z.string(), z.string()),
 });
@@ -52,7 +53,8 @@ export const ruleCheckSchema = z.object({
   routed_by: z.array(z.string()),
   // Absent for roles without "rates:read", which also never receive the BR-01 / BR-13 results.
   budget_rate: decimal.optional(),
-  amount: decimal.optional(),
+  // Null while the price is pending.
+  amount: decimal.nullable().optional(),
 });
 export type RuleCheck = z.infer<typeof ruleCheckSchema>;
 
@@ -68,8 +70,9 @@ const requestSummarySchema = z.object({
     section_code: z.string(),
   }),
   quantity: decimal,
-  unit_price: decimal.optional(),
-  amount: decimal.optional(),
+  // Absent for roles without "rates:read"; null while the price is pending (the QS enters it).
+  unit_price: decimal.nullable().optional(),
+  amount: decimal.nullable().optional(),
   needed_by: z.iso.date(),
   status: z.enum(REQUEST_STATUSES),
   approval_level: z.enum(["qs", "pm"]),
@@ -195,12 +198,12 @@ export type PoDetail = z.infer<typeof poDetailSchema>;
 const budgetFigures = {
   boq_amount: decimal,
   budget: decimal,
-  approved: decimal,
+  approved: decimal, // approved, not yet on a purchase order
+  on_order: decimal, // ordered, not yet delivered
+  spent: decimal, // delivered
+  // Cumulative: every approved, ordered or delivered request once, at its latest value (BR-13).
   committed: decimal,
-  spent: decimal,
-  remaining: decimal,
-  forecast: decimal,
-  variance: decimal,
+  remaining: decimal, // budget - committed
 };
 const budgetSchema = z.object({
   project_id: z.uuid(),
@@ -270,7 +273,7 @@ export interface RequestCheckInput {
   project_id: string;
   boq_item_id: string;
   quantity: string;
-  /** Left out by roles that do not see rates: the request starts at the budgeted rate. */
+  /** Left out by roles that do not see rates: the price stays pending until the QS check. */
   unit_price?: string;
 }
 
@@ -389,6 +392,16 @@ export function useOrder(id: string) {
   });
 }
 
+const orderResultSchema = z.object({
+  // Null when every line went back to the project manager.
+  order: poDetailSchema.nullable(),
+  // Lines sent back for PM approval at the quoted price (BR-14, BR-13), with the reasons.
+  returned: z.array(
+    z.object({ request_id: z.uuid(), number: z.string(), unit_price: decimal, rules: z.array(ruleResultSchema) }),
+  ),
+});
+export type OrderResult = z.infer<typeof orderResultSchema>;
+
 export interface OrderInput {
   supplier_id: string;
   expected_delivery: string;
@@ -399,8 +412,9 @@ export interface OrderInput {
 export function useCreateOrder() {
   const invalidate = useInvalidateMaterials();
   return useMutation({
-    mutationFn: (body: OrderInput) => apiRequest("/purchase-orders", poDetailSchema, { method: "POST", body }).then((r) => r.data),
-    onSuccess: (po) => invalidate(po.project.id),
+    mutationFn: (body: OrderInput) => apiRequest("/purchase-orders", orderResultSchema, { method: "POST", body }).then((r) => r.data),
+    // Returned lines change requests on the same project, so the whole materials cache is refreshed.
+    onSuccess: (result) => invalidate(result.order?.project.id),
   });
 }
 

@@ -253,7 +253,7 @@ export function RequestFormPage() {
               <p className="text-sm text-ink-faint">
                 {pricing
                   ? "Choose an item and enter a quantity and price to see how the rules apply."
-                  : "Choose an item and enter a quantity to check it against the BOQ. The quantity surveyor prices the request at the QS check."}
+                  : "Choose an item and enter a quantity to check it against the BOQ. The price stays pending until the quantity surveyor enters the quoted price at the QS check."}
               </p>
             ) : check.data ? (
               <RuleChecks check={check.data} />

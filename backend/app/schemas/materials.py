@@ -43,8 +43,8 @@ class RequestCreate(BaseModel):
     project_id: uuid.UUID
     boq_item_id: uuid.UUID
     quantity: Quantity
-    # Expected unit price. Only roles that see rates may give one; otherwise (site engineers) the
-    # request starts at the item's budgeted rate and the QS prices it at the QS check.
+    # Expected unit price. Only roles that see rates may give one. Without it (always the case for
+    # site engineers) the price is pending and the QS enters the quoted price at the QS check.
     unit_price: Price | None = None
     needed_by: date
     notes: Notes | None = None
@@ -82,7 +82,7 @@ class DecisionIn(BaseModel):
 
     decision: Decision
     comment: Comment | None = None
-    # The QS check may set the expected unit price when approving (the requester may not see rates).
+    # The quoted unit price, set by the QS when approving at the QS check (required if pending).
     unit_price: Price | None = None
 
     _comment = field_validator("comment")(_blank_to_none)
@@ -90,7 +90,7 @@ class DecisionIn(BaseModel):
 
 class RuleResultOut(BaseModel):
     rule: str
-    severity: Literal["pass", "warn", "block"]
+    severity: Literal["pass", "warn", "block", "pending"]
     message: str
     facts: dict[str, str]
 
@@ -114,7 +114,7 @@ class RuleCheckBasics(BaseModel):
 
 class RuleCheckOut(RuleCheckBasics):
     budget_rate: Decimal
-    amount: Decimal
+    amount: Decimal | None  # None while the price is pending
 
     @field_validator("results")
     @classmethod
@@ -161,8 +161,9 @@ class RequestSummaryBasics(BaseModel):
 
 
 class RequestSummary(RequestSummaryBasics):
-    unit_price: Decimal
-    amount: Decimal
+    # None while the price is pending: the QS enters the quoted price at the QS check.
+    unit_price: Decimal | None
+    amount: Decimal | None
 
 
 class RequestListBasics(BaseModel):
@@ -363,6 +364,23 @@ class PurchaseOrderDetail(PurchaseOrderSummary):
     deliveries: list[DeliveryOut]
 
 
+class ReturnedLineOut(BaseModel):
+    """A request sent back to the PM at order time (BR-13 or BR-14), at the quoted price."""
+
+    request_id: uuid.UUID
+    number: str
+    unit_price: Decimal
+    rules: list[RuleResultOut]
+
+
+class OrderResult(BaseModel):
+    """What issuing a purchase order did: the order (if any line could be ordered) and the lines
+    that went back for project manager approval instead."""
+
+    order: PurchaseOrderDetail | None
+    returned: list[ReturnedLineOut]
+
+
 # --- Budget ----------------------------------------------------------------------------------------
 
 
@@ -370,11 +388,11 @@ class BudgetFigures(BaseModel):
     boq_amount: Decimal
     budget: Decimal
     approved: Decimal  # approved requests not yet on a purchase order
-    committed: Decimal  # ordered, not yet delivered
+    on_order: Decimal  # ordered, not yet delivered
     spent: Decimal  # delivered
-    remaining: Decimal  # budget - committed - spent
-    forecast: Decimal  # spent + committed + approved
-    variance: Decimal  # budget - forecast (negative: over budget)
+    # Cumulative: every approved, ordered or delivered request once, at its latest value (BR-13).
+    committed: Decimal
+    remaining: Decimal  # budget - committed (negative: over budget)
 
 
 class BudgetLineOut(BudgetFigures):

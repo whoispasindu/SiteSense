@@ -400,7 +400,7 @@ def _seed_materials(db: Session) -> None:
             continue
         supplier = db.scalar(select(Supplier).where(Supplier.name == supplier_name))
         assert supplier is not None
-        po = procurement_service.create_order(
+        outcome = procurement_service.create_order(
             db,
             buyer,
             PurchaseOrderCreate(
@@ -410,7 +410,8 @@ def _seed_materials(db: Session) -> None:
             ),
             meta=meta,
         )
-        if delivered:
+        po = outcome.order
+        if delivered and po is not None:
             procurement_service.record_delivery(
                 db,
                 buyer,

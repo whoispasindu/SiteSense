@@ -11,7 +11,7 @@ import { SectionHeading } from "../../components/ui/SectionHeading";
 import { Sheet } from "../../components/ui/Sheet";
 import { errorText } from "../../features/admin/adminUtils";
 import { formatDate } from "../../features/projects/dates";
-import { RequestStatusBadge, RuleChecks } from "../../features/materials/MaterialBits";
+import { PriceText, RequestStatusBadge, RuleChecks } from "../../features/materials/MaterialBits";
 import { formatAmount, formatQuantity } from "../../lib/money";
 import { formatSiteTime, siteTodayIso } from "../../lib/time";
 import { NotFoundPage } from "../NotFoundPage";
@@ -19,6 +19,7 @@ import { NotFoundPage } from "../NotFoundPage";
 const ACTION_TEXT: Record<string, string> = {
   submit: "Submitted",
   resubmit: "Changed and resubmitted",
+  return_for_approval: "Sent back for PM approval",
   approve: "Approved",
   reject: "Rejected",
   request_change: "Asked for a change",
@@ -70,8 +71,10 @@ function DecisionDialog({ request, decision, onClose }: { request: RequestDetail
   const decide = useDecide(request.id);
   const [comment, setComment] = useState("");
   const needsComment = decision === "reject" || decision === "request_change";
-  // At the QS check the QS prices the request (site engineers raise requests without prices).
+  // At the QS check the QS enters the quoted price. Requests from site engineers arrive with the
+  // price pending, and cannot be approved until it is entered.
   const pricing = decision === "approve" && request.status === "requested" && request.unit_price !== undefined;
+  const pricePending = request.unit_price === null;
   const [price, setPrice] = useState(request.unit_price ?? "");
   const [error, setError] = useState<string | null>(null);
 
@@ -82,7 +85,7 @@ function DecisionDialog({ request, decision, onClose }: { request: RequestDetail
       return;
     }
     if (pricing && !(/^\d{1,12}(\.\d{1,2})?$/.test(price.trim()) && Number(price) > 0)) {
-      setError("Enter the expected unit price, greater than zero.");
+      setError(pricePending ? "Enter the quoted unit price before approving: the price is pending." : "Enter the quoted unit price, greater than zero.");
       return;
     }
     const priceChanged = pricing && Number(price) !== Number(request.unit_price);
@@ -107,22 +110,31 @@ function DecisionDialog({ request, decision, onClose }: { request: RequestDetail
         ) : null}
         <p className="text-sm text-ink-soft">
           {request.number}: {formatQuantity(request.quantity)} {request.boq_item.unit} of {request.boq_item.description}
-          {request.amount !== undefined ? `, LKR ${formatAmount(request.amount)}` : ""}.
+          {request.amount ? `, LKR ${formatAmount(request.amount)}` : ""}
+          {pricePending ? ", price pending" : ""}.
         </p>
         {pricing ? (
-          <TextField
-            label={`Expected unit price (LKR / ${request.boq_item.unit})`}
-            inputMode="decimal"
-            value={price}
-            hint={
-              request.rules.budget_rate !== undefined
-                ? `Budgeted ${formatAmount(request.rules.budget_rate)}. The rules are checked again with this price when you approve.`
-                : undefined
-            }
-            onChange={(e) => {
-              setPrice(e.target.value);
-            }}
-          />
+          <div className="grid items-start gap-3 sm:grid-cols-[1fr_auto]">
+            <TextField
+              label={`Quoted unit price (LKR / ${request.boq_item.unit})`}
+              inputMode="decimal"
+              required
+              value={price}
+              hint="BR-01 and BR-13 are checked with this price when you approve."
+              onChange={(e) => {
+                setPrice(e.target.value);
+              }}
+            />
+            {request.rules.budget_rate !== undefined ? (
+              <div className="rounded-lg border border-dashed border-rule-strong bg-paper-sunk/60 px-3 py-2 sm:mt-6" aria-label="Reference">
+                <p className="text-xs text-ink-faint">Budgeted rate</p>
+                <p className="tabular text-sm font-medium text-ink">
+                  LKR {formatAmount(request.rules.budget_rate)} / {request.boq_item.unit}
+                </p>
+                <p className="text-xs text-ink-faint">More than 5% above: PM approves</p>
+              </div>
+            ) : null}
+          </div>
         ) : null}
         <TextAreaField
           label={needsComment ? "Comment" : "Comment (optional)"}
@@ -148,8 +160,10 @@ function EditDialog({ request, onClose }: { request: RequestDetail; onClose: () 
   const update = useUpdateRequest(request.id);
   const [quantity, setQuantity] = useState(String(Number(request.quantity)));
   // Roles without rates (site engineers) change quantity and dates only; the QS prices the request.
+  // A rate reader may leave a pending price empty: the QS enters it at the QS check.
   const pricing = request.unit_price !== undefined;
   const [price, setPrice] = useState(request.unit_price ?? "");
+  const priceGiven = price.trim() !== "";
   const [neededBy, setNeededBy] = useState(request.needed_by);
   const [notes, setNotes] = useState(request.notes ?? "");
   const [comment, setComment] = useState("");
@@ -157,7 +171,7 @@ function EditDialog({ request, onClose }: { request: RequestDetail; onClose: () 
 
   function onSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!(Number(quantity) > 0) || (pricing && !(Number(price) > 0))) {
+    if (!(Number(quantity) > 0) || (pricing && priceGiven && !(Number(price) > 0))) {
       setError(pricing ? "Quantity and price must be greater than zero." : "The quantity must be greater than zero.");
       return;
     }
@@ -169,7 +183,7 @@ function EditDialog({ request, onClose }: { request: RequestDetail; onClose: () 
     update.mutate(
       {
         quantity: quantity.trim(),
-        ...(pricing ? { unit_price: price.trim() } : {}),
+        ...(pricing && priceGiven ? { unit_price: price.trim() } : {}),
         needed_by: neededBy,
         notes: notes.trim() || null,
         comment: comment.trim() || null,
@@ -260,6 +274,11 @@ export function RequestDetailPage() {
       </header>
 
       {r.status !== "rejected" && r.status !== "cancelled" && r.status !== "change_requested" ? <Progress request={r} /> : null}
+      {r.status === "pm_approval" && r.history.at(-1)?.action === "return_for_approval" ? (
+        <Alert tone="warn" title="Sent back from ordering">
+          {r.history.at(-1)?.comment ?? ""}
+        </Alert>
+      ) : null}
       {r.status === "change_requested" ? (
         <Alert tone="warn" title="A change was requested">
           {r.history.at(-1)?.comment ?? ""}
@@ -287,13 +306,17 @@ export function RequestDetailPage() {
               {r.unit_price !== undefined ? (
                 <div>
                   <dt className="text-ink-faint">Unit price</dt>
-                  <dd className="tabular font-medium text-ink">LKR {formatAmount(r.unit_price)}</dd>
+                  <dd className="tabular font-medium text-ink">
+                    <PriceText value={r.unit_price} />
+                  </dd>
                 </div>
               ) : null}
               {r.amount !== undefined ? (
                 <div>
                   <dt className="text-ink-faint">Value</dt>
-                  <dd className="tabular font-medium text-ink">LKR {formatAmount(r.amount)}</dd>
+                  <dd className="tabular font-medium text-ink">
+                    <PriceText value={r.amount} />
+                  </dd>
                 </div>
               ) : null}
             </dl>

@@ -1,4 +1,4 @@
-"""Business rules for material requests (BR-01, BR-02, BR-04, BR-05, BR-13) and the approval states.
+"""Material request rules (BR-01, BR-02, BR-04, BR-05, BR-13, BR-14) and the approval states.
 
 Pure functions over plain values: no database, no clock, no request. Services gather the facts and
 call these, so every rule is tested on its own (``tests/test_rules_materials.py``) and documented in
@@ -15,7 +15,8 @@ CENTS = Decimal("0.01")
 ZERO = Decimal(0)
 
 ApprovalLevel = Literal["qs", "pm"]
-Severity = Literal["pass", "warn", "block"]
+# "pending": the rule cannot be evaluated yet because the price has not been entered.
+Severity = Literal["pass", "warn", "block", "pending"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,11 +104,16 @@ def item_budget_rate(*, item_rate: Decimal, section_amount: Decimal, line_budget
     return item_rate * line_budget / section_amount
 
 
-def check_price(*, unit_price: Decimal, budget_rate: Decimal) -> RuleResult:
+PRICE_PENDING = "Price pending: the QS enters the quoted price at the QS check."
+
+
+def check_price(*, unit_price: Decimal | None, budget_rate: Decimal) -> RuleResult:
     """BR-01: a unit price more than 5% above the item's budgeted rate needs the project manager.
 
     Only the price is compared here; the section's budget as a whole is BR-13.
     """
+    if unit_price is None:
+        return RuleResult("BR-01", "pending", PRICE_PENDING, {"budget_rate": str(money(budget_rate))})
     price_over = (unit_price - budget_rate) / budget_rate if budget_rate > 0 else Decimal(1)
     facts = {
         "unit_price": str(unit_price),
@@ -135,13 +141,17 @@ def check_price(*, unit_price: Decimal, budget_rate: Decimal) -> RuleResult:
 
 
 def check_section_budget(
-    *, line_budget: Decimal, line_committed: Decimal, request_amount: Decimal
+    *, line_budget: Decimal, line_committed: Decimal, request_amount: Decimal | None
 ) -> RuleResult:
     """BR-13: if the section's committed cost plus this request exceeds its budget line, the PM approves.
 
-    ``line_committed`` is everything already committed against the line: approved requests, open
-    purchase orders and deliveries. There is no tolerance: any excess needs the project manager.
+    ``line_committed`` is the section's committed cost: every other request counted once at its
+    latest value (delivered, else on order, else approved), pending requests excluded. There is
+    no tolerance: any excess needs the project manager.
     """
+    if request_amount is None:
+        facts = {"line_budget": str(money(line_budget)), "line_committed": str(money(line_committed))}
+        return RuleResult("BR-13", "pending", PRICE_PENDING, facts)
     after = line_committed + request_amount
     facts = {
         "line_budget": str(money(line_budget)),
@@ -160,9 +170,9 @@ def check_section_budget(
 
 def route_approval(
     *,
-    unit_price: Decimal,
+    unit_price: Decimal | None,
     budget_rate: Decimal,
-    request_amount: Decimal,
+    request_amount: Decimal | None,
     line_budget: Decimal,
     line_committed: Decimal,
 ) -> tuple[ApprovalLevel, list[RuleResult], list[str]]:
@@ -176,6 +186,26 @@ def route_approval(
     ]
     fired = [r.rule for r in results if r.severity == "warn"]
     return ("pm" if fired else "qs"), results, fired
+
+
+# --- BR-14: the price on the purchase order ----------------------------------------------------------
+
+
+def check_order_price(*, approved_price: Decimal, order_price: Decimal) -> RuleResult:
+    """BR-14: a purchase-order price more than 5% above the approved price goes back to the PM.
+
+    Up to 5% above is accepted at ordering (normal quote movement); anything more needs a fresh
+    project manager approval at the new price before it can be ordered.
+    """
+    over = (order_price - approved_price) / approved_price
+    facts = {"approved_price": str(approved_price), "order_price": str(order_price), "price_over": _pct(over)}
+    if over > PRICE_TOLERANCE:
+        message = (
+            f"The order price is {_pct(over)} above the approved price (limit 5%): sent back for "
+            "project manager approval."
+        )
+        return RuleResult("BR-14", "warn", message, facts)
+    return RuleResult("BR-14", "pass", "The order price is within 5% of the approved price.", facts)
 
 
 # --- BR-04: segregation of duties ------------------------------------------------------------------

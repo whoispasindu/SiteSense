@@ -57,8 +57,9 @@ class MaterialRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     requested_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     quantity: Mapped[Decimal] = mapped_column(QUANTITY, nullable=False)
-    # The requester's expected unit price (cost), checked against the budget line (BR-01).
-    unit_price: Mapped[Decimal] = mapped_column(RATE, nullable=False)
+    # Expected unit price (cost). NULL means "price pending": a site engineer raised the request
+    # without one, and the QS must enter the quoted price before approving (BR-01, BR-13).
+    unit_price: Mapped[Decimal | None] = mapped_column(RATE, nullable=True)
     needed_by: Mapped[date] = mapped_column(Date, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default=RequestStatus.REQUESTED.value)

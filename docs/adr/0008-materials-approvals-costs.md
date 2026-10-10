@@ -1,6 +1,7 @@
 # ADR 0008: Material requests, approvals and cost control
 
-- Status: accepted (amended 2026-10-10: BR-01 split into BR-01 and BR-13; cost visibility)
+- Status: accepted (amended 2026-10-10: BR-01 split into BR-01 and BR-13; cost visibility; price
+  pending, cumulative committed cost and BR-14)
 - Date: 2026-10-10
 
 ## Context
@@ -27,19 +28,31 @@ at the project owner's request; it was first built as one rule with both checks.
 **Rates and amounts only for PM, QS and procurement.** A `rates:read` permission and role-specific
 response schemas: every response that carries money has a cost-free base schema, and
 `app/services/visibility.py` returns that base version to site engineers. Engineers therefore
-cannot set prices either. Their requests start at the budgeted rate and the QS prices them at the
-QS check, which matches Workflow B ("QS check: price against the budget line").
+cannot set prices either.
 
-**Costs are derived, never stored.**
-- Approved cost comes from approved requests (at the request price).
-- Committed cost comes from purchase-order lines not yet delivered (at the order price).
-- Spent cost comes from deliveries (at the order price).
-- There are no running totals that could drift from the documents. One query per project
-  computes them (`section_costs`).
+**Price pending until the QS check.** An engineer's request is stored with `unit_price` NULL
+(migration 0007), not the budgeted rate. A budgeted rate would make BR-01 pass by construction and
+put an invented figure into the budget. The QS must enter the quoted price to approve, with the
+budgeted rate shown as reference, which matches Workflow B ("QS check: price against the budget
+line"). Pending requests are not committed.
 
-**Order price capped at the approved price.** Procurement may negotiate a lower price on the
-purchase order, but not a higher one. A higher price would need a fresh approval, so BR-01 cannot
-be bypassed at the ordering stage.
+**Costs are derived, never stored.** One query per project (`section_costs`) reads every approved,
+ordered or delivered request with its order line and deliveries:
+- Approved: approved requests not yet ordered (at the approved price).
+- On order: ordered, not yet delivered (at the order price).
+- Spent: deliveries (at the order price).
+- Committed: each request once, at its latest value (delivered, else order, else approved), which
+  equals approved + on order + spent. This is the figure BR-13 checks and the budget shows.
+- There are no running totals that could drift from the documents.
+
+**Price changes at ordering go back to the PM (BR-14), and BR-13 is checked again.** This replaces
+the first version, which refused any order price above the approved one. Quotes move, so up to 5%
+above is accepted; beyond that, or if the order price pushes the section over its line, the request
+returns to PM approval at the quoted price instead of failing the whole order. The other lines are
+still ordered. Lines are checked in order against a running committed total, so lines on the same
+order (or on separate orders) cannot each fit alone and together exceed the line. The history
+reason carries no amounts because engineers can read it; procurement gets the full messages in the
+response.
 
 **One purchase order covers one project; a request is ordered at most once.** Enforced by a unique
 `request_id` on order lines (plus a row lock), so committed cost is never double-counted.

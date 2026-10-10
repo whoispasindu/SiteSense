@@ -104,6 +104,17 @@ internal project role see section budgets.
    totals). They are now limited to `rates:read` by role-specific schemas, as described above.
 7. **The schedule summary embedded the full project summary**, including its contract value and
    totals. It now uses the cost-free project card for engineers.
+8. **Rule messages with amounts in the request history.** The first version of the send-back at
+   ordering wrote the BR-13 message ("committed cost would be LKR …") into the history comment,
+   which engineers can read. The history now gives the reason in words only. The full messages go
+   to procurement in the order response and to the audit log. The cost-visibility test now walks a
+   sent-back request and fails on any string containing "LKR". Mutation-checked: restoring the old
+   comment makes it fail.
+9. **Price pending and ordering, reviewed.** `price_required` is enforced in the service, not only
+   in the screen. The order path still locks the requests and re-checks BR-05 first. A line sent
+   back drops out of the running committed total, so it cannot block the lines after it. A request
+   the PM approved is re-sent only if its order amount exceeds the approved amount, so procurement
+   cannot raise a price past the PM unseen, and the PM is not asked twice for the same excess.
 
 ## Phase 4 review: 2026-10-10
 

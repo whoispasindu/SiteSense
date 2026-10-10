@@ -60,6 +60,12 @@ from app.services.visibility import sees_rates
 
 ZERO = Decimal(0)
 OPEN_PROJECT_STATUSES = {ProjectStatus.ACTIVE.value, ProjectStatus.ON_HOLD.value}
+# Requests whose cost is committed against the budget line (BR-13 and the budget view).
+COMMITTED_STATUSES = (
+    RequestStatus.APPROVED.value,
+    RequestStatus.ORDERED.value,
+    RequestStatus.DELIVERED.value,
+)
 # Requests that still count against the BOQ quantity (BR-02).
 LIVE_STATUSES = tuple(
     s.value for s in RequestStatus if s not in (RequestStatus.REJECTED, RequestStatus.CANCELLED)
@@ -83,52 +89,73 @@ def next_number(db: Session, kind: str) -> str:
 
 @dataclass(slots=True)
 class SectionCosts:
-    approved: Decimal = ZERO  # approved, not yet ordered (request price)
-    committed: Decimal = ZERO  # ordered, not yet delivered (order price)
-    spent: Decimal = ZERO  # delivered (order price)
+    """A section's cost figures. ``committed`` is the cumulative total that BR-13 checks."""
 
-    @property
-    def used(self) -> Decimal:
-        return self.approved + self.committed + self.spent
+    approved: Decimal = ZERO  # approved, not yet on a purchase order (approved price)
+    on_order: Decimal = ZERO  # ordered, not yet delivered (order price)
+    spent: Decimal = ZERO  # delivered (order price)
+    committed: Decimal = ZERO  # every request once, at its latest value
+
+    def add(self, other: "SectionCosts") -> None:
+        self.approved += other.approved
+        self.on_order += other.on_order
+        self.spent += other.spent
+        self.committed += other.committed
+
+
+def latest_value(
+    *, approved_amount: Decimal | None, order_amount: Decimal | None, delivered: Decimal | None
+) -> Decimal:
+    """A request's committed value: delivered (once fully delivered), else on order, else approved."""
+    if delivered is not None:
+        return delivered
+    if order_amount is not None:
+        return order_amount
+    return approved_amount or ZERO
 
 
 def section_costs(db: Session, project_id: uuid.UUID) -> dict[uuid.UUID, SectionCosts]:
-    """Approved, committed and spent cost per BOQ section, derived from the documents themselves."""
-    costs: dict[uuid.UUID, SectionCosts] = {}
+    """Cost figures per BOQ section, derived from requests, order lines and deliveries.
 
-    approved = db.execute(
-        select(BoqItem.section_id, func.sum(MaterialRequest.quantity * MaterialRequest.unit_price))
-        .join(BoqItem, BoqItem.id == MaterialRequest.boq_item_id)
-        .where(
-            MaterialRequest.project_id == project_id, MaterialRequest.status == RequestStatus.APPROVED.value
-        )
-        .group_by(BoqItem.section_id)
-    ).all()
-    for section_id, amount in approved:
-        costs.setdefault(section_id, SectionCosts()).approved = rules.money(Decimal(amount or 0))
-
+    Each request counts once at its latest value. Pending requests (QS check, PM approval, change
+    requested) and closed ones (rejected, cancelled) are not committed and are left out.
+    """
     delivered = (
         select(Delivery.line_id, func.sum(Delivery.quantity).label("qty"))
         .group_by(Delivery.line_id)
         .subquery()
     )
-    ordered = db.execute(
+    rows = db.execute(
         select(
             BoqItem.section_id,
+            MaterialRequest.quantity,
+            MaterialRequest.unit_price,
             PurchaseOrderLine.quantity,
             PurchaseOrderLine.unit_price,
+            PurchaseOrderLine.amount,
             func.coalesce(delivered.c.qty, 0),
         )
-        .join(MaterialRequest, MaterialRequest.id == PurchaseOrderLine.request_id)
         .join(BoqItem, BoqItem.id == MaterialRequest.boq_item_id)
+        .outerjoin(PurchaseOrderLine, PurchaseOrderLine.request_id == MaterialRequest.id)
         .outerjoin(delivered, delivered.c.line_id == PurchaseOrderLine.id)
-        .where(MaterialRequest.project_id == project_id)
+        .where(MaterialRequest.project_id == project_id, MaterialRequest.status.in_(COMMITTED_STATUSES))
     ).all()
-    for section_id, quantity, price, done in ordered:
+    costs: dict[uuid.UUID, SectionCosts] = {}
+    for section_id, quantity, price, ordered_qty, order_price, order_amount, done in rows:
         entry = costs.setdefault(section_id, SectionCosts())
+        if order_amount is None:  # approved, not ordered yet
+            approved = rules.money(quantity * price)
+            entry.approved += approved
+            entry.committed += approved
+            continue
         done = Decimal(done)
-        entry.spent += rules.money(done * price)
-        entry.committed += rules.money(max(quantity - done, ZERO) * price)
+        spent = rules.money(done * order_price)
+        entry.spent += spent
+        entry.on_order += rules.money(max(ordered_qty - done, ZERO) * order_price)
+        fully = done >= ordered_qty
+        entry.committed += latest_value(
+            approved_amount=None, order_amount=order_amount, delivered=spent if fully else None
+        )
     return costs
 
 
@@ -140,7 +167,7 @@ class ItemFacts:
     item: BoqItem
     section_amount: Decimal
     line_budget: Decimal
-    line_used: Decimal
+    line_committed: Decimal  # the section's committed cost, this request excluded
     already_requested: Decimal
 
     @property
@@ -158,13 +185,16 @@ def _item(db: Session, project: Project, item_id: uuid.UUID, *, lock: bool = Fal
     return item
 
 
-def _own_cost(request: MaterialRequest) -> Decimal:
-    """What this request already contributes to its section's costs (so it is not counted twice)."""
-    if request.po_line is not None:
-        return request.po_line.amount
-    if request.status == RequestStatus.APPROVED.value:
-        return rules.money(request.quantity * request.unit_price)
-    return ZERO
+def own_committed(request: MaterialRequest) -> Decimal:
+    """This request's own committed value (so it is not counted twice when it is re-checked)."""
+    if request.status not in COMMITTED_STATUSES:
+        return ZERO
+    line = request.po_line
+    if line is None:
+        return rules.money(request.quantity * (request.unit_price or ZERO))
+    done = sum((d.quantity for d in line.deliveries), ZERO)
+    spent = rules.money(done * line.unit_price) if done >= line.quantity else None
+    return latest_value(approved_amount=None, order_amount=line.amount, delivered=spent)
 
 
 def item_facts(
@@ -177,21 +207,26 @@ def item_facts(
     requested_stmt = select(func.coalesce(func.sum(MaterialRequest.quantity), 0)).where(
         MaterialRequest.boq_item_id == item.id, MaterialRequest.status.in_(LIVE_STATUSES)
     )
-    used = section_costs(db, project.id).get(item.section_id, SectionCosts()).used
+    committed = section_costs(db, project.id).get(item.section_id, SectionCosts()).committed
     if exclude is not None:
         requested_stmt = requested_stmt.where(MaterialRequest.id != exclude.id)
-        used -= _own_cost(exclude)
+        committed -= own_committed(exclude)
     return ItemFacts(
         item=item,
         section_amount=Decimal(section_amount or 0),
         line_budget=Decimal(line_budget or 0),
-        line_used=used,
+        line_committed=committed,
         already_requested=Decimal(db.scalar(requested_stmt) or 0),
     )
 
 
-def evaluate(facts: ItemFacts, quantity: Decimal, unit_price: Decimal) -> RuleCheckOut:
-    amount = rules.money(quantity * unit_price)
+def amount_of(quantity: Decimal, unit_price: Decimal | None) -> Decimal | None:
+    return None if unit_price is None else rules.money(quantity * unit_price)
+
+
+def evaluate(facts: ItemFacts, quantity: Decimal, unit_price: Decimal | None) -> RuleCheckOut:
+    """All rules for a request. Without a price (pending) BR-01 and BR-13 report "pending"."""
+    amount = amount_of(quantity, unit_price)
     quantity_result = rules.check_quantity(
         boq_quantity=facts.item.quantity, already_requested=facts.already_requested, requested=quantity
     )
@@ -200,7 +235,7 @@ def evaluate(facts: ItemFacts, quantity: Decimal, unit_price: Decimal) -> RuleCh
         budget_rate=facts.budget_rate,
         request_amount=amount,
         line_budget=facts.line_budget,
-        line_committed=facts.line_used,
+        line_committed=facts.line_committed,
     )
     results = [quantity_result, *routing]
     return RuleCheckOut(
@@ -213,15 +248,6 @@ def evaluate(facts: ItemFacts, quantity: Decimal, unit_price: Decimal) -> RuleCh
         budget_rate=rules.money(facts.budget_rate),
         amount=amount,
     )
-
-
-def default_price(facts: ItemFacts) -> Decimal:
-    """The starting price for a request raised without one (site engineers do not see rates):
-    the item's budgeted rate, or its contract rate when the section has no budget yet."""
-    for candidate in (rules.money(facts.budget_rate), facts.item.rate):
-        if candidate > 0:
-            return candidate
-    raise BusinessRuleError("This BOQ item has no rate yet. Ask the quantity surveyor to raise the request.")
 
 
 def _no_prices_from(user: User, price: Decimal | None) -> None:
@@ -270,7 +296,7 @@ def to_summary(r: MaterialRequest) -> RequestSummary:
         boq_item=_item_ref(r.boq_item),
         quantity=r.quantity,
         unit_price=r.unit_price,
-        amount=rules.money(r.quantity * r.unit_price),
+        amount=amount_of(r.quantity, r.unit_price),
         needed_by=r.needed_by,
         status=r.status,
         approval_level=r.approval_level,
@@ -461,7 +487,7 @@ def check_request(db: Session, user: User, project: Project, data: RequestCheck)
     _no_prices_from(user, data.unit_price)
     item = _item(db, project, data.boq_item_id)
     facts = item_facts(db, project, item)
-    return evaluate(facts, data.quantity, data.unit_price or default_price(facts))
+    return evaluate(facts, data.quantity, data.unit_price)
 
 
 def _history(
@@ -513,7 +539,7 @@ def create_request(db: Session, user: User, data: RequestCreate, *, meta: Reques
     # Lock the BOQ item: concurrent requests for it are checked one after another (BR-02).
     item = _item(db, project, data.boq_item_id, lock=True)
     facts = item_facts(db, project, item)
-    unit_price = data.unit_price or default_price(facts)
+    unit_price = data.unit_price  # None: price pending until the QS enters the quote
     check = evaluate(facts, data.quantity, unit_price)
     if check.blocked:
         raise _blocked(check)
@@ -652,6 +678,12 @@ def decide(
                 "A price can only be set by the quantity surveyor when approving at the QS check."
             )
         request.unit_price = data.unit_price
+    if stage == "qs" and data.decision == "approve" and request.unit_price is None:
+        missing = BusinessRuleError(
+            "Enter the quoted unit price before approving: this request's price is pending."
+        )
+        missing.code = "price_required"
+        raise missing
     level = request.approval_level
     if stage == "qs" and data.decision == "approve":
         # Re-check routing with today's figures (and the QS's price): commitments may have changed.

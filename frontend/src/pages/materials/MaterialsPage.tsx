@@ -186,7 +186,9 @@ export function MaterialsPage() {
                     {formatQuantity(r.quantity)} {r.boq_item.unit}
                   </td>
                   {r.amount !== undefined ? (
-                    <td className="tabular px-4 py-3 text-right font-medium whitespace-nowrap text-ink">{formatCompactLKR(r.amount)}</td>
+                    <td className="tabular px-4 py-3 text-right font-medium whitespace-nowrap text-ink">
+                      {r.amount === null ? <span className="text-xs font-normal text-ink-faint italic">Price pending</span> : formatCompactLKR(r.amount)}
+                    </td>
                   ) : null}
                   <td className="tabular hidden px-4 py-3 whitespace-nowrap text-ink-soft lg:table-cell">{formatDate(r.needed_by)}</td>
                   <td className="px-4 py-3">

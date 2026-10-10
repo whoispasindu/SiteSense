@@ -224,3 +224,49 @@ def test_who_acts_next() -> None:
     assert rules.stage_for("pm_approval") == "pm"
     assert rules.stage_for("change_requested") == "requester"
     assert rules.stage_for("approved") is None
+
+
+# --- Price pending ---------------------------------------------------------------------------------
+
+
+def test_without_a_price_br01_and_br13_are_pending() -> None:
+    level, results, fired = rules.route_approval(
+        unit_price=None, budget_rate=D(100), request_amount=None, line_budget=D(1000), line_committed=D(0)
+    )
+
+    assert [(r.rule, r.severity) for r in results] == [("BR-01", "pending"), ("BR-13", "pending")]
+    assert fired == []
+    assert level == "qs"  # the QS check comes first anyway, and prices the request
+    assert results[0].facts == {"budget_rate": "100.00"}
+
+
+# --- BR-14: order price against the approved price -------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("order_price", "severity"),
+    [("1900", "pass"), ("2000", "pass"), ("2100", "pass"), ("2100.01", "warn"), ("2500", "warn")],
+)
+def test_br14_sends_orders_more_than_five_percent_above_approval_back(
+    order_price: str, severity: str
+) -> None:
+    result = rules.check_order_price(approved_price=D(2000), order_price=D(order_price))
+
+    assert result.rule == "BR-14"
+    assert result.severity == severity
+
+
+def test_br14_message_says_how_far_over() -> None:
+    result = rules.check_order_price(approved_price=D(2000), order_price=D(2200))
+
+    assert "10.0% above the approved price" in result.message
+    assert result.facts == {"approved_price": "2000", "order_price": "2200", "price_over": "10.0%"}
+
+
+def test_latest_value_counts_each_request_once() -> None:
+    from app.services.materials_service import latest_value
+
+    assert latest_value(approved_amount=D(100), order_amount=None, delivered=None) == D(100)
+    assert latest_value(approved_amount=D(100), order_amount=D(95), delivered=None) == D(95)
+    assert latest_value(approved_amount=D(100), order_amount=D(95), delivered=D(95)) == D(95)
+    assert latest_value(approved_amount=None, order_amount=None, delivered=None) == D(0)

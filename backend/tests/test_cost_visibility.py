@@ -23,10 +23,10 @@ COST_KEYS = frozenset(
         "contract_value", "boq_total", "budget_total", "amount", "budget_amount", "budget_line_id",
         "rate", "unit_price", "budget_rate", "total", "budget", "approved", "committed", "spent",
         "remaining", "forecast", "variance", "boq_amount", "line_budget", "line_committed",
-        "line_after_request", "line_over", "price_over",
+        "line_after_request", "line_over", "price_over", "on_order", "approved_price", "order_price",
     }
 )  # fmt: skip
-COST_RULES = {"BR-01", "BR-13"}
+COST_RULES = {"BR-01", "BR-13", "BR-14"}
 
 
 def walk(value: Any) -> Iterator[tuple[str, Any]]:
@@ -53,6 +53,8 @@ def cost_leaks(document: Any) -> list[str]:
         if key in COST_KEYS and (key not in AMBIGUOUS or isinstance(value, str))
     ]
     leaks += [f"rule {v}" for key, v in walk(document) if key == "rule" and v in COST_RULES]
+    # Amounts written into free text (rule messages, history comments, notifications).
+    leaks += [f"{key}: {v}" for key, v in walk(document) if isinstance(v, str) and "LKR" in v]
     return leaks
 
 
@@ -60,7 +62,8 @@ def cost_leaks(document: Any) -> list[str]:
 def flow(
     api: TestClient, boq: Boq, se: Who, qs: Who, buyer: Who, supplier: Supplier, db: Session
 ) -> dict[str, str]:
-    """One delivered request, one waiting at the QS check, one daily report and a programme task."""
+    """One delivered request, one waiting at the QS check, one sent back from ordering (BR-13 and
+    BR-14), one daily report and a programme task."""
     delivered = raise_request(api, boq, se, quantity="10")
     decide(api, delivered["id"], qs, "approve", unit_price="1950")
     po = api.post(
@@ -71,7 +74,7 @@ def flow(
             "lines": [{"request_id": delivered["id"]}],
         },
         headers=buyer.headers,
-    ).json()
+    ).json()["order"]
     api.post(
         f"/api/v1/purchase-orders/{po['id']}/deliveries",
         json={
@@ -82,10 +85,23 @@ def flow(
         headers=buyer.headers,
     )
     pending = raise_request(api, boq, se, quantity="5")
+    returned = raise_request(api, boq, se, quantity="900")
+    decide(api, returned["id"], qs, "approve", unit_price="2000")
+    sent_back = api.post(
+        "/api/v1/purchase-orders",
+        json={
+            "supplier_id": str(supplier.id),
+            "expected_delivery": needed_by(3),
+            "lines": [{"request_id": returned["id"], "unit_price": "6000"}],
+        },
+        headers=buyer.headers,
+    ).json()
+    assert [r["rule"] for r in sent_back["returned"][0]["rules"]] == ["BR-14", "BR-13"]
     return {
         "project": str(boq.project.id),
         "delivered": str(delivered["id"]),
         "pending": str(pending["id"]),
+        "returned": str(returned["id"]),
         "po": po["id"],
     }
 
@@ -101,6 +117,7 @@ def engineer_calls(api: TestClient, se: Who, boq: Boq, ids: dict[str, str]) -> d
         "requests": "/api/v1/material-requests",
         "request delivered": f"/api/v1/material-requests/{ids['delivered']}",
         "request pending": f"/api/v1/material-requests/{ids['pending']}",
+        "request sent back": f"/api/v1/material-requests/{ids['returned']}",
         "orders": "/api/v1/purchase-orders",
         "order": f"/api/v1/purchase-orders/{ids['po']}",
         "suppliers": "/api/v1/suppliers",

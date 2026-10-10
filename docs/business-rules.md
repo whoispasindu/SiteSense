@@ -19,7 +19,8 @@ boundaries can be tested directly; services gather the facts and apply the resul
 | BR-10 | Risk score 70+ is High (automatic PM alert), 40–69 Medium, under 40 Low | Phase 6 | | |
 | BR-11 | A safety issue marked stop-work blocks related tasks until the PM clears it | Phase 7/9 | | |
 | BR-12 | If a supplier's predicted on-time chance is under 50% for a critical-path item, suggest an alternative | Phase 10 | | |
-| BR-13 | If the section's committed cost plus this request exceeds its budget line, the project manager approves | Phase 5 (added at the project owner's request: the section check that was part of BR-01) | `rules/materials.py: check_section_budget` | `test_rules_materials.py` (`test_br13_*`), `test_qs_approval_rechecks_routing_with_current_figures` |
+| BR-13 | If the section's committed cost plus this request exceeds its budget line, the project manager approves. Checked at approval and again at purchase-order issue | Phase 5 (added at the project owner's request: the section check that was part of BR-01) | `rules/materials.py: check_section_budget`, `services/procurement_service.py: create_order` | `test_rules_materials.py` (`test_br13_*`), `test_qs_approval_rechecks_routing_with_current_figures`, `test_two_requests_that_fit_alone_exceed_the_line_together_at_approval`, `test_two_lines_that_fit_alone_exceed_the_line_together_at_po_issue` |
+| BR-14 | A purchase-order unit price more than 5% above the approved price sends the request back for project manager approval | Phase 5 (added at the project owner's request) | `rules/materials.py: check_order_price`, `services/procurement_service.py: create_order` | `test_rules_materials.py` (`test_br14_*`), `test_order_price_more_than_five_percent_above_approval_goes_back_to_the_pm` |
 
 ## BR-01 and BR-13: who approves
 
@@ -33,18 +34,52 @@ budgeted rate is its share of that line: `contract rate × section budget ÷ sec
 unit price more than 5% above it fires BR-01. Exactly 5% does not. Nothing else is compared here.
 
 **BR-13: the section's budget line as a whole.** BR-13 fires when the section's committed cost plus
-this request is more than the line's budget, with no tolerance. "Committed cost" means everything
-already committed against the line: approved requests not yet ordered, open purchase orders, and
-deliveries. Delivered cost counts because it was committed before it arrived; otherwise the check
-would loosen as goods are delivered. Exactly reaching the budget line does not fire it.
+this request is more than the line's budget, with no tolerance. Exactly reaching the budget line
+does not fire it.
 
-Both rules are worked out when the request is submitted and again when the QS approves. A request
-that fitted when raised therefore goes to the PM if commitments since then have used up the line.
+**Committed cost** is cumulative. Every approved, ordered or delivered request on the line is
+counted once, at its latest value:
 
-**Who prices a request.** Site engineers do not see rates (see
-[roles-and-access.md](roles-and-access.md)), so they raise requests with a quantity only. Such a
-request starts at the item's budgeted rate (BR-01 passes) and the QS sets the expected price at the
-QS check. Both rules are then evaluated again with that price.
+- delivered in full: the delivered amount;
+- otherwise on a purchase order: the order amount;
+- otherwise approved: the approved amount (quantity × approved price).
+
+Pending requests (at the QS check or PM approval, or with a change requested) are not committed.
+Rejected and cancelled requests never are. Delivered cost stays committed, so the check does not
+loosen as goods arrive. The budget screen shows the same figure as **Committed**, next to its parts:
+**Spent** (delivered), **On order** (ordered, not yet delivered) and **Approved** (not yet ordered).
+Committed = spent + on order + approved, and **Left** = budget − committed.
+
+**When BR-01 and BR-13 are worked out.** When the request is submitted, again when the QS approves
+(with the QS's price and today's commitments), and BR-13 once more at purchase-order issue (see
+BR-14 below). A request that fitted when raised therefore goes to the PM if commitments since then
+have used up the line.
+
+**Price pending.** Site engineers do not see rates (see [roles-and-access.md](roles-and-access.md)),
+so they raise requests with a quantity only, and a price sent by an engineer is refused
+(`422 price_not_allowed`). Their requests start with no price: BR-01 and BR-13 report `pending`,
+and the budget does not count them. The QS must enter the quoted unit price before approving
+(`422 price_required` otherwise); the approve dialog shows the item's budgeted rate beside the
+field as reference. Both rules are then evaluated with that price.
+
+## BR-14 and BR-13 at purchase-order issue
+
+Procurement may order at a different price from the approved one. Each line is checked again when
+the order is issued:
+
+- **BR-14:** an order unit price more than 5% above the approved price (exactly 5% passes).
+- **BR-13:** the section's committed cost plus the line at its order price exceeding the budget
+  line. Lines are taken in order and each accepted line is added to the section's committed cost
+  before the next is checked, so two lines that fit alone but not together cannot both get through.
+  A request the PM has already approved is not sent back for BR-13 again unless its order amount is
+  higher than the amount the PM approved.
+
+A line that fails either rule is not ordered. The request goes back to **PM approval** at the
+quoted price, with a `return_for_approval` step in its history, an audit entry and a notification
+to the site's project managers. The other lines are still ordered. If no line is left, no purchase
+order is created (`200` with `order: null`); otherwise `201`. The response lists the returned lines
+with the rule messages for procurement. The history step gives the reason in words without prices,
+because site engineers can read the history.
 
 ### Test cases
 
@@ -58,6 +93,13 @@ QS check. Both rules are then evaluated again with that price.
 | Section already over before the request | BR-13 fires | `[150000-1-warn]` |
 | Price on budget but the line filled since submission | PM approval, `routed_by = ["BR-13"]` | `test_qs_approval_rechecks_routing_with_current_figures` |
 | Both rules fire | `routed_by = ["BR-01", "BR-13"]` | `test_both_rules_can_fire` |
+| Engineer's request, no price yet | BR-01 and BR-13 `pending`; the QS cannot approve without a price | `test_without_a_price_br01_and_br13_are_pending`, `test_qs_cannot_approve_until_the_price_is_entered` |
+| Two requests fit alone, not together, at approval | The second goes to the PM, `routed_by = ["BR-13"]` | `test_two_requests_that_fit_alone_exceed_the_line_together_at_approval` |
+| Committed counted once at its latest value | Approved → order → delivered amount, never twice | `test_latest_value_counts_each_request_once`, `test_full_flow_from_site_to_delivery_updates_the_budget` |
+| Order price 5.00% over the approved price | Ordered | `test_order_price_up_to_five_percent_above_approval_is_accepted` |
+| Order price 5.01% over (BR-14) | Sent back for PM approval, nothing ordered | `test_order_price_more_than_five_percent_above_approval_goes_back_to_the_pm` |
+| Two lines fit alone, not together, at PO issue | First ordered, second sent back (BR-13) | `test_two_lines_that_fit_alone_exceed_the_line_together_at_po_issue`, `test_two_requests_ordered_on_separate_orders_are_checked_together` |
+| PM already approved the excess | Ordered at the approved price without going back | `test_pm_approved_requests_are_not_returned_for_the_same_excess` |
 
 ## BR-02 in detail
 
@@ -76,6 +118,7 @@ requested --approve, BR-01 or BR-13 fires--> pm_approval --approve--> approved
 requested | pm_approval --reject--> rejected
 requested | pm_approval --request change--> change_requested --edit and resubmit--> requested
 requested | pm_approval | change_requested --cancel (requester)--> cancelled
+approved --purchase order, line fails BR-14 or BR-13--> pm_approval (at the quoted price)
 ```
 
 Anything else is refused with `409 invalid_transition`. Reject and request-change need a comment.

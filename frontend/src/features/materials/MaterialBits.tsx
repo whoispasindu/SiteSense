@@ -22,13 +22,26 @@ const SEVERITY: Record<RuleCheck["results"][number]["severity"], { icon: IconNam
   pass: { icon: "audit", tone: "text-signal-low", label: "Passed" },
   warn: { icon: "alert", tone: "text-signal-medium", label: "Check" },
   block: { icon: "close", tone: "text-signal-high", label: "Blocked" },
+  pending: { icon: "schedule", tone: "text-ink-faint", label: "Waiting for the price" },
 };
 
 const RULE_NAMES: Record<string, string> = {
   "BR-01": "Unit price against the budgeted rate",
   "BR-02": "Quantity against the BOQ",
   "BR-13": "Section cost against its budget line",
+  "BR-14": "Order price against the approved price",
 };
+
+/** A price, or "Price pending" while the QS has not entered the quoted price yet. */
+export function PriceText({ value, prefix = "LKR " }: { value: string | null; prefix?: string }) {
+  if (value === null) return <span className="font-normal text-ink-faint italic">Price pending</span>;
+  return (
+    <>
+      {prefix}
+      {formatAmount(value)}
+    </>
+  );
+}
 
 /** "Sent to the project manager by BR-01 and BR-13", or null when the QS can approve. */
 function routingText(check: RuleCheck): string | null {
@@ -76,7 +89,9 @@ export function RuleChecks({ check, compact = false }: { check: RuleCheck; compa
           {check.amount !== undefined ? (
             <div>
               <dt className="text-ink-faint">Request value</dt>
-              <dd className="tabular font-medium text-ink">LKR {formatAmount(check.amount)}</dd>
+              <dd className="tabular font-medium text-ink">
+                <PriceText value={check.amount} />
+              </dd>
             </div>
           ) : null}
           {check.budget_rate !== undefined ? (
