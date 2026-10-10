@@ -21,7 +21,6 @@ from app.core.permissions import Permission, Role, has_permission
 from app.core.scoping import scope_to_user_sites
 from app.integrations.storage import Storage
 from app.models import DailyReport, Project, ProjectStatus, ReportPhoto, ReportProgress, Site, Task, User
-from app.models.user import user_site_assignments
 from app.schemas.report import (
     AuthorOut,
     PhotoOut,
@@ -170,17 +169,7 @@ def _duplicate(report: DailyReport) -> ConflictError:
 
 
 def _site_managers(db: Session, project: Project, roles: set[Role]) -> list[User]:
-    return list(
-        db.scalars(
-            select(User)
-            .join(user_site_assignments, user_site_assignments.c.user_id == User.id)
-            .where(
-                user_site_assignments.c.site_id == project.site_id,
-                User.is_active.is_(True),
-                User.role.in_([r.value for r in roles]),
-            )
-        ).all()
-    )
+    return notification_service.site_people(db, project.site_id, roles)
 
 
 def create_report(
@@ -447,7 +436,7 @@ def today_status(db: Session, user: User, *, deadline_hour: int) -> ReportStatus
 
 
 def projects_missing_report(db: Session, day: date) -> list[Project]:
-    """Active projects on active sites with no report for ``day`` (BR-11)."""
+    """Active projects on active sites with no report for ``day`` (BR-07)."""
     has_report = exists().where(DailyReport.project_id == Project.id, DailyReport.report_date == day)
     return list(
         db.scalars(

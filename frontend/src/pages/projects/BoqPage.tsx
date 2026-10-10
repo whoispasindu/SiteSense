@@ -8,6 +8,7 @@ import { Button, primaryLinkClass } from "../../components/ui/Button";
 import { Icon } from "../../components/ui/icons";
 import { Sheet } from "../../components/ui/Sheet";
 import { errorText } from "../../features/admin/adminUtils";
+import { BudgetPanel } from "../../features/materials/BudgetPanel";
 import { formatAmount, formatQuantity, toNumber } from "../../lib/money";
 import { useCurrentProject } from "./projectContext";
 
@@ -201,6 +202,8 @@ export function BoqPage() {
         </dl>
         {importLink}
       </div>
+
+      {can("cost:read") && data.sections.length > 0 ? <BudgetPanel projectId={project.id} /> : null}
 
       {data.sections.length === 0 ? (
         <Sheet className="px-6 py-12 text-center">

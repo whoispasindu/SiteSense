@@ -2,7 +2,7 @@
 
     python -m app.cli create-admin --email admin@company.lk --name "Nimal Perera"
     python -m app.cli seed-dev            # local development only
-    python -m app.cli send-reminders      # missing daily report reminders now (BR-11)
+    python -m app.cli send-reminders      # missing daily report reminders now (BR-07)
     python -m app.cli refresh-weather     # fetch the 5-day forecast for every active site
 
 ``create-admin`` prints a one-time temporary password; the admin must change it at first sign-in.
@@ -32,8 +32,20 @@ from app.core.security import (
     validate_password,
 )
 from app.integrations.weather import OpenMeteoClient
-from app.models import BoqSection, DailyReport, ProgressSnapshot, Project, Site, Task, User
-from app.services import audit
+from app.models import (
+    BoqItem,
+    BoqSection,
+    DailyReport,
+    MaterialRequest,
+    ProgressSnapshot,
+    Project,
+    Site,
+    Supplier,
+    Task,
+    User,
+)
+from app.schemas.materials import DecisionIn, DeliveryIn, OrderLineIn, PurchaseOrderCreate, RequestCreate
+from app.services import audit, materials_service, procurement_service
 from app.services.audit import RequestMeta
 from app.services.auth_service import normalize_email
 from app.services.boq_import import parse_boq
@@ -57,6 +69,25 @@ DEMO_REPORTS: list[tuple[int, int, str, Decimal, str, str | None]] = [
      "Stripped level 2 formwork. MEP sleeves installed in level 3 slab before inspection.",
      "Tower crane down for two hours (hydraulic leak); lifts delayed."),
 ]  # fmt: skip
+
+DEMO_SUPPLIERS = [
+    ("Kelani Building Supplies", "Nimal Fernando", "+94 11 245 7781", "cement, blocks, aggregates"),
+    ("Southern Steel Traders", "Ruwani de Silva", "+94 91 223 4410", "reinforcement steel"),
+    ("Colombo Ready-Mix", "Asanka Perera", "+94 11 287 9002", "ready-mix concrete"),
+    ("Ceylon Formwork Hire", "Dinesh Jayasuriya", "+94 11 260 1188", "formwork, scaffolding"),
+    ("Hill Country Hardware", "Fathima Rizvi", "+94 81 222 6091", "waterproofing, plaster, hardware"),
+]
+
+# Havelock material requests and how far each gets:
+# (item, quantity, unit price, needed in days, stage, supplier, delivered quantity)
+DEMO_REQUESTS: list[tuple[str, str, str, int, str, str | None, str | None]] = [
+    ("C.03", "24000", "340", 5, "delivered", "Southern Steel Traders", "24000"),
+    ("C.02", "180", "34500", 7, "ordered", "Colombo Ready-Mix", "60"),
+    ("D.01", "1200", "2750", 12, "approved", None, None),
+    ("C.04", "2000", "2240", 10, "pm_approval", None, None),
+    ("B.05", "400", "2600", 9, "requested", None, None),
+    ("D.03", "3000", "1200", 20, "change_requested", None, None),
+]
 
 DEMO_SITES = [
     ("COL-07", "Havelock Residences", "Colombo 05", 6.8836, 79.8650),
@@ -228,6 +259,7 @@ def seed_dev() -> int:
                 continue
             _seed_programme(db, target, programme, DEMO_PACE[code])
         _seed_reports(db)
+        _seed_materials(db)
     database.dispose()
     print(
         f"Seeded {len(DEMO_SITES)} sites, {created} new demo users and {new_projects} new projects "
@@ -307,6 +339,81 @@ def _seed_reports(db: Session) -> None:
             )
         )
     db.commit()
+
+
+def _seed_materials(db: Session) -> None:
+    """Suppliers and a set of Havelock material requests at every stage, made through the services
+    so numbering, history, notifications and the rules are exactly what the app produces."""
+    for name, contact, phone, categories in DEMO_SUPPLIERS:
+        if not db.scalar(select(Supplier).where(Supplier.name == name)):
+            db.add(Supplier(name=name, contact_name=contact, phone=phone, categories=categories))
+    db.commit()
+
+    project = db.scalar(select(Project).where(Project.code == "HR-2026-01"))
+    people = {
+        u.email.split("@")[0]: u
+        for u in db.scalars(select(User).where(User.email.like("%@sitesense.example")))
+    }
+    if project is None or db.scalar(select(MaterialRequest).where(MaterialRequest.project_id == project.id)):
+        return
+    engineer, qs, pm, buyer = people["engineer"], people["qs"], people["pm"], people["procurement"]
+    meta = RequestMeta(ip_address=None, user_agent="seed-dev")
+    today = clock.site_today()
+    for code, quantity, price, days, stage, supplier_name, delivered in DEMO_REQUESTS:
+        item = db.scalar(select(BoqItem).where(BoqItem.project_id == project.id, BoqItem.item_code == code))
+        if item is None:
+            continue
+        request = materials_service.create_request(
+            db,
+            engineer,
+            RequestCreate(
+                project_id=project.id,
+                boq_item_id=item.id,
+                quantity=Decimal(quantity),
+                unit_price=Decimal(price),
+                needed_by=today + timedelta(days=days),
+                notes=None,
+            ),
+            meta=meta,
+        )
+        if stage == "requested":
+            continue
+        if stage == "change_requested":
+            materials_service.decide(
+                db,
+                qs,
+                request.id,
+                DecisionIn(decision="request_change", comment="Split it by floor, please."),
+                meta=meta,
+            )
+            continue
+        materials_service.decide(db, qs, request.id, DecisionIn(decision="approve"), meta=meta)
+        if stage == "pm_approval":
+            continue
+        if request.status == "pm_approval":
+            materials_service.decide(db, pm, request.id, DecisionIn(decision="approve"), meta=meta)
+        if stage == "approved" or supplier_name is None:
+            continue
+        supplier = db.scalar(select(Supplier).where(Supplier.name == supplier_name))
+        assert supplier is not None
+        po = procurement_service.create_order(
+            db,
+            buyer,
+            PurchaseOrderCreate(
+                supplier_id=supplier.id,
+                expected_delivery=today + timedelta(days=days),
+                lines=[OrderLineIn(request_id=request.id)],
+            ),
+            meta=meta,
+        )
+        if delivered:
+            procurement_service.record_delivery(
+                db,
+                buyer,
+                po.id,
+                DeliveryIn(request_id=request.id, quantity=Decimal(delivered), delivered_on=today),
+                meta=meta,
+            )
 
 
 def send_reminders() -> int:

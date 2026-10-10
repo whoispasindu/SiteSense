@@ -25,6 +25,8 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { label: "Schedule", path: "/schedule", icon: "schedule", phase: 3, permission: "schedule:read" },
       { label: "Site reports", path: "/reports", icon: "reports", phase: 4, permission: "reports:read" },
       { label: "Materials", path: "/materials", icon: "materials", phase: 5, permission: "materials:read" },
+      { label: "Purchase orders", path: "/purchase-orders", icon: "cost", phase: 5, permission: "materials:read" },
+      { label: "Suppliers", path: "/suppliers", icon: "client", phase: 5, permission: "suppliers:manage" },
     ],
   },
   {

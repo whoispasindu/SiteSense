@@ -12,7 +12,8 @@ APScheduler and are safe to run more than once ([ADR 0007](adr/0007-daily-report
 ```
  Browser (React + TS)  --/api/v1-->  FastAPI
                                       |- api/           HTTP only: routing, auth dependencies, schemas in/out
-                                      |- services/      workflows and business rules (BR-01..BR-12)
+                                      |- services/      workflows: gather facts, apply rules, save, audit, notify
+                                      |- rules/         business rules as pure functions (docs/business-rules.md)
                                       |- ai/            risk model, NLP classifier, supplier model, briefing
                                       |- integrations/  weather, file storage, later LLM and email (adapters)
                                       |- models/        SQLAlchemy tables

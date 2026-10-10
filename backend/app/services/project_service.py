@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.core.permissions import ROLE_LABELS, Role
 from app.core.scoping import accessible_site_ids, ensure_site_access, scope_to_user_sites
-from app.models import BoqItem, BoqSection, BudgetLine, Project, ProjectStatus, Site, User
+from app.models import BoqItem, BoqSection, BudgetLine, MaterialRequest, Project, ProjectStatus, Site, User
 from app.models.user import user_site_assignments
 from app.schemas.auth import SiteSummary
 from app.schemas.project import (
@@ -278,10 +278,17 @@ def import_boq(
 ) -> ImportReport:
     existing = db.scalar(select(func.count(BoqItem.id)).where(BoqItem.project_id == project.id)) or 0
     imported = False
+    # Material requests point at BOQ items, and replacing the BOQ would orphan them. Once any exist,
+    # the BOQ changes through variations (Phase 8) instead. Checked on the dry run too, so the QS
+    # learns this before preparing a file.
+    if db.scalar(select(MaterialRequest.id).where(MaterialRequest.project_id == project.id).limit(1)):
+        raise BusinessRuleError(
+            "This BOQ cannot be replaced: material requests already refer to its items. "
+            "Changes to the BOQ go through variations."
+        )
 
     if not dry_run and parsed.is_valid:
-        # Replacing a BOQ is all-or-nothing inside one transaction. From Phase 5, material requests
-        # reference BOQ items: a re-import must then be refused (or reconciled) once any exist.
+        # Replacing a BOQ is all-or-nothing inside one transaction.
         db.execute(delete(BoqSection).where(BoqSection.project_id == project.id))
         sections: dict[str, BoqSection] = {}
         for position, summary in enumerate(parsed.sections, start=1):

@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 
 import { TYPE_LABELS } from "../../api/projects";
+import { useBudget } from "../../api/materials";
 import { useAuth } from "../../auth/context";
 import { primaryLinkClass } from "../../components/ui/Button";
 import { SectionHeading } from "../../components/ui/SectionHeading";
@@ -13,6 +14,7 @@ import { useCurrentProject } from "./projectContext";
 export function ProjectOverview() {
   const p = useCurrentProject();
   const { can } = useAuth();
+  const costs = useBudget(p.id, can("cost:read") && p.item_count > 0);
   const boq = toNumber(p.boq_total);
   const budget = toNumber(p.budget_total);
   const margin = boq > 0 ? ((boq - budget) / boq) * 100 : 0;
@@ -61,7 +63,11 @@ export function ProjectOverview() {
             label="Cost budget"
             value={p.item_count ? formatCompactLKR(p.budget_total) : "—"}
             title={`LKR ${formatAmount(p.budget_total)}`}
-            note="Committed and spent cost arrive with materials (Phase 5)"
+            note={
+              costs.data
+                ? `Spent ${formatCompactLKR(costs.data.totals.spent)} · committed ${formatCompactLKR(costs.data.totals.committed)}`
+                : "Cost to date is on the BOQ & budget tab"
+            }
           />
           <KpiTile
             icon="risk"

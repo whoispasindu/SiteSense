@@ -49,6 +49,13 @@ class AuditAction:
     REPORT_UPDATED = "report.updated"
     REPORT_PHOTO_ADDED = "report.photo_added"
     REPORT_PHOTO_DELETED = "report.photo_deleted"
+    REQUEST_CREATED = "material_request.created"
+    REQUEST_UPDATED = "material_request.updated"
+    REQUEST_DECIDED = "material_request.decided"
+    SUPPLIER_CREATED = "supplier.created"
+    SUPPLIER_UPDATED = "supplier.updated"
+    PURCHASE_ORDER_ISSUED = "purchase_order.issued"
+    DELIVERY_RECORDED = "delivery.recorded"
 
 
 def record(

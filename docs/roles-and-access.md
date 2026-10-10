@@ -69,7 +69,7 @@ assigned to. Every site-data endpoint uses the helpers in
 
 | Method and path | Who | Notes |
 | --- | --- | --- |
-| `GET /api/v1/reports/today` | PM, QS, Site Engineer | Today's report status for every visible active project (BR-11) |
+| `GET /api/v1/reports/today` | PM, QS, Site Engineer | Today's report status for every visible active project (BR-07) |
 | `GET /api/v1/projects/{id}/reports` | PM, QS, Site Engineer | Report history, newest first, paginated |
 | `POST /api/v1/projects/{id}/reports` | Site Engineer | One per project per day (TC-03); progress updates the programme |
 | `GET /api/v1/reports/{id}` | PM, QS, Site Engineer | |
@@ -83,6 +83,25 @@ assigned to. Every site-data endpoint uses the helpers in
 
 Every report, photo and weather call goes through the project's site scope: out of scope
 answers `404`, exactly like a missing record.
+
+## Phase 5 endpoints
+
+| Method and path | Who | Notes |
+| --- | --- | --- |
+| `GET /api/v1/material-requests` | PM, QS, Site Engineer, Procurement | Scoped to the caller's sites (procurement: company-wide); pipeline counts |
+| `POST /api/v1/material-requests/check` | PM, QS, Site Engineer | Rule results for a draft, nothing saved |
+| `POST /api/v1/material-requests` | PM, QS, Site Engineer | BR-02 blocks; BR-01 sets the approval level |
+| `GET /api/v1/material-requests/{id}` | PM, QS, Site Engineer, Procurement | Live rule results, history, order, allowed actions |
+| `PATCH /api/v1/material-requests/{id}` | The requester, after "change requested" | Saving resubmits to the QS |
+| `POST /api/v1/material-requests/{id}/decision` | QS at the QS check, PM at PM approval, never the requester (BR-04); requester may cancel | Wrong stage or role: 403 (TC-01); invalid transition: 409 |
+| `GET /api/v1/projects/{id}/boq-items` | PM, QS, Site Engineer | BOQ item picker with quantity already requested |
+| `GET /api/v1/projects/{id}/budget` | PM, QS | Budget, approved, committed, spent per section (TC-07: never clients) |
+| `GET /api/v1/suppliers` | PM, QS, Site Engineer, Procurement | Inactive suppliers only for procurement |
+| `POST /api/v1/suppliers`, `PATCH /api/v1/suppliers/{id}` | Procurement | |
+| `GET /api/v1/purchase-orders/ready` | Procurement | Approved requests not yet ordered (BR-05) |
+| `GET /api/v1/purchase-orders`, `GET /api/v1/purchase-orders/{id}` | PM, QS, Site Engineer, Procurement | Site-scoped |
+| `POST /api/v1/purchase-orders` | Procurement | Approved requests only; price never above the approved price |
+| `POST /api/v1/purchase-orders/{id}/deliveries` | Procurement | Never more than ordered |
 
 `backend/tests/test_role_matrix.py` calls every endpoint as every role. New endpoints must be added there.
 

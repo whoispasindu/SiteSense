@@ -71,7 +71,10 @@ docker compose exec backend python -m app.cli seed-dev
 
 `seed-dev` also creates three demo projects; Havelock Residences comes with a full BOQ
 (`backend/app/seed_data/boq-havelock-residences.csv`, also a good file to try the import with),
-a programme and a week of daily reports. Sign in as the site engineer to file today's report.
+a programme, a week of daily reports, five suppliers and material requests at every stage
+(QS check, PM approval, ready to order, ordered, delivered, change requested). Sign in as the
+site engineer to file today's report or raise a request, as the QS or PM to approve, and as
+procurement to order and receive.
 
 Two operator commands run the scheduled jobs on demand:
 
@@ -165,7 +168,7 @@ Backend settings are environment variables prefixed with `SITESENSE_`
 | `SITESENSE_MAX_PHOTO_BYTES` / `SITESENSE_MAX_PHOTOS_PER_REPORT` | Photo limits | `10485760` / `12` |
 | `SITESENSE_WEATHER_ENABLED` | Live forecast from Open-Meteo (off: cached forecasts only) | `true` |
 | `SITESENSE_SCHEDULER_ENABLED` | Run the 18:00 reminder and 05:30 weather jobs in the API process | `true` |
-| `SITESENSE_REPORT_DEADLINE_HOUR` | BR-11 daily report deadline, site time | `18` |
+| `SITESENSE_REPORT_DEADLINE_HOUR` | BR-07 daily report deadline, site time | `18` |
 
 In production the API refuses to start with debug on, wildcard or plain-HTTP origins, or the
 example database password.
@@ -201,8 +204,8 @@ docs/           architecture, decision records, security reviews, model cards
 | 1 | Authentication, roles and users | Done |
 | 2 | Projects, BOQ and budget | Done |
 | 3 | Schedule basics | Done |
-| 4 | Daily site reports | In progress |
-| 5 | Materials, approvals and rules engine | Planned |
+| 4 | Daily site reports | Done |
+| 5 | Materials, approvals and rules engine | In progress |
 | 6 | Demo data and risk model v1 → **v0.1 MVP** | Planned |
 | 7 | Report NLP classifier | Planned |
 | 8 | Cost control, claims and variations | Planned |

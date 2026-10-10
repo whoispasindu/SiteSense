@@ -20,6 +20,23 @@ uses [Semantic Versioning](https://semver.org/).
   - Sidebar icons, an avatar user menu and calmer error pages. The sign-in button now says "Sign in".
 
 ### Added
+- **Phase 5: materials, approvals and rules engine.**
+  - Material requests against BOQ items, with a rules engine of pure functions: BR-01 (the QS
+    approves up to 5% over budget, the PM above that), BR-02 (quantity blocked beyond the BOQ plus
+    3%), BR-04 (no approving your own request) and BR-05 (no purchase order before approval).
+  - Approval state machine: QS check, PM approval, approved, ordered and delivered, plus rejected,
+    change requested and cancelled. Invalid transitions are refused, and every step is audited
+    and notified.
+  - Suppliers, purchase orders (one project each, price never above the approved price) and
+    deliveries (never more than ordered).
+  - Budget per BOQ section shows approved, committed and spent cost, derived from orders and
+    deliveries so it updates by itself. The BOQ cannot be replaced once requests refer to it.
+  - Web: Materials page with pipeline counts and filters; a request form with a BOQ item picker
+    and a live rules check; a request page with rule results, history and approve, reject or
+    request-change actions. Purchase-order, delivery and supplier screens for procurement, and
+    a cost-control panel on the BOQ tab.
+  - `seed-dev` adds suppliers and requests at every stage.
+  - `docs/business-rules.md` documents every rule.
 - **Phase 4: daily site reports.**
   - Site engineers file one report per project per day: weather, crew, work done, problems,
     task progress and up to 12 photos. A second report for the same day is refused with a link
@@ -31,7 +48,7 @@ uses [Semantic Versioning](https://semver.org/).
   - The author can correct a report, and add or remove photos, on the day they submitted it.
     Task progress in a report updates the programme.
   - An 18:00 reminder notifies the engineers and project managers of sites still missing
-    today's report (BR-11). Project managers are notified when a report is filed.
+    today's report (BR-07). Project managers are notified when a report is filed.
   - In-app notifications with a bell in the top bar. They are reused by later phases.
   - Web: Site reports page (today's status), project Reports tab with a weather strip and
     history, a phone-friendly report form and a report detail page with a photo viewer.

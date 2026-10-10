@@ -134,7 +134,7 @@ class ReportDetail(BaseModel):
 
 
 class TodayStatus(BaseModel):
-    """One active project and whether today's report is in (BR-11)."""
+    """One active project and whether today's report is in (BR-07)."""
 
     project_id: uuid.UUID
     project_code: str
@@ -169,7 +169,7 @@ class WeatherOut(BaseModel):
     fetched_at: datetime | None
     message: str | None
     days: list[WeatherDayOut]
-    # BR-08 groundwork: days with heavy rain forecast (more than 10 mm).
+    # BR-06 groundwork: days with heavy rain forecast (more than 10 mm).
     heavy_rain_threshold_mm: Decimal
 
 

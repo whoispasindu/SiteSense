@@ -39,7 +39,7 @@ def _notes(db: Session, user: User) -> list[Notification]:
     return list(db.scalars(select(Notification).where(Notification.user_id == user.id)).all())
 
 
-# --- BR-11: missing-report reminder ------------------------------------------------------------
+# --- BR-07: missing-report reminder ------------------------------------------------------------
 
 
 def test_reminder_fires_for_engineer_and_pm_when_no_report(
