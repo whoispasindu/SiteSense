@@ -114,7 +114,8 @@ already includes the variation's budget change.
 - Claims and variations work end to end for the PM, QS and client, and the budget page shows the
   forecast and variance (the guide's "done when").
 - Committed cost still covers materials only (Phase 5), so the forecast is a materials-led trend
-  applied to the whole budget line. Labour and plant costs are not tracked yet. The screen says what
+  applied to the whole budget line. Labour, subcontract and plant costs are tracked in
+  [#26](https://github.com/whoispasindu/SiteSense/issues/26). The screen says what
   the forecast is based on.
 - Releasing retention and client-issued variations are left to later phases. Decided for the Phase 12
   portal: clients will also see variations a PM approved under their limit, labelled "Approved by

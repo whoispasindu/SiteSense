@@ -138,8 +138,8 @@ screens, and the demo seed.
 - Decided for the Phase 12 portal: clients also see variations a PM approved under their limit,
   labelled and read-only, with no internal costs ([Phase 12 plan](plans/phase-12-client-portal.md)).
   Until then they see only variations sent to them.
-- Committed cost covers materials only, so the forecast is a materials-led trend. Labour and plant
-  costs are not tracked yet.
+- Committed cost covers materials only, so the forecast is a materials-led trend. Labour, subcontract
+  and plant costs: [#26](https://github.com/whoispasindu/SiteSense/issues/26).
 - Variation counts as a risk model input: risk model v2 (Phase 10).
 
 ## Phase 7 review: 2026-10-11
