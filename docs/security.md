@@ -135,8 +135,9 @@ screens, and the demo seed.
 ### Open items
 
 - Retention release at practical completion (close-out).
-- The client portal (Phase 12) should decide whether clients also see variations the PM approved
-  under the limit; today they see only variations sent to them.
+- Decided for the Phase 12 portal: clients also see variations a PM approved under their limit,
+  labelled and read-only, with no internal costs ([Phase 12 plan](plans/phase-12-client-portal.md)).
+  Until then they see only variations sent to them.
 - Committed cost covers materials only, so the forecast is a materials-led trend. Labour and plant
   costs are not tracked yet.
 - Variation counts as a risk model input: risk model v2 (Phase 10).

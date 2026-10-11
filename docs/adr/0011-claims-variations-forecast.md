@@ -116,7 +116,9 @@ already includes the variation's budget change.
 - Committed cost still covers materials only (Phase 5), so the forecast is a materials-led trend
   applied to the whole budget line. Labour and plant costs are not tracked yet. The screen says what
   the forecast is based on.
-- Releasing retention, client-issued variations, and showing PM-approved variations in the client
-  portal are left to later phases (close-out, Phase 12).
+- Releasing retention and client-issued variations are left to later phases. Decided for the Phase 12
+  portal: clients will also see variations a PM approved under their limit, labelled "Approved by
+  contractor, under your approval limit", without decision buttons or internal costs, and the
+  contract value they see includes them ([Phase 12 plan](../plans/phase-12-client-portal.md)).
 - The risk model does not yet use variation counts as an input; that comes with risk model v2
   (Phase 10).
