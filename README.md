@@ -17,7 +17,10 @@ SiteSense tells a construction company which site will slip before it does, and 
 > **Status: v0.1 MVP (Phases 0 to 6 of 14).** Projects, BOQ and budgets, schedules, daily site
 > reports, materials and approvals, and the first AI feature: a daily delay and cost-overrun risk
 > score. More arrives phase by phase (see [Roadmap](#roadmap)). Not production-ready yet. The risk
-> model is trained on simulated projects (see the [model card](docs/model-card-risk.md)).
+> model is trained on simulated projects (see the [model card](docs/model-card-risk.md)). The report
+> issue classifier (Phase 7, in review) is trained on synthetic sentences and tested on sentences
+> written by the project, not real site reports, so its scores are not yet evidence about real sites
+> (see its [model card](docs/model-card-report-issues.md)).
 
 ## What it will do
 

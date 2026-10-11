@@ -136,7 +136,8 @@ issue features, the AI check screen and the stop-work banner.
 
 - **Redaction misses unknown first names.** A worker who is not an app user and is named without a
   title ("sunil absent") is not redacted. Options: a site's worker list, or a name recogniser.
-  (Owner: product, before real reports are collected.)
+  No report text may go to an external service until this is fixed
+  ([#23](https://github.com/whoispasindu/SiteSense/issues/23)).
 - Measure the classifier on real, consented, confirmed tags before trusting the numbers.
 - BR-11 blocking of related programme tasks: Phase 9.
 - Memory: each API worker holds the 266 MB model. Size the workers accordingly, or move tagging to a

@@ -85,7 +85,9 @@ round number, not tuned on any data. Flagging catches half the mistakes for a fi
 
 - **Names are removed before anything else.** Names of people on the project's site, the author's,
   and titled names ("Mr Perera") become `[PERSON]` before the text is classified or stored. Company
-  names stay.
+  names stay. An untitled first name of someone without an account ("sunil absent") is not yet
+  removed, so no report text may go to an external service until
+  [#23](https://github.com/whoispasindu/SiteSense/issues/23) is fixed.
 - The AI suggests; the author decides. Each stored issue keeps what the AI said (category, severity,
   confidence, model version) beside what the author confirmed, so disagreement can be measured.
 - Only the author can analyse and confirm, on the day of the report.
