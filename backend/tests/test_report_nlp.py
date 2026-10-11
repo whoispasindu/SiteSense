@@ -10,6 +10,7 @@ import pytest
 
 from app.ai.nlp import model as text_model
 from app.ai.nlp import rules
+from app.ai.nlp import text as text_module
 from app.ai.nlp.tagger import LOW_CONFIDENCE, tag_problems, tag_sentence
 from app.ai.nlp.text import PERSON, redact, sentences
 
@@ -79,6 +80,46 @@ def test_everyday_words_in_a_name_are_not_redacted() -> None:
     assert redact("site engineer and project manager on leave", ["Kasun Site Engineer", "Rose Mark"]) == (
         "site engineer and project manager on leave"
     )
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("sunil absent", f"{PERSON} absent"),  # issue #23: no title, no account, lower case
+        ("SUNIL and kamal did not come", f"{PERSON} and {PERSON} did not come"),
+        ("sunil perera went home early", f"{PERSON} went home early"),  # one name, one [PERSON]
+        ("kasun's gang idle after lunch", f"{PERSON}'s gang idle after lunch"),
+        ("kamal naha ada", f"{PERSON} naha ada"),  # code-mixed: "kamal not here today"
+        ("murugan and fathima on leave", f"{PERSON} and {PERSON} on leave"),  # Tamil and Muslim names
+        ("Gamage Hardware late again", f"{PERSON} Hardware late again"),  # a surname in a company name
+    ],
+)
+def test_common_names_without_a_title_are_redacted(text: str, expected: str) -> None:
+    assert redact(text) == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Heavy rain from 10 am, pour postponed",
+        "Crane down with a hydraulic leak",
+        "baas says crane eka kadila",
+        "Still waiting for revised stair drawings from the consultant",
+        "Cube test failed on the level 4 slab",
+        "sunny day, no issues with the mixer",
+    ],
+)
+def test_everyday_site_text_is_left_alone(text: str) -> None:
+    assert redact(text) == text
+
+
+@pytest.mark.parametrize("entry", ["Sunil", "al", "rain", "o'brien", "sunil2"])
+def test_the_name_list_refuses_entries_that_are_not_plain_names(tmp_path: Path, entry: str) -> None:
+    names = tmp_path / "names.txt"
+    names.write_text("\n".join(["# comment", "kasun", entry]), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="lower-case name"):
+        text_module._load_common_names(names)
 
 
 # --- The shipped classifier ------------------------------------------------------------------------------

@@ -16,7 +16,8 @@ uses [Semantic Versioning](https://semver.org/).
   - Follow-ups the author can tick (all start unticked): draft a material request (prefilled, and
     closed when the request is raised), alert the project managers, or flag stop-work, which stays
     on the project as a banner until a project manager clears it (BR-11, in part).
-  - Names of people are replaced with `[PERSON]` before tagging and storage.
+  - Names of people are replaced with `[PERSON]` before tagging and storage, including common Sri
+    Lankan names written without a title, in any case (#23).
   - The classifier: DistilBERT for the category (macro F1 0.80 on 199 hand-written test sentences,
     against 0.73 for the TF-IDF baseline) and TF-IDF with the labelling guide's rules for severity
     (0.50; DistilBERT did not beat it). DistilBERT runs as ONNX; the TF-IDF model is the fallback.
@@ -35,6 +36,7 @@ uses [Semantic Versioning](https://semver.org/).
 - Analysing a report is rate limited per client; confirmations lock the report so a double submit
   cannot duplicate follow-ups.
 - The transformer training dependencies are pinned and audited in CI.
+- A test lists every module that can call out of the server; a new one fails until reviewed.
 
 ## [0.1.0] - 2026-10-10
 

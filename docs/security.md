@@ -35,7 +35,7 @@ here, newest first. The baseline design is in [ADR 0003](adr/0003-security-basel
 | AI models | Model files are JSON data validated before use (structure, feature indexes, finite numbers, children after parents, size limits); no pickle/joblib loading; golden predictions prove the scorer matches training; CI retrains and checks the shipped model is reproducible | `ai/risk/model.py`, `ml/check_model.py` | `test_risk_model.py`, CI ML job |
 | Large model files | ONNX weights live in a GitHub Release, not the repository; a committed manifest pins SHA-256 and size; `fetch_models.py` verifies before moving a file into place and the backend verifies again before onnxruntime parses it; plain file names only; 300 MB cap; mismatch or missing means the TF-IDF fallback; ONNX is an operator graph, not pickled code | `scripts/fetch_models.py`, `ai/nlp/transformer.py` | `test_report_transformer.py` (tamper, size, names, fallback, parity), CI fetches and runs them with `SITESENSE_REQUIRE_MODELS=1` |
 | Outbound calls (ML runtime) | onnxruntime's telemetry to Microsoft is switched off before it is imported, in code and in the image | `ai/nlp/transformer.py`, `backend/Dockerfile` | `test_onnxruntime_telemetry_is_off_before_onnxruntime_is_imported`; checked in the container: no connection |
-| Personal data in free text | Names of site people, the author and titled names become `[PERSON]` before classification and storage | `ai/nlp/text.py: redact`, `services/issue_service.py` | `test_names_are_redacted_before_storage`, `test_report_nlp.py` |
+| Personal data in free text | Names of site people, the author, titled names and common Sri Lankan names (any case) become `[PERSON]` before classification and storage; only the weather client may call out of the server | `ai/nlp/text.py: redact`, `ai/nlp/names_lk.txt`, `services/issue_service.py` | `test_names_are_redacted_before_storage`, `test_report_nlp.py`, `test_outbound_calls.py`, ML `test_the_name_list_holds_no_word_from_the_report_data` |
 | Supply chain | Pinned deps, Dependabot (pip, npm, actions, docker), pip-audit, npm audit, dependency review, CodeQL `security-extended`, actions pinned to SHAs, `permissions: contents: read`, `persist-credentials: false` | `.github/` | CI |
 
 ## Phase 7 review: 2026-10-11
@@ -81,7 +81,8 @@ issue features, the AI check screen and the stop-work banner.
 ### Privacy and responsible AI
 
 - Names are redacted to `[PERSON]` before anything else: people on the project's site, the author,
-  and titled names ("Mr Perera", "supervisor Nimal"). The stored snippet is the redacted sentence.
+  titled names ("Mr Perera", "supervisor Nimal") and common Sri Lankan names without a title
+  ("sunil absent"). The stored snippet is the redacted sentence.
 - No real report text was used for training. The training data is synthetic, and the test sentences
   were written by the project.
 - Each issue keeps what the AI said beside what the author confirmed, with the model version, so
@@ -91,12 +92,13 @@ issue features, the AI check screen and the stop-work banner.
 
 ### Verification beyond unit tests
 
-- **Mutation checks: 14 of 14** deliberate faults fail a test. These cover low-confidence never
+- **Mutation checks: 17 of 17** deliberate faults fail a test. These cover low-confidence never
   flagged, names reaching the classifier, repetition not raising severity, injury not high,
   unkept suggestions confirmed, anyone clearing stop-work, stop-work without a safety issue,
   re-analysing after confirming, a non-author confirming, no re-score after confirming,
-  suggestions counted as risk inputs, the hash not checked, a follow-up from another project, and
-  the backend copy of the severity rules drifting from `ml/`.
+  suggestions counted as risk inputs, the hash not checked, a follow-up from another project,
+  the backend copy of the severity rules drifting from `ml/`, the common-name list switched off, an
+  everyday word added to it, and a new module importing a network client.
 - **Race, against the running API:** two simultaneous confirmations of the same report. Without the
   fix, both succeeded (3 of 3 runs), doubling the stop-work flag, the PM alert and the
   notifications. With it: 200 and 409, one of each (3 of 3).
@@ -131,13 +133,18 @@ issue features, the AI check screen and the stop-work banner.
 7. **The 8-bit model was batch-dependent.** Found while exporting: its activations are quantised per
    input, so a sentence's score changed with its neighbours (0.087 on the golden rows). Full
    precision ships, and a test checks a sentence scores the same alone or in a batch.
+8. **Redaction missed untitled first names** ([#23](https://github.com/whoispasindu/SiteSense/issues/23)).
+   A worker without an account, named without a title ("sunil absent"), was stored as written.
+   Redaction now also removes 236 common Sri Lankan given names and surnames in any case. The list
+   shares no word with the 1,719 data sentences (tested) and holds no ordinary English word.
+   A new test lists every module that imports a network client (today only the weather client) and
+   fails if another appears, so report text cannot reach an outside service without review.
+   Mutation-checked: switching the list off fails 7 tests; adding a network import fails the guard.
 
 ### Open items
 
-- **Redaction misses unknown first names.** A worker who is not an app user and is named without a
-  title ("sunil absent") is not redacted. Options: a site's worker list, or a name recogniser.
-  No report text may go to an external service until this is fixed
-  ([#23](https://github.com/whoispasindu/SiteSense/issues/23)).
+- A rare name that is not on the list and has no title still gets through redaction; a site worker
+  list or a local name recogniser would close that gap.
 - Measure the classifier on real, consented, confirmed tags before trusting the numbers.
 - BR-11 blocking of related programme tasks: Phase 9.
 - Memory: each API worker holds the 266 MB model. Size the workers accordingly, or move tagging to a

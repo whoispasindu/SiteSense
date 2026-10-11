@@ -1,21 +1,25 @@
 """Text handling for report issue tagging: split a report's problems into sentences, redact names.
 
 Pure functions (no database). People's names are replaced with ``[PERSON]`` before a sentence is
-classified or stored, so no name reaches a model input, an issue row or a log. Two kinds of names
-are caught:
+classified or stored, so no name reaches a model input, an issue row, a log or (later) any outside
+service. Three kinds of names are caught:
 
 - the names of people the app knows on the project's site (their full names and each part of
   three letters or more), passed in by the caller;
-- a capitalised word after a title or a site role ("Mr Perera", "foreman Sunil", "baas Nimal").
+- a capitalised word after a title or a site role ("Mr Perera", "foreman Sunil", "baas Nimal");
+- common Sri Lankan given names and surnames in any case, with or without a title ("sunil absent"),
+  from ``names_lk.txt``. That list holds only names that are not also everyday words.
 
-It cannot catch every name in free text (an unknown name with no title or role); the labelling guide
-and the model card say so. Company names are not people and are left alone.
+A rare name that is in none of these still gets through; the model card says so. Company names are
+left alone, except a listed name inside one ("Gamage Hardware" becomes "[PERSON] Hardware"): when
+unsure, a word is removed rather than kept.
 """
 
 from __future__ import annotations
 
 import re
 from collections.abc import Iterable
+from pathlib import Path
 
 PERSON = "[PERSON]"
 MAX_SENTENCES = 20
@@ -105,8 +109,27 @@ def _known_names(full_names: Iterable[str]) -> list[str]:
     return sorted(names, key=len, reverse=True)
 
 
+def _load_common_names(path: Path) -> re.Pattern[str]:
+    names = set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        name = line.strip()
+        if not name or name.startswith("#"):
+            continue
+        if not re.fullmatch(r"[a-z]{3,}", name) or name in _COMMON:
+            raise ValueError(f"{path.name}: {name!r} must be a lower-case name of 3+ letters, not a word.")
+        names.add(name)
+    alternatives = "|".join(sorted(names, key=len, reverse=True))
+    return re.compile(rf"(?<![\w\[])(?:{alternatives})(?![\w\]])", re.I)
+
+
+_COMMON_NAME = _load_common_names(Path(__file__).with_name("names_lk.txt"))
+_ADJACENT = re.compile(rf"{re.escape(PERSON)}(?:\s+{re.escape(PERSON)})+")
+
+
 def redact(text: str, people: Iterable[str] = ()) -> str:
-    """Replace people's names with [PERSON]."""
+    """Replace people's names with [PERSON]; a full name becomes a single [PERSON]."""
     for name in _known_names(people):
         text = re.sub(rf"(?<![\w\[]){re.escape(name)}(?![\w\]])", PERSON, text, flags=re.I)
-    return _TITLED_NAME.sub(lambda m: f"{m.group(1)} {PERSON}", text)
+    text = _TITLED_NAME.sub(lambda m: f"{m.group(1)} {PERSON}", text)
+    text = _COMMON_NAME.sub(PERSON, text)
+    return _ADJACENT.sub(PERSON, text)

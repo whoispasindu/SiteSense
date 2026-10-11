@@ -54,8 +54,11 @@ Repetition is judged on the sentence with the repeat words removed, then raised 
 stopped work is high. On the test set the rules lift severity from 0.467 to 0.500.
 
 **Names are redacted first.** Before classification or storage, names of people on the project's
-site, the author's name and titled names become `[PERSON]`. The stored snippet is the redacted
-sentence. Company names stay.
+site, the author's name, titled names and common Sri Lankan given names and surnames (a local list,
+`names_lk.txt`, matched in any case) become `[PERSON]`. The stored snippet is the redacted sentence.
+The list was chosen over a per-site worker list, which would need upkeep and would itself be
+personal data. Only the weather client may call out of the server, enforced by a test, so report
+text cannot quietly reach an outside service.
 
 **Suggest, then confirm.** Analysis stores suggestions only. The author confirms (keep, edit,
 remove, add) and ticks follow-ups, all unticked by default. Only the author, on the day of the

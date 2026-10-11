@@ -83,14 +83,23 @@ round number, not tuned on any data. Flagging catches half the mistakes for a fi
 
 ## Responsible use
 
-- **Names are removed before anything else.** Names of people on the project's site, the author's,
-  and titled names ("Mr Perera") become `[PERSON]` before the text is classified or stored. Company
-  names stay. An untitled first name of someone without an account ("sunil absent") is not yet
-  removed, so no report text may go to an external service until
-  [#23](https://github.com/whoispasindu/SiteSense/issues/23) is fixed.
+- **Names are removed before anything else.** These become `[PERSON]` before the text is
+  classified or stored:
+  - names of people on the project's site, and the author's;
+  - titled names ("Mr Perera", "baas Nimal");
+  - 236 common Sri Lankan given names and surnames, in any case and without a title ("sunil absent",
+    [#23](https://github.com/whoispasindu/SiteSense/issues/23)).
+
+  The name list holds no word from the 1,719 training, validation and test sentences (a test checks
+  this), and none that is an ordinary English word. Company names stay, except a listed surname
+  inside one ("Gamage Hardware" becomes "[PERSON] Hardware"): when unsure, a word is removed. A rare
+  name in none of these still gets through. The only module that calls out of the server is the
+  weather client, and a test fails if another one appears before someone checks what it sends.
 - The AI suggests; the author decides. Each stored issue keeps what the AI said (category, severity,
   confidence, model version) beside what the author confirmed, so disagreement can be measured.
-- Only the author can analyse and confirm, on the day of the report.
+- Only the author can analyse and confirm, on the day of the report. A tag not confirmed that day
+  is lost; a 24-hour window or PM confirmation is proposed in
+  [#24](https://github.com/whoispasindu/SiteSense/issues/24).
 - Issues describe the work, never a person's performance.
 
 ## Limitations
@@ -102,6 +111,10 @@ round number, not tuned on any data. Flagging catches half the mistakes for a fi
   trusting these numbers.
 - **Code-mixing is shallow.** Only common Sinhala and Tamil words written in English letters are
   covered. Sinhala or Tamil script is not.
+- **`[PERSON]` lowers confidence.** The model never saw it in training, so sentences with a
+  redacted name score lower (for example 0.52 for "[PERSON] absent", which is still tagged labour)
+  and are more often highlighted for the author to check. The next retraining should put
+  `[PERSON]` into the generated sentences.
 - **One label per sentence.** A sentence with two problems gets the one that matters most, as the
   labelling guide says. The author can add the second.
 - **Severity is weak** (above).

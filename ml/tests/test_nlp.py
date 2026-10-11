@@ -98,3 +98,25 @@ def test_the_backend_copy_of_the_rules_is_the_same_code() -> None:
     backend = Path(__file__).parents[2] / "backend" / "app" / "ai" / "nlp" / "rules.py"
 
     assert _code_without_docstring(Path(rules.__file__)) == _code_without_docstring(backend)
+
+
+def test_the_name_list_holds_no_word_from_the_report_data() -> None:
+    """Issue #23: the backend redacts these names in any case, so none may be an everyday word.
+
+    Any word of the training, validation or hand-written test sentences counts as everyday.
+    """
+    names_file = Path(__file__).parents[2] / "backend" / "app" / "ai" / "nlp" / "names_lk.txt"
+    names = {
+        line.strip()
+        for line in names_file.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.startswith("#")
+    }
+    words = {
+        word
+        for name in ("train.csv", "val.csv", "test_handwritten.csv")
+        for row in rows(name)
+        for word in re.findall(r"[a-z]+", row["text"].lower())
+    }
+
+    assert len(names) > 200
+    assert names.isdisjoint(words), sorted(names & words)
