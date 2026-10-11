@@ -8,6 +8,16 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Phase 10, risk model v2 (in progress):
+  - **Risk model 1.2.0: rain now counts** ([#27](https://github.com/whoispasindu/SiteSense/issues/27),
+    [model card](docs/model-card-risk.md#rain-an-assumption-not-measured-data)). The simulator
+    assumes programmes allow for half of a town's usual rain (`RAIN_ALLOWANCE`, an assumption, not
+    measured data), loses work by rain intensity and on the day after heavy rain, and is recalibrated
+    so the median project is still 10% late. A new input, `wet_days_ahead`, is the heavy-rain days
+    expected from the site's climate (nearest of seven towns, shipped with the backend) until the
+    planned end. Rain's share of the delay model goes from 0.0% to 12.7% (8.3% if programmes allow
+    three quarters; `ml/rain_sensitivity.py`). The risk panel shows it as "Wet season ahead".
+
 - Phase 9, advanced schedule ([ADR 0012](docs/adr/0012-critical-path-calendar-weather-stop-work.md)):
   - **Task links and the critical path:** the PM links tasks finish-to-start, with a lag in working
     days. Loops are refused. The critical path is calculated with a two-pass CPM written from scratch.

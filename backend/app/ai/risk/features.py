@@ -12,6 +12,8 @@ takes its neutral value and a note says so, so the score is still produced but t
     late_deliveries_count  order lines delivered after, or still overdue past, their expected date
     avg_lateness_days      mean lateness of those lines
     rain_days_next_14      forecast days with heavy rain (BR-06: 10 mm or more) in the next 14 days
+    wet_days_ahead         heavy-rain working days expected from the site's climate (nearest of seven
+                           towns) from tomorrow to the planned end, at least the next 28 days (1.2)
     budget_variance_pct    committed cost against the budgeted value of the same work, % over
     crew_vs_plan_pct       average reported crew over the last 14 days against the planned crew, %
     missing_reports_14     working days (Mon to Sat) in the last 14 without a daily report (BR-07)
@@ -31,6 +33,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.ai.risk import climate
 from app.models import (
     DailyReport,
     Delivery,
@@ -55,6 +58,7 @@ FEATURE_NAMES = (
     "late_deliveries_count",
     "avg_lateness_days",
     "rain_days_next_14",
+    "wet_days_ahead",
     "budget_variance_pct",
     "crew_vs_plan_pct",
     "missing_reports_14",
@@ -164,6 +168,16 @@ def _rain(db: Session, project: Project, on: date, notes: list[str]) -> float:
     return heavy * FORECAST_DAYS / len(rows)
 
 
+def _wet_days_ahead(project: Project, on: date, notes: list[str]) -> float:
+    site = project.site
+    if site.latitude is None or site.longitude is None:
+        notes.append("The site has no coordinates: rain ahead uses Sri Lanka's average climate.")
+        town = climate.national_average()
+    else:
+        town = climate.nearest(site.latitude, site.longitude).town
+    return climate.wet_days_ahead(town, on, project.planned_end)
+
+
 def _cost(db: Session, project: Project) -> float:
     committed, budgeted = committed_against_budget(db, project.id)
     if budgeted <= 0:
@@ -237,6 +251,7 @@ def build(db: Session, project: Project, on: date) -> FeatureSet:
         "late_deliveries_count": late_count,
         "avg_lateness_days": lateness,
         "rain_days_next_14": _rain(db, project, on, notes),
+        "wet_days_ahead": _wet_days_ahead(project, on, notes),
         "budget_variance_pct": _cost(db, project),
         "crew_vs_plan_pct": crew,
         "missing_reports_14": missing,

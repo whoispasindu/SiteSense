@@ -11,8 +11,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-MODEL = Path(__file__).parent.parent / "backend" / "app" / "ai" / "risk" / "models" / "risk-v1.1.0.json"
-METRICS = Path(__file__).parent / "models" / "risk-v1.1.0" / "metrics.json"
+MODEL = Path(__file__).parent.parent / "backend" / "app" / "ai" / "risk" / "models" / "risk-v1.2.0.json"
+METRICS = Path(__file__).parent / "models" / "risk-v1.2.0" / "metrics.json"
 TOLERANCE = 0.01  # days / percentage points
 
 

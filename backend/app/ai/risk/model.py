@@ -26,7 +26,7 @@ from typing import Any
 
 MODELS_DIR = Path(__file__).parent / "models"
 MODEL_FORMAT = "sitesense-gbdt-v1"
-CURRENT_VERSION = "1.1.0"
+CURRENT_VERSION = "1.2.0"
 # Hard limits: a model file outside them is refused rather than trusted.
 MAX_TREES = 5000
 MAX_NODES = 1 << 16

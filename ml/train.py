@@ -43,7 +43,7 @@ from data_generator.simulate import FEATURES, TARGETS, risk_score
 ML = Path(__file__).parent
 DATA = ML / "data" / "snapshots.csv"
 BACKEND_MODELS = ML.parent / "backend" / "app" / "ai" / "risk" / "models"
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 SEED = 2026
 BANDS = ("low", "medium", "high")
 
@@ -55,6 +55,7 @@ MONOTONE: dict[str, dict[str, int]] = {
         "late_deliveries_count": 1,
         "avg_lateness_days": 1,
         "rain_days_next_14": 1,
+        "wet_days_ahead": 1,
         "crew_vs_plan_pct": -1,
         "missing_reports_14": 1,
         "issues_material_14": 1,
@@ -64,6 +65,7 @@ MONOTONE: dict[str, dict[str, int]] = {
     "overrun_pct": {
         "progress_gap_pct": -1,
         "budget_variance_pct": 1,
+        "wet_days_ahead": 1,
         "late_deliveries_count": 1,
         "avg_lateness_days": 1,
         "issues_design_14": 1,
@@ -186,13 +188,8 @@ def backtest(test: pd.DataFrame, predicted: np.ndarray) -> dict[str, Any]:
     }
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Train and export risk model v1")
-    parser.add_argument("--data", type=Path, default=DATA)
-    args = parser.parse_args(argv)
-
-    data = pd.read_csv(args.data)
-    data_hash = hashlib.sha256(args.data.read_bytes()).hexdigest()
+def train_and_evaluate(data: pd.DataFrame) -> tuple[dict[str, lgb.Booster], dict[str, Any], pd.DataFrame]:
+    """Grouped split, tuning, training and every held-out metric: the boosters, the report, the test rows."""
     split = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=SEED)
     train_idx, test_idx = next(split.split(data, groups=data["project_id"]))
     train, test = data.iloc[train_idx], data.iloc[test_idx]
@@ -268,6 +265,18 @@ def main(argv: list[str] | None = None) -> int:
         for stage in stages.cat.categories
         if (stages == stage).any()
     }
+    return boosters, report, test
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Train and export the risk model")
+    parser.add_argument("--data", type=Path, default=DATA)
+    args = parser.parse_args(argv)
+
+    data = pd.read_csv(args.data)
+    data_hash = hashlib.sha256(args.data.read_bytes()).hexdigest()
+    boosters, report, test = train_and_evaluate(data)
+    train = data[~data.index.isin(test.index)]
 
     # Golden rows: LightGBM's own predictions, which the backend's JSON scorer must reproduce.
     golden_x = test.sample(25, random_state=SEED)[list(FEATURES)]

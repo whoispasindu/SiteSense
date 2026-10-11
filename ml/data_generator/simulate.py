@@ -41,6 +41,22 @@ PROJECT_TYPES = ("residential", "commercial", "mixed_use", "industrial", "instit
 HEAVY_RAIN_MM = 10.0  # BR-06: heavy rain is 10 mm or more in a day
 WORKING_DAYS = 6  # Monday to Saturday, the usual site week in Sri Lanka
 
+# Rain (see ASSUMPTIONS.md). Share of a working day lost by the day's rain, highest band first.
+RAIN_BANDS: tuple[tuple[float, float], ...] = ((25.0, 0.8), (HEAVY_RAIN_MM, 0.45), (2.0, 0.1))
+RAIN_LINGER = 0.25  # share of the next day also lost after heavy rain (wet ground, dewatering, access)
+# ASSUMPTION, NOT MEASURED: the share of the town's usual rain loss for the month that programmes
+# allow for. Half means programmes under-allow for the monsoon, as Sri Lankan delay surveys suggest.
+# Replace with contractor figures when available. The model card reports the results at 0.75 too.
+RAIN_ALLOWANCE = 0.5
+# Sensitivity by share of the work done, as (up to, factor): earthworks and substructure, the
+# frame, closed in.
+RAIN_STAGES: tuple[tuple[float, float], ...] = ((0.3, 1.2), (0.6, 1.0), (1.0, 0.4))
+# Base pace of work against the programme, before rain, crew and materials (1.0 = exactly on plan).
+# Calibrated (``--calibrate``) so the median project ends 10% of its planned duration late, as in
+# risk model v1: the rain assumptions change what explains delay, not how late projects are.
+BASE_PACE = 1.096
+TARGET_MEDIAN_DELAY_PCT = 10.0
+
 FEATURES = (
     "elapsed_pct",  # days since start / planned duration x 100 (over 100 once past the planned end)
     "planned_duration_days",
@@ -49,6 +65,7 @@ FEATURES = (
     "late_deliveries_count",  # deliveries that arrived after, or are still overdue past, the expected date
     "avg_lateness_days",  # mean lateness of those deliveries
     "rain_days_next_14",  # forecast days with heavy rain in the next 14 days
+    "wet_days_ahead",  # heavy-rain working days expected, from the local climate, until the planned end
     "budget_variance_pct",  # committed cost against the budgeted value of the same work, % over
     "crew_vs_plan_pct",  # average reported crew over the last 14 days against the planned crew, %
     "missing_reports_14",  # working days in the last 14 days without a daily report (BR-07)
@@ -142,25 +159,68 @@ class Week:
     features: dict[str, float]
 
 
-def lost_day(mm: float) -> float:
-    """Share of a working day lost to rain."""
-    return 0.7 if mm >= HEAVY_RAIN_MM else 0.15 if mm >= 2.0 else 0.0
+def lost_day(mm: float, yesterday_mm: float = 0.0) -> float:
+    """Share of a working day lost to its own rain, plus the lingering effect of heavy rain the day before."""
+    own = next((share for floor, share in RAIN_BANDS if mm >= floor), 0.0)
+    linger = RAIN_LINGER if yesterday_mm >= HEAVY_RAIN_MM else 0.0
+    return min(own + linger, 1.0)
+
+
+def rain_on(rain: dict[date, float], day: date) -> float:
+    """A day's rain, and the day before's (for the lingering effect)."""
+    return lost_day(rain.get(day, 0.0), rain.get(day - timedelta(days=1), 0.0))
 
 
 def normal_lost_by_month(rain: dict[date, float]) -> dict[int, float]:
     """The town's average share of a day lost to rain, per calendar month (what a programme allows for)."""
     totals: dict[int, list[float]] = {}
-    for day, mm in rain.items():
-        totals.setdefault(day.month, []).append(lost_day(mm))
+    for day in rain:
+        totals.setdefault(day.month, []).append(rain_on(rain, day))
     return {month: float(np.mean(values)) for month, values in totals.items()}
 
 
+def stage_sensitivity(stage: float) -> float:
+    return next((factor for upto, factor in RAIN_STAGES if stage < upto), RAIN_STAGES[-1][1])
+
+
+def heavy_rain_climate(rain: dict[date, float]) -> dict[int, float]:
+    """The town's share of days with heavy rain, per calendar month (its long-term climate).
+
+    Rounded to 4 decimals: the backend scores with exactly these numbers (``rain_climate.json``).
+    """
+    days: dict[int, list[bool]] = {}
+    for day, mm in rain.items():
+        days.setdefault(day.month, []).append(mm >= HEAVY_RAIN_MM)
+    return {month: round(float(np.mean(values)), 4) for month, values in sorted(days.items())}
+
+
+def wet_days_ahead(climate: dict[int, float], today: date, planned_end: date) -> float:
+    """Heavy-rain working days (Mon to Sat) expected from tomorrow to the planned end, from the climate.
+
+    Never less than the next 28 days, so a project past its planned end still sees the season ahead.
+    Mirrored in backend/app/ai/risk/features.py.
+    """
+    last = max(planned_end, today + timedelta(days=28))
+    total = 0.0
+    day = today + timedelta(days=1)
+    while day <= last:
+        if day.weekday() < WORKING_DAYS:
+            total += climate[day.month]
+        day += timedelta(days=1)
+    return total
+
+
 def simulate(
-    project: Project, rain: dict[date, float], normal_lost: dict[int, float], rng: np.random.Generator
+    project: Project,
+    rain: dict[date, float],
+    normal_lost: dict[int, float],
+    climate: dict[int, float],
+    rng: np.random.Generator,
 ) -> tuple[list[Week], dict[str, float]]:
     """Run one project to completion. Returns weekly feature snapshots and the final outcome."""
     W = float(project.planned_weeks)
     planned_days = project.planned_weeks * 7
+    planned_end = project.start + timedelta(days=planned_days - 1)
     budget = project.contract_value_m * 0.82  # cost budget: contract value less margin and contingency
     overhead_per_week = 0.10 * budget / W  # time-related costs (site staff, cranes, hoarding), 10% of budget
 
@@ -197,12 +257,12 @@ def simulate(
                     late = 1 + round(rng.gamma(2.0, 3.0) * (1.5 - project.quality))
                 project.deliveries.append(Delivery(expected, expected + timedelta(days=late)))
 
-        # Rain: heavy days lose most of a day's work, wet days a little. Programmes already allow for the
-        # usual weather of the town and month, so only rain beyond that slows the job (and a dry spell
-        # helps). Less effect once the building is closed in.
-        lost = sum(lost_day(rain.get(week_start + timedelta(days=d), 0.0)) for d in range(WORKING_DAYS))
-        excess = lost - WORKING_DAYS * normal_lost[week_start.month]
-        rain_factor = 1 - (excess / WORKING_DAYS) * (1.0 if stage < 0.6 else 0.5)
+        # Rain: heavy days lose most of a day's work, wet days a little. Programmes allow for part of the
+        # usual weather of the town and month (RAIN_ALLOWANCE), so rain beyond that slows the job (and a
+        # dry spell helps). The effect depends on the stage: less once the building is closed in.
+        lost = sum(rain_on(rain, week_start + timedelta(days=d)) for d in range(WORKING_DAYS))
+        excess = lost - WORKING_DAYS * RAIN_ALLOWANCE * normal_lost[week_start.month]
+        rain_factor = 1 - (excess / WORKING_DAYS) * stage_sensitivity(stage)
 
         # Crew: drifts around a level set by management quality, with occasional shortages.
         if shortage_weeks == 0 and rng.random() < 0.04 + 0.04 * (1 - project.quality):
@@ -217,7 +277,7 @@ def simulate(
         overdue = sum(1 for d in project.deliveries if d.expected <= week_end and d.arrives > week_end)
         material_factor = 1 - min(0.04 * overdue, 0.4)
 
-        base = rng.normal(1.0 + 0.12 * (project.quality - 0.7), 0.03)
+        base = rng.normal(BASE_PACE + 0.12 * (project.quality - 0.7), 0.03)
         efficiency = max(base * rain_factor * crew_factor * material_factor + rng.normal(0, 0.04), 0.05)
 
         # Variations: extra scope (work and cost) the original plan never had.
@@ -306,6 +366,7 @@ def simulate(
             "late_deliveries_count": float(len(lateness)),
             "avg_lateness_days": float(np.mean(lateness)) if lateness else 0.0,
             "rain_days_next_14": float(forecast),
+            "wet_days_ahead": wet_days_ahead(climate, snapshot, planned_end),
             "budget_variance_pct": variance_pct,
             "crew_vs_plan_pct": float(crew_pct),
             "missing_reports_14": float(sum(1 for c in last_12 if c is None)),
@@ -335,12 +396,14 @@ def generate(n_projects: int, seed: int, rainfall: dict[str, dict[date, float]])
     rng = np.random.default_rng(seed)
     towns = sorted(rainfall)
     normals = {town: normal_lost_by_month(series) for town, series in rainfall.items()}
+    climates = {town: heavy_rain_climate(series) for town, series in rainfall.items()}
     last_rain_day = min(max(days) for days in rainfall.values())
     rows: list[dict[str, object]] = []
     for project_id in range(1, n_projects + 1):
         # Leave room for the plan and a long overrun inside the rainfall history.
         project = draw_project(rng, project_id, towns, last_rain_day - timedelta(days=4 * 365))
-        weeks, outcome = simulate(project, rainfall[project.town], normals[project.town], rng)
+        town = project.town
+        weeks, outcome = simulate(project, rainfall[town], normals[town], climates[town], rng)
         score = risk_score(outcome["delay_days"], outcome["overrun_pct"], project.planned_weeks * 7)
         for w in weeks:
             rows.append(
@@ -358,12 +421,45 @@ def generate(n_projects: int, seed: int, rainfall: dict[str, dict[date, float]])
     return rows
 
 
+def median_delay_pct(rows: list[dict[str, object]]) -> float:
+    """Median final delay as % of the planned duration, one value per project."""
+    finals = {r["project_id"]: r for r in rows}.values()
+    return float(
+        np.median([100 * float(r["delay_days"]) / float(r["planned_duration_days"]) for r in finals])
+    )
+
+
+def calibrate_pace(n_projects: int, seed: int, rainfall: dict[str, dict[date, float]]) -> float:
+    """The BASE_PACE giving a median delay of TARGET_MEDIAN_DELAY_PCT, found by bisection, to 3 decimals."""
+    global BASE_PACE
+    saved = BASE_PACE
+    low, high = 0.9, 1.3
+    try:
+        while high - low > 0.0005:
+            BASE_PACE = (low + high) / 2
+            if median_delay_pct(generate(n_projects, seed, rainfall)) > TARGET_MEDIAN_DELAY_PCT:
+                low = BASE_PACE  # still too late: work faster
+            else:
+                high = BASE_PACE
+        return round((low + high) / 2, 3)
+    finally:
+        BASE_PACE = saved
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     parser.add_argument("--projects", type=int, default=300)
     parser.add_argument("--seed", type=int, default=2026)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--calibrate", action="store_true", help="print the BASE_PACE for the target delay")
     args = parser.parse_args(argv)
+
+    if args.calibrate:
+        pace = calibrate_pace(args.projects, args.seed, load_rainfall())
+        print(
+            f"BASE_PACE = {pace} gives a median delay of {TARGET_MEDIAN_DELAY_PCT}% of the planned duration"
+        )
+        return 0
 
     rows = generate(args.projects, args.seed, load_rainfall())
     args.output.parent.mkdir(parents=True, exist_ok=True)

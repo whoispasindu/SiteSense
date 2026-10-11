@@ -280,8 +280,8 @@ docs/           architecture, decision records, security reviews, model cards
 | 6 | Demo data and risk model v1 → **v0.1 MVP** | Done |
 | 7 | Report NLP classifier | Done |
 | 8 | Cost control, claims and variations | Done |
-| 9 | Advanced schedule | In review |
-| 10 | Risk model v2, what-if planner and supplier model | Planned |
+| 9 | Advanced schedule | Done |
+| 10 | Risk model v2, what-if planner and supplier model | In progress |
 | 11 | Dashboard, alerts and AI briefing | Planned |
 | 12 | Client portal | Planned |
 | 13 | Hardening and deployment | Planned |

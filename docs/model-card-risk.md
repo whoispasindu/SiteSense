@@ -1,11 +1,11 @@
-# Model card: delay and cost-overrun risk, v1.1.0
+# Model card: delay and cost-overrun risk, v1.2.0
 
 | | |
 | --- | --- |
 | Model | Two gradient-boosted tree ensembles (LightGBM 4.7): final **delay in days** and final **cost overrun in %** |
-| Version | 1.1.0, trained 2026-10-10. Model file: `backend/app/ai/risk/models/risk-v1.1.0.json`. See [Changes](#changes) |
+| Version | 1.2.0, trained 2026-10-11. Model file: `backend/app/ai/risk/models/risk-v1.2.0.json`. See [Changes](#changes) |
 | Training code | `ml/data_generator/simulate.py`, `ml/train.py`. Exploration: `ml/notebooks/01_explore.ipynb` |
-| Training data | **Synthetic**: 300 simulated projects, 18,329 weekly snapshots, real Open-Meteo rainfall. See [Data](#data) |
+| Training data | **Synthetic**: 300 simulated projects, 18,153 weekly snapshots, real Open-Meteo rainfall. Rain's effect rests on an **assumed** allowance; see [Rain](#rain-an-assumption-not-measured-data) |
 | Owner | SiteSense project. Retrained weekly once real completed projects exist (guide, section 4.6) |
 
 ## What it is for
@@ -35,6 +35,7 @@ simulator. When the app has no data for an input it takes a neutral value and th
 | `progress_gap_pct`, `progress_rate_trend` | Programme tasks and progress snapshots | 0 (no programme) |
 | `late_deliveries_count`, `avg_lateness_days` | Purchase orders and deliveries | 0 |
 | `rain_days_next_14` | 14-day forecast cache (heavy rain is 10 mm or more, BR-06) | 0 (scaled if fewer days are cached) |
+| `wet_days_ahead` (1.2) | The site's rain climate: for the nearest of seven towns, the share of heavy-rain days in each month (Open-Meteo, 2012 to 2025, `backend/app/ai/risk/rain_climate.json`), summed over the working days from tomorrow to the planned end, at least the next 28 days. Computed locally; nothing is fetched | Sri Lanka's average climate (site without coordinates) |
 | `budget_variance_pct` | Committed requests against the budgeted value of the same quantities | 0 (nothing committed) |
 | `crew_vs_plan_pct` | Daily report crews against the project's planned crew | 0 (no planned crew set) |
 | `missing_reports_14` | Daily reports (BR-07) | |
@@ -59,20 +60,66 @@ Not yet used: variation counts (Phase 8).
 
 | Target | Model | MAE | RMSE | R² |
 | --- | --- | --- | --- | --- |
-| Delay (days) | LightGBM | **19.8** | **29.2** | **0.58** |
-| Delay (days) | Linear baseline | 25.5 | 34.6 | 0.42 |
-| Overrun (%) | LightGBM | **5.5** | **7.7** | **0.23** |
-| Overrun (%) | Linear baseline | 5.7 | 8.0 | 0.18 |
+| Delay (days) | LightGBM | **19.1** | **25.5** | **0.65** |
+| Delay (days) | Linear baseline | 22.6 | 29.1 | 0.54 |
+| Overrun (%) | LightGBM | 4.8 | 6.2 | 0.22 |
+| Overrun (%) | Linear baseline | **4.7** | **6.1** | **0.27** |
 
-- **High band:** F1 0.61 (baseline 0.46); macro F1 across the three bands 0.58.
-- **Getting better as a project runs:** delay MAE is 29 days in the first quarter and 13 days in the last.
-- **Backtest:** of 16 held-out projects that ended High, 15 were flagged High at some point, at a
-  median of 54% of the planned duration, 28 weeks before the planned end. 1 of the 28 projects that
-  ended Low was flagged High at some point (a false alarm; 3 in v1.0).
-- **What the delay model leans on most** (share of gain): progress gap 31%, planned duration 21%,
-  time elapsed 19%, contract size 11%, delivery lateness 5%.
+- **High band:** F1 0.57 (baseline 0.59); macro F1 across the three bands 0.58.
+- **Getting better as a project runs:** delay MAE is 27 days in the first quarter and 13 days in the last.
+- **Backtest:** of 23 held-out projects that ended High, 22 were flagged High at some point, at a
+  median of 52% of the planned duration, 30 weeks before the planned end. 1 of the 22 projects that
+  ended Low was flagged High at some point (a false alarm).
+- **What the delay model leans on most** (share of gain): progress gap 36%, time elapsed 19%, planned
+  duration 13%, contract size 13%, **wet season ahead 12%**, delivery lateness 3%.
+- **The linear baseline does slightly better on overrun and on the High band** in this run. With 60
+  test projects the difference is within noise, and the trees keep the monotone constraints and the
+  drivers. Risk model v2 (later in Phase 10) revisits the overrun model.
+
+These are not directly comparable with v1.1's results: the rain change gives a different simulated
+set (23 of the 60 test projects end High, against 16). The comparison that isolates the change is
+below.
+
+## Rain: an assumption, not measured data
+
+In v1.1 rain held 0.0% of the delay model's gain. The model was right, given the simulator: it
+assumed programmes allow for all of a town's usual rain, so only wetter-than-normal weeks slowed work,
+and over a project that evened out. Surveys of Sri Lankan building projects rank rainy weather as a
+leading cause of delay, which suggests the opposite. Version 1.2 changes the simulator
+([ASSUMPTIONS.md](../ml/data_generator/ASSUMPTIONS.md#rain-risk-model-12), issue
+[#27](https://github.com/whoispasindu/SiteSense/issues/27)):
+
+- **`RAIN_ALLOWANCE = 0.5`: programmes allow for half of the usual rain loss for the month.** This is
+  an **assumption chosen by the project owner, not measured data.** It is a named simulator parameter
+  and will be replaced with contractor figures when they exist.
+- Rain intensity matters (2–10 mm loses 10% of a day, 10–25 mm 45%, 25 mm or more 80%), a quarter of
+  the day after heavy rain is lost too, and earthworks suffer more than a closed-in building.
+- The base pace is recalibrated so the median project is still 10% late, as in v1. Rain changes
+  **what explains** delay, not how late projects are.
+- A new input, `wet_days_ahead`, gives the model the season still to come. The 14-day forecast stays
+  small (0.5%): two weeks of weather barely move a final delay.
+
+**Same data, with and without `wet_days_ahead`:** delay MAE 20.1 to 19.1 days, R² 0.61 to 0.65, High
+F1 0.54 to 0.57. High projects are flagged earlier, at a median of 52% of the planned duration
+instead of 58% (30 weeks before the planned end, instead of 27), with 1 false alarm instead of 0.
+
+**Sensitivity to the assumption** (`ml/rain_sensitivity.py`, `ml/models/risk-v1.2.0/rain-sensitivity.json`).
+The whole pipeline run again with programmes allowing three quarters of the usual rain, with the pace
+recalibrated (1.046 instead of 1.096):
+
+| Allowance | Rain's share of delay gain | Delay MAE | High F1 | Final bands L / M / H |
+| --- | --- | --- | --- | --- |
+| **0.5 (shipped)** | **12.7%** (wet season 12.2, forecast 0.5) | 19.1 | 0.57 | 40% / 31% / 29% |
+| 0.75 | 8.3% (8.1, 0.2) | 18.4 | 0.58 | 41% / 33% / 25% |
+
+So rain's weight depends on the assumption (a third less at 0.75) but does not vanish. In the demo
+data, the wet season ahead is now the largest driver for the two wet-zone projects (Galle and
+Colombo), and lowers the forecast for the Kandy project, whose remaining programme is drier.
 
 ## Changes
+
+**1.2.0 (Phase 10, issue #27).** Rain (above): the simulator's rain rule, a recalibrated pace, and
+the new `wet_days_ahead` input (monotone: more wet days ahead can only raise either forecast).
 
 **1.1.0 (Phase 7).** Adds the three report-issue counts. Their rules in the simulator are in
 `ASSUMPTIONS.md`: material delays follow overdue deliveries, safety issues follow poor site
@@ -101,11 +148,11 @@ records first, and real issues may carry more than simulated ones; real data wil
   point, so "4 points behind" can lower a forecast if typical projects are further behind by then.
   The screen says so.
 - **No ranges yet.** Likely ranges (quantile models) arrive with risk model v2 (Phase 10).
-- **Rain barely counts.** `rain_days_next_14` holds 0.0% of the delay model's gain, because the
-  simulator only slows work for rain beyond a town's usual weather for the month. The programme
-  forecast and BR-06 react to rain since Phase 9; the simulator's rain effect is to be reviewed before
-  the Phase 10 retrain ([#27](https://github.com/whoispasindu/SiteSense/issues/27)). Stopped working
-  days (BR-11) do reach the model, through the progress gap.
+- **Rain's weight is assumed.** It follows from `RAIN_ALLOWANCE`, which no contractor has confirmed
+  (see [Rain](#rain-an-assumption-not-measured-data) for how much it matters). The climate comes from
+  the nearest of seven towns, which is coarse for sites far from all of them (the hill country east
+  of Kandy, the north-west).
+- Stopped working days (BR-11) reach the model through the progress gap.
 
 ## Responsible use
 
@@ -121,5 +168,7 @@ records first, and real issues may carry more than simulated ones; real data wil
   assumptions and their sources are in `ASSUMPTIONS.md`. The generated file (`ml/data/`) is not
   committed; its SHA-256 is recorded in the model file and in `metrics.json`.
 - **Rainfall:** daily precipitation for seven Sri Lankan towns, 2012 to 2025, from the Open-Meteo
-  archive API (free, no key; CC BY 4.0). Committed as `ml/data_generator/rainfall.csv`.
+  archive API (free, no key; CC BY 4.0). Committed as `ml/data_generator/rainfall.csv`. The monthly
+  climate the app uses is derived from it (`python -m data_generator.climate`); a test checks the
+  backend's copy matches.
 - **No personal data** is used anywhere in training.

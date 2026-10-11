@@ -248,6 +248,7 @@ def test_drivers_are_limited() -> None:
         ("avg_lateness_days", 6.5, "6.5 days on average"),
         ("avg_lateness_days", 0, "none late"),
         ("rain_days_next_14", 6, "6 days in the next 14"),
+        ("wet_days_ahead", 41.6, "about 42 heavy-rain days expected in the rest of the programme"),
         ("budget_variance_pct", 3.1, "+3.1%"),
         ("crew_vs_plan_pct", -12, "-12% over the last 14 days"),
         ("missing_reports_14", 1, "1 day in the last 14"),
