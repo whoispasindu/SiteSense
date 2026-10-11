@@ -133,6 +133,9 @@ def _editable(db: Session, user: User, report_id: uuid.UUID) -> tuple[DailyRepor
     report, project = report_service.get_report(db, user, report_id)  # 404 outside the user's sites
     if not report_service.is_editable(report, user):
         raise ForbiddenError("Only the report's author can check its issues, on the day it was filed.")
+    # Lock the report so two analyses or confirmations (two tabs, a double submit) run one after the
+    # other: the second then sees the first's result and gets 409 instead of duplicating follow-ups.
+    db.execute(select(DailyReport.id).where(DailyReport.id == report.id).with_for_update())
     if _confirmed(_issues(db, report), _actions(db, report)):
         raise ConflictError("The issues in this report have already been confirmed.")
     return report, project

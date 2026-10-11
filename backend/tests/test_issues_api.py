@@ -98,6 +98,19 @@ def test_analysing_again_replaces_the_suggestions(
     assert {i["id"] for i in first["issues"]}.isdisjoint({i["id"] for i in second["issues"]})
 
 
+def test_analysis_is_rate_limited_per_client(
+    api: TestClient, report_project: Project, engineer: Person
+) -> None:
+    report_id = file_report(api, report_project, engineer, "Crane down")
+    statuses = [
+        api.post(f"/api/v1/reports/{report_id}/analyze", headers=engineer.headers).status_code
+        for _ in range(31)
+    ]
+
+    assert statuses[:30] == [200] * 30
+    assert statuses[30] == 429
+
+
 def test_a_report_without_problems_has_nothing_to_tag(
     api: TestClient, report_project: Project, engineer: Person
 ) -> None:

@@ -68,7 +68,22 @@ docker compose exec backend python -m app.cli seed-dev
 ```
 
 This creates three sites, one account per role, three demo projects with BOQs, programmes,
-daily reports, suppliers, material requests at every stage, and a risk score for every open project.
+daily reports (with confirmed AI issue tags), suppliers, material requests at every stage, and a
+risk score for every open project.
+
+**Optional: fetch the larger AI model**
+
+The report issue classifier uses a fine-tuned DistilBERT model (266 MB) that is kept out of the
+repository. Without it, the app uses the smaller TF-IDF model that is committed, and says so in the
+logs. To fetch it (needs Python 3 and the [GitHub CLI](https://cli.github.com/) signed in to an
+account that can read this repository):
+
+```bash
+python scripts/fetch_models.py
+```
+
+The files are checked against the SHA-256 in the committed manifest before they are used. Restart
+the API afterwards (`docker compose restart backend`).
 
 **4. Open the app**
 
@@ -87,7 +102,7 @@ Every account uses the password in `SITESENSE_DEMO_PASSWORD` in your `.env`
 | --- | --- | --- |
 | Project Manager | `pm@sitesense.example` | Dashboard ranked by risk; open Havelock Residences for the forecast and its drivers; approve requests sent to the PM |
 | Quantity Surveyor | `qs@sitesense.example` | Enter the quoted price at the QS check and watch BR-01 and BR-13 decide who approves; BOQ and budget |
-| Site Engineer | `engineer@sitesense.example` | File today's daily report for Havelock; raise a material request |
+| Site Engineer | `engineer@sitesense.example` | File today's daily report for Havelock and write a problem or two: the AI check tags them for you to confirm; raise a material request |
 | Procurement Officer | `procurement@sitesense.example` | Order approved requests, record deliveries, manage suppliers |
 | Company Admin | `admin@sitesense.example` | Users, sites and the audit log |
 | Client | `client@sitesense.example` | Client portal (arrives in Phase 12) |
@@ -174,7 +189,7 @@ ruff check . && ruff format --check . && mypy app tests && pytest --cov
 cd frontend
 npm run lint && npm run typecheck && npm run coverage && npm run build
 
-# ml: simulator and export tests, and a check that retraining reproduces the shipped model
+# ml: simulator, report-issue data and export tests, and a check that retraining reproduces the risk model
 cd ml
 ruff check . && pytest && python check_model.py
 ```
@@ -221,7 +236,7 @@ example database password.
 | Web | React 19, TypeScript, Vite, Tailwind CSS 4, React Router, TanStack Query, Zod |
 | API | Python 3.13, FastAPI, Pydantic, SQLAlchemy 2, Alembic, structlog |
 | Data | PostgreSQL 18 |
-| AI (from Phase 6) | pandas, scikit-learn, XGBoost, SHAP |
+| AI | LightGBM (risk), scikit-learn (TF-IDF baseline), DistilBERT fine-tuned with PyTorch (report issues); served as JSON (pure Python) and ONNX Runtime, no pickles |
 | Quality | pytest, Ruff, mypy, Vitest, Testing Library, ESLint, CodeQL, Gitleaks |
 
 Architecture notes, the [roles and access matrix](docs/roles-and-access.md) and decision records live in [docs/](docs/).
@@ -248,7 +263,7 @@ docs/           architecture, decision records, security reviews, model cards
 | 4 | Daily site reports | Done |
 | 5 | Materials, approvals and rules engine | Done |
 | 6 | Demo data and risk model v1 → **v0.1 MVP** | Done |
-| 7 | Report NLP classifier | Planned |
+| 7 | Report NLP classifier | In review |
 | 8 | Cost control, claims and variations | Planned |
 | 9 | Advanced schedule | Planned |
 | 10 | Risk model v2, what-if planner and supplier model | Planned |

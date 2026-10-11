@@ -4,9 +4,10 @@
 
 1. Rebuild the TF-IDF baseline with its recorded settings and score both models on the same
    hand-written test sentences; a paired bootstrap gives a 95% interval for the category gain.
-2. Export the fine-tuned model to ONNX and quantise it to 8-bit integers (about a quarter of the
-   size), then score the quantised model through exactly the pipeline the backend uses: the
-   ``tokenizers`` library and ``onnxruntime``.
+2. Export the fine-tuned model to ONNX at full precision, and an 8-bit quantised copy (a quarter of
+   the size). Score both through the pipeline the backend uses (``tokenizers`` and ``onnxruntime``,
+   one sentence at a time). Full precision ships: the 8-bit gain over the baseline was not clear
+   of zero.
 3. Write a small manifest (committed) with the files' SHA-256, labels, metrics and golden
    predictions. The ONNX file and tokenizer are attached to a GitHub Release, not committed; the
    backend refuses files whose hash does not match the manifest.

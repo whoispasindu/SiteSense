@@ -1,6 +1,6 @@
 """The DistilBERT category model (ONNX), with integrity checks and a fallback.
 
-The model and its tokenizer are too large for the repository (67 MB), so they are attached to a
+The model and its tokenizer are too large for the repository (266 MB), so they are attached to a
 GitHub Release and fetched into ``models/report-issues-category/`` by ``scripts/fetch_models.py``.
 The committed manifest pins each file's SHA-256 and size. Files are checked *before* onnxruntime
 parses them, so a tampered or truncated file is never loaded.
@@ -14,10 +14,15 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 from typing import Any
+
+# onnxruntime's Linux build sends usage telemetry to Microsoft (mobile.events.data.microsoft.com)
+# unless this is set before it is imported. The server must not call out to third parties.
+os.environ["ORT_DISABLE_TELEMETRY"] = "1"
 
 import numpy as np
 import onnxruntime as ort

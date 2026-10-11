@@ -1,5 +1,6 @@
 """Report issue data and rules: the test set stays separate, the generator is reproducible."""
 
+import ast
 import csv
 import re
 from pathlib import Path
@@ -82,3 +83,18 @@ def test_the_generator_is_reproducible(tmp_path: Path, monkeypatch: pytest.Monke
 def test_guide_rules_match_the_backend_cases(text: str, model_says: str, expected: str) -> None:
     """Same cases as backend/tests/test_report_nlp.py::test_guide_rules."""
     assert rules.severity(text, lambda _t: model_says) == expected
+
+
+def _code_without_docstring(path: Path) -> str:
+    module = ast.parse(path.read_text(encoding="utf-8"))
+    first = module.body[0] if module.body else None
+    if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant):
+        module.body = module.body[1:]
+    return ast.dump(module)
+
+
+def test_the_backend_copy_of_the_rules_is_the_same_code() -> None:
+    """The backend cannot import ml/, so it keeps a copy; only the module docstrings may differ."""
+    backend = Path(__file__).parents[2] / "backend" / "app" / "ai" / "nlp" / "rules.py"
+
+    assert _code_without_docstring(Path(rules.__file__)) == _code_without_docstring(backend)

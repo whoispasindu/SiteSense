@@ -10,7 +10,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from app.api.deps import DbSession, Meta, require_permission
+from app.api.deps import DbSession, Meta, rate_limit, require_permission
 from app.core.permissions import Permission
 from app.models import User
 from app.schemas.issues import ActionOut, CloseActionIn, ConfirmIn, ReportIssues
@@ -26,7 +26,11 @@ def report_issues(report_id: uuid.UUID, user: Reader, db: DbSession) -> ReportIs
     return issue_service.get_issues(db, user, report_id)
 
 
-@router.post("/reports/{report_id}/analyze", response_model=ReportIssues)
+@router.post(
+    "/reports/{report_id}/analyze",
+    response_model=ReportIssues,
+    dependencies=[Depends(rate_limit("analyze", "analyze_rate_per_minute"))],
+)
 def analyze_report(report_id: uuid.UUID, user: Reader, db: DbSession) -> ReportIssues:
     """Tag the report's problems. Suggestions only: nothing changes until the author confirms."""
     return issue_service.analyze(db, user, report_id)

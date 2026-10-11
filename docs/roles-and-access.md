@@ -112,6 +112,19 @@ answers `404`, exactly like a missing record.
 
 Scores are written only by the scheduler, after daily reports and by the CLI; no endpoint writes them.
 
+## Phase 7 endpoints
+
+| Method and path | Who | Notes |
+| --- | --- | --- |
+| `GET /api/v1/reports/{id}/issues` | PM, QS, Site Engineer | Tags and follow-ups; `can_confirm` only for the author on the day |
+| `POST /api/v1/reports/{id}/analyze` | Site Engineer, **author only**, on the day of the report | Stores suggestions only; again replaces them until confirmed (then 409). Rate limited per client |
+| `POST /api/v1/reports/{id}/issues/confirm` | Site Engineer, **author only**, on the day of the report | Once. Follow-ups must match a confirmed issue (422). Re-scores the project's risk |
+| `POST /api/v1/report-actions/{id}/close` | Stop-work: **project manager only** (BR-11). Other open follow-ups: the author or a PM | Already closed: 409 |
+| `GET /api/v1/projects/{id}/report-actions` | PM, QS, Site Engineer | Open follow-ups on the project, stop-work first |
+
+All of them go through the report's or project's site scope (404 elsewhere). A material request
+raised with `report_action_id` must belong to the same project and an open material follow-up.
+
 `backend/tests/test_role_matrix.py` calls every endpoint as every role. New endpoints must be added
 there, and `test_every_api_route_is_in_the_matrix` fails if one is missing.
 

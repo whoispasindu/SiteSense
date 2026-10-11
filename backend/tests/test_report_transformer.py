@@ -2,6 +2,9 @@
 
 import json
 import os
+import subprocess
+import sys
+import textwrap
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -126,3 +129,35 @@ def test_scoring_does_not_depend_on_other_sentences(shipped: transformer.Categor
     together = shipped.probabilities(["crane down", "a much longer sentence about cement deliveries"])[0]
 
     assert alone == pytest.approx(together, abs=1e-5)
+
+
+def test_onnxruntime_telemetry_is_off_before_onnxruntime_is_imported() -> None:
+    """onnxruntime's Linux build calls Microsoft's telemetry service unless told not to at import time.
+
+    In a fresh interpreter without the variable, load the code that tags reports and record the
+    setting at the moment onnxruntime is first imported, whichever module imports it first.
+    """
+    probe = textwrap.dedent(
+        """
+        import os, sys
+        seen = []
+        class Watch:
+            def find_spec(self, name, path=None, target=None):
+                if name == "onnxruntime" and not seen:
+                    seen.append(os.environ.get("ORT_DISABLE_TELEMETRY"))
+        sys.meta_path.insert(0, Watch())
+        import app.api.router, app.services.issue_service, app.cli
+        print(seen)
+        """
+    )
+    env = {k: v for k, v in os.environ.items() if k != "ORT_DISABLE_TELEMETRY"}
+    result = subprocess.run(  # noqa: S603 - fixed interpreter and code
+        [sys.executable, "-c", probe],
+        cwd=Path(__file__).parents[1],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    assert result.stdout.strip() == "['1']"

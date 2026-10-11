@@ -16,8 +16,9 @@ from app.ai.nlp import model as text_model
 from app.ai.nlp import rules, transformer
 from app.ai.nlp.text import redact, sentences
 
-# Below this category probability a tag is shown as "check this". Chosen on the validation set so
-# that most correct tags clear it and most wrong ones do not (see the model card).
+# Below this category probability a tag is shown as "check this". A fixed, round threshold, not tuned.
+# On the hand-written test set about a fifth of tags fall below it, they are right half the time
+# (against 87% above it), and they hold half of the errors (see docs/model-card-report-issues.md).
 LOW_CONFIDENCE = 0.6
 
 

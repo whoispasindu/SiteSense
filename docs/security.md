@@ -33,7 +33,114 @@ here, newest first. The baseline design is in [ADR 0003](adr/0003-security-basel
 | Approvals | Stage-and-role checks, segregation of duties (BR-04), state machine (invalid transitions 409), order prices more than 5% over approval go back to the PM (BR-14), row locks against double approval and quantity races | `rules/materials.py`, `services/materials_service.py`, `services/procurement_service.py` | `test_rules_materials.py`, `test_materials_api.py` |
 | Notifications | Per-user only (others answer 404); links restricted to in-app paths by service and database constraint; de-duplicated reminders | `services/notification_service.py`, migration 0005 | `test_reminders_notifications.py`, `reports.test.tsx` |
 | AI models | Model files are JSON data validated before use (structure, feature indexes, finite numbers, children after parents, size limits); no pickle/joblib loading; golden predictions prove the scorer matches training; CI retrains and checks the shipped model is reproducible | `ai/risk/model.py`, `ml/check_model.py` | `test_risk_model.py`, CI ML job |
+| Large model files | ONNX weights live in a GitHub Release, not the repository; a committed manifest pins SHA-256 and size; `fetch_models.py` verifies before moving a file into place and the backend verifies again before onnxruntime parses it; plain file names only; 300 MB cap; mismatch or missing means the TF-IDF fallback; ONNX is an operator graph, not pickled code | `scripts/fetch_models.py`, `ai/nlp/transformer.py` | `test_report_transformer.py` (tamper, size, names, fallback, parity), CI fetches and runs them with `SITESENSE_REQUIRE_MODELS=1` |
+| Outbound calls (ML runtime) | onnxruntime's telemetry to Microsoft is switched off before it is imported, in code and in the image | `ai/nlp/transformer.py`, `backend/Dockerfile` | `test_onnxruntime_telemetry_is_off_before_onnxruntime_is_imported`; checked in the container: no connection |
+| Personal data in free text | Names of site people, the author and titled names become `[PERSON]` before classification and storage | `ai/nlp/text.py: redact`, `services/issue_service.py` | `test_names_are_redacted_before_storage`, `test_report_nlp.py` |
 | Supply chain | Pinned deps, Dependabot (pip, npm, actions, docker), pip-audit, npm audit, dependency review, CodeQL `security-extended`, actions pinned to SHAs, `permissions: contents: read`, `persist-credentials: false` | `.github/` | CI |
+
+## Phase 7 review: 2026-10-11
+
+Scope: the report-issue training code and data (`ml/nlp/`), the TF-IDF scorer, the DistilBERT ONNX
+runtime and its manifest, `scripts/fetch_models.py`, the tagger and redaction, report issues and
+follow-up actions (migration 0009, five endpoints), the material-request link, risk model 1.1.0 with
+issue features, the AI check screen and the stop-work banner.
+
+### OWASP Top 10 (2021) walk-through
+
+- **A01 Broken access control.** The five endpoints are in the role matrix for every role. Reading
+  needs `reports:read` and the report's site (404 elsewhere). Only the author, on the day of the
+  report, can analyse or confirm (403 otherwise). Only a project manager can clear stop-work
+  (BR-11); the author and the QS get 403. A material request can only close an open material
+  follow-up of the same project. Mutation-checked (below).
+- **A03 Injection.** Report text reaches the classifier as data; it is a classifier, not a language
+  model, so there are no instructions to inject. Snippets are rendered by React as text.
+  Notification links are fixed in-app paths.
+- **A04 Insecure design.** The AI only suggests: nothing changes until the author confirms, and
+  every follow-up box starts unticked. Follow-ups must match a confirmed issue (a stop-work needs a
+  confirmed safety issue). Confirmation happens once. **Fixed:** two simultaneous confirmations
+  (below).
+- **A05 / DoS.** Problems text is capped at 5,000 characters, tagging at 20 sentences of 300
+  characters, the tokenizer at 48 tokens, confirmation at 30 issues of 300 characters. A worst-case
+  analysis takes 0.4 s of CPU; onnxruntime is limited to 2 threads. **Fixed:** analysis is now rate
+  limited (below). The model loads once per worker (about 2 s, about 270 MB).
+- **A06 Vulnerable components.** New in the backend: onnxruntime 1.31.0 and tokenizers 0.23.3.
+  pip-audit **0** for the backend, the ML stack and the transformer extras (torch, transformers,
+  safetensors, onnx). The extras are now audited in CI too. npm audit **0** (no new packages).
+- **A08 Software and data integrity.** No pickles anywhere: the TF-IDF model is validated JSON, and
+  ONNX is an operator graph. The weights are pinned by SHA-256 in a committed manifest, checked by
+  the fetch script and again before parsing. Tampered, resized and wrongly named files are refused,
+  and file names in the manifest cannot contain paths. Golden rows prove the backend reproduces
+  training. The release holding the files is a pre-release of this private repository; CI reads it
+  with the read-only workflow token.
+- **A09 Logging.** New audit events: `report.issues_confirmed` (kept, removed, added and edited
+  counts, follow-ups) and `report_action.closed`. Falling back to TF-IDF is logged once with the reason. The report text
+  itself is not logged.
+- **A10 SSRF and outbound calls.** **Fixed:** onnxruntime called Microsoft's telemetry service
+  (below).
+
+### Privacy and responsible AI
+
+- Names are redacted to `[PERSON]` before anything else: people on the project's site, the author,
+  and titled names ("Mr Perera", "supervisor Nimal"). The stored snippet is the redacted sentence.
+- No real report text was used for training. The training data is synthetic, and the test sentences
+  were written by the project.
+- Each issue keeps what the AI said beside what the author confirmed, with the model version, so
+  disagreement can be measured later.
+- The model card states what the model is weak at. Severity is weak (macro F1 0.50) and leans
+  towards "high", which is why the PM alert is never pre-ticked.
+
+### Verification beyond unit tests
+
+- **Mutation checks: 14 of 14** deliberate faults fail a test. These cover low-confidence never
+  flagged, names reaching the classifier, repetition not raising severity, injury not high,
+  unkept suggestions confirmed, anyone clearing stop-work, stop-work without a safety issue,
+  re-analysing after confirming, a non-author confirming, no re-score after confirming,
+  suggestions counted as risk inputs, the hash not checked, a follow-up from another project, and
+  the backend copy of the severity rules drifting from `ml/`.
+- **Race, against the running API:** two simultaneous confirmations of the same report. Without the
+  fix, both succeeded (3 of 3 runs), doubling the stop-work flag, the PM alert and the
+  notifications. With it: 200 and 409, one of each (3 of 3).
+- **Outbound connections, in the container:** watching the process's own sockets while loading and
+  running the model. Before the fix: one HTTPS connection to `mobile.events.data.microsoft.com`.
+  After: none.
+- `fetch_models.py` against the published release: both files downloaded and byte-identical to
+  the exported ones.
+- In the browser: the engineer files a report, sees the tags (an unsure one highlighted), edits a
+  category, ticks stop-work and the PM alert, and confirms. The PM sees the banner on the project and
+  clears it.
+
+### Findings fixed during the review
+
+1. **onnxruntime sent telemetry to Microsoft.** The Linux build of onnxruntime 1.31 opens a
+   connection to Microsoft's event collector when a model is loaded. A server holding site reports
+   must not call third parties. `ORT_DISABLE_TELEMETRY=1` is now set before onnxruntime is imported
+   (code and Docker image), and a test fails if anything imports onnxruntime before that.
+2. **Two simultaneous confirmations both succeeded**, duplicating follow-ups and alerts (two tabs or
+   a double submit). Analysis and confirmation now lock the report row first, so the second waits,
+   sees the first, and gets 409.
+3. **Analysis had no rate limit.** At up to 0.4 s of CPU a call, a signed-in author could keep a
+   worker busy. It is now limited per client (30 a minute, configurable), tested.
+4. **The transformer requirements file was missing.** The training script referred to
+   `requirements-transformer.txt`, but it had not been committed, so the PyTorch training stack was
+   neither pinned nor audited. It is now pinned and audited in CI.
+5. **No test held the two copies of the severity rules together.** The backend cannot import `ml/`,
+   so it keeps a copy; a test now fails if the code differs.
+6. **Stale or wrong comments.** The confidence threshold was described as chosen on validation data
+   (it is a fixed round number; its behaviour on the test set is in the model card). The model was
+   described as 67 MB (it is 266 MB at full precision).
+7. **The 8-bit model was batch-dependent.** Found while exporting: its activations are quantised per
+   input, so a sentence's score changed with its neighbours (0.087 on the golden rows). Full
+   precision ships, and a test checks a sentence scores the same alone or in a batch.
+
+### Open items
+
+- **Redaction misses unknown first names.** A worker who is not an app user and is named without a
+  title ("sunil absent") is not redacted. Options: a site's worker list, or a name recogniser.
+  (Owner: product, before real reports are collected.)
+- Measure the classifier on real, consented, confirmed tags before trusting the numbers.
+- BR-11 blocking of related programme tasks: Phase 9.
+- Memory: each API worker holds the 266 MB model. Size the workers accordingly, or move tagging to a
+  background job if workers multiply.
 
 ## Phase 6 review: 2026-10-10
 

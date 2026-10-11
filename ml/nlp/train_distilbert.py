@@ -1,6 +1,6 @@
 """Fine-tune DistilBERT for the report issue classifier, for comparison with the TF-IDF baseline.
 
-    pip install -r requirements-transformer.txt     # PyTorch (CPU) and transformers, about 1 GB
+    pip install -r requirements-transformer.txt     # PyTorch (CPU), transformers and ONNX tools
     python -m nlp.train_distilbert
 
 One shared encoder (distilbert-base-uncased, loaded from safetensors) with two heads: category and
