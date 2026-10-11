@@ -18,8 +18,8 @@ describe("NotFoundPage", () => {
   });
 
   it("treats not-yet-built modules as unknown routes", async () => {
-    mockApi(sessionApi(makeMe("project_manager")));
-    const next = nextUnbuiltModule();
+    const { item: next, role } = nextUnbuiltModule();
+    mockApi(sessionApi(makeMe(role)));
     renderRoute(next.path);
 
     expect(await screen.findByRole("heading", { name: "Off the drawings." })).toBeInTheDocument();

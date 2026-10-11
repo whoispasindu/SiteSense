@@ -112,6 +112,13 @@ answers `404`, exactly like a missing record.
 
 Scores are written only by the scheduler, after daily reports and by the CLI; no endpoint writes them.
 
+## Phase 10 endpoints
+
+| Method and path | Who | Notes |
+| --- | --- | --- |
+| `GET /api/v1/projects/{id}/risk`, `GET /api/v1/risk/projects` | PM, QS | Now with the likely range of every forecast (`ranges`), and the score's range in the 14-day history |
+| `POST /api/v1/projects/{id}/risk/what-if` | **Project manager only** (`risk:what_if`) | Up to four recovery actions, each once, with an optional cost (LKR, 2 decimals). Calculates only: nothing is stored or changed. Site-scoped (404 otherwise) |
+
 ## Phase 9 endpoints
 
 | Method and path | Who | Notes |

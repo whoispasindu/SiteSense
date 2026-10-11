@@ -177,6 +177,7 @@ ENDPOINTS = [
              {"variation_limit": "5.00", "reason": "Matrix check"}),
     Endpoint("GET", "/api/v1/projects/{project_id}/risk", RISK_READERS),
     Endpoint("GET", "/api/v1/risk/projects", RISK_READERS),
+    Endpoint("POST", "/api/v1/projects/{project_id}/risk/what-if", PM_ONLY, {"actions": []}),
     Endpoint("GET", "/api/v1/notifications", ALL_ROLES),
     Endpoint("POST", "/api/v1/notifications/{notification_id}/read", ALL_ROLES),
     Endpoint("POST", "/api/v1/notifications/read-all", ALL_ROLES),

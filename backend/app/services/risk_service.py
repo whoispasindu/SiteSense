@@ -23,19 +23,27 @@ from sqlalchemy.orm import Session
 
 from app.ai.risk import features as feature_builder
 from app.ai.risk import model as risk_model
-from app.ai.risk import scoring
+from app.ai.risk import scoring, whatif
 from app.core import clock
 from app.core.logging import get_logger
 from app.core.permissions import Role
-from app.models import Project, ProjectStatus, RiskScore, User
+from app.models import BudgetLine, Project, ProjectStatus, RiskScore, User
 from app.schemas.risk import (
+    AdviceOut,
     DriverOut,
+    EffectOut,
+    ForecastOut,
     ProjectRisk,
+    RangeOut,
     Ranges,
     RiskHistoryPoint,
     RiskOut,
     RiskRanking,
     ScoreRange,
+    WhatIfActionIn,
+    WhatIfActionOut,
+    WhatIfIn,
+    WhatIfOut,
 )
 from app.services import notification_service, project_service
 from app.services.notification_service import NewNotification
@@ -283,3 +291,109 @@ def ranking(db: Session, user: User) -> list[RiskRanking]:
             )
         )
     return sorted(out, key=lambda r: (r.score is None, -(r.score or 0), r.code))
+
+
+# --- What-if planner (Phase 10) ----------------------------------------------------------------------
+
+
+def _forecast(
+    model: risk_model.RiskModel, values: dict[str, float], planned_days: float, extra_cost_pct: float = 0.0
+) -> ForecastOut:
+    """The model's forecast for these inputs, with its likely range; ``extra_cost_pct`` adds entered costs."""
+    delay, overrun = model.predict(tuple(values[name] for name in model.features))
+    cost, cost_low, cost_high = (v + extra_cost_pct for v in (overrun.value, overrun.low, overrun.high))
+    score = scoring.risk_score(delay.value, cost, planned_days)
+    return ForecastOut(
+        delay_days=round(delay.value, 1),
+        delay_range=RangeOut(low=round(delay.low, 1), high=round(delay.high, 1)),
+        overrun_pct=round(cost, 2),
+        overrun_range=RangeOut(low=round(cost_low, 2), high=round(cost_high, 2)),
+        score=score,
+        score_range=ScoreRange(
+            low=scoring.risk_score(delay.low, cost_low, planned_days),
+            high=scoring.risk_score(delay.high, cost_high, planned_days),
+        ),
+        level=scoring.level(score),
+    )
+
+
+def _saved(
+    model: risk_model.RiskModel, before: dict[str, float], ids: list[str]
+) -> tuple[EffectOut, EffectOut]:
+    """What the actions save, from half their planned change (low) to all of it (high)."""
+    delay0, overrun0 = model.predict(tuple(before[n] for n in model.features))
+    ends = []
+    for strength in (whatif.HALF, whatif.FULL):
+        after = whatif.applied(before, ids, strength)
+        delay, overrun = model.predict(tuple(after[n] for n in model.features))
+        ends.append((delay0.value - delay.value, overrun0.value - overrun.value))
+    (d_low, o_low), (d_high, o_high) = ends
+    return (
+        EffectOut(low=round(min(d_low, d_high), 1), high=round(max(d_low, d_high), 1)),
+        EffectOut(low=round(min(o_low, o_high), 2), high=round(max(o_low, o_high), 2)),
+    )
+
+
+def what_if(db: Session, user: User, project_id: uuid.UUID, data: WhatIfIn) -> WhatIfOut:
+    """Test recovery actions on today's forecast. Nothing is stored and nothing in the project changes."""
+    project = project_service.get_project(db, user, project_id)  # 404 outside the user's sites
+    today = clock.site_today()
+    model = risk_model.current()
+    built = feature_builder.build(db, project, today)
+    values = built.values
+    planned_days = values["planned_duration_days"]
+    budget = db.scalar(
+        select(func.coalesce(func.sum(BudgetLine.budget_amount), 0)).where(
+            BudgetLine.project_id == project.id
+        )
+    ) or Decimal(0)
+    notes = list(built.notes)
+    if budget <= 0:
+        notes.append("No cost budget yet: entered action costs cannot be added to the cost forecast.")
+
+    def pct(cost: Decimal | None) -> float | None:
+        return float(cost / budget * 100) if cost is not None and budget > 0 else None
+
+    chosen: dict[str, WhatIfActionIn] = {a.id: a for a in data.actions}
+    actions = []
+    for action in whatif.CATALOGUE:
+        delay_saved, overrun_saved = _saved(model, values, [action.id])
+        entered = chosen.get(action.id)
+        actions.append(
+            WhatIfActionOut(
+                id=action.id,
+                label=action.label,
+                description=action.description,
+                change=whatif.describe_change(
+                    action, values, whatif.applied(values, [action.id], whatif.FULL)
+                ),
+                selected=entered is not None,
+                delay_saved_days=delay_saved,
+                overrun_saved_pct=overrun_saved,
+                cost=entered.cost if entered else None,
+                cost_pct=round(p, 3) if entered and (p := pct(entered.cost)) is not None else None,
+            )
+        )
+
+    plan = plan_delay = plan_overrun = None
+    if chosen:
+        ids = [str(action_id) for action_id in chosen]
+        added = sum(p for a in chosen.values() if (p := pct(a.cost)) is not None)
+        plan = _forecast(model, whatif.applied(values, ids, whatif.FULL), planned_days, added)
+        plan_delay, model_overrun = _saved(model, values, ids)
+        plan_overrun = EffectOut(
+            low=round(model_overrun.low - added, 2), high=round(model_overrun.high - added, 2)
+        )
+    return WhatIfOut(
+        project_id=project.id,
+        as_of=today,
+        model_version=model.version,
+        baseline=_forecast(model, values, planned_days),
+        actions=actions,
+        plan=plan,
+        plan_delay_saved_days=plan_delay,
+        plan_overrun_saved_pct=plan_overrun,
+        costs_not_entered=[whatif.BY_ID[a.id].label for a in data.actions if a.cost is None],
+        advice=[AdviceOut(id=a.id, label=a.label, text=a.text) for a in whatif.advice(values)],
+        notes=notes,
+    )

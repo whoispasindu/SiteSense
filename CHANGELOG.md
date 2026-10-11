@@ -23,6 +23,13 @@ uses [Semantic Versioning](https://semver.org/).
     High-risk alert all show it. Drivers are exact SHAP values (TreeSHAP in pure Python, checked
     against LightGBM). For each target a sign-constrained straight line competes with the trees, and
     the trees ship only if clearly better: they do for delay; the line ships for overrun.
+  - **What-if planner** on each project's new **Risk** tab (project managers): add a crew, work
+    Sundays, expedite late materials, weather protection. Each action's effect is a range (half its
+    planned change to all of it), labelled a simulation estimate; the PM's cost for an action is added
+    to the cost forecast, and a blank cost is called out, never treated as free. Filing reports and
+    following up issues appear as advice only. A test checks no action or combination ever makes a
+    forecast, or either end of its range, worse. The tab also shows the score's last 14 days with its
+    range, and **Risk & what-if** in the menu lists every project by risk.
   - **Forecast handover, two ways:** the Schedule tab shows the programme's date "At current rates"
     and the risk model's likely range, with a note when they disagree. Engineers see the first only.
 

@@ -8,8 +8,11 @@ import { errorText } from "../admin/adminUtils";
 import { RiskBadge, ScoreScale } from "./RiskBits";
 import { delayRangeText, delayText, NO_RANGE_TEXT, overrunRangeText, overrunText, scoreRangeText } from "./risk";
 
-/** The dashboard's ranking: every open project on the user's sites, highest risk first. */
-export function RiskRankingPanel() {
+/**
+ * Every open project on the user's sites, highest risk first: on the dashboard (links to the project)
+ * and on the Risk & what-if page (links to the project's Risk tab).
+ */
+export function RiskRankingPanel({ linkTo = "overview" }: { linkTo?: "overview" | "risk" }) {
   const ranking = useRiskRanking();
 
   return (
@@ -27,7 +30,10 @@ export function RiskRankingPanel() {
               </span>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <Link to={`/projects/${r.project_id}`} className="truncate font-medium text-ink hover:underline">
+                  <Link
+                    to={linkTo === "risk" ? `/projects/${r.project_id}/risk` : `/projects/${r.project_id}`}
+                    className="truncate font-medium text-ink hover:underline"
+                  >
                     {r.name}
                   </Link>
                   <span className="font-mono text-xs text-ink-faint">

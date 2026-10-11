@@ -1,4 +1,4 @@
-import type { Driver, Range, RiskLevel } from "../../api/risk";
+import type { Driver, Effect, Range, RiskLevel } from "../../api/risk";
 import type { Tone } from "../../components/ui/StatusBadge";
 
 /** BR-10 bands in words: colour is never the only signal. */
@@ -72,4 +72,25 @@ export function driverEffect(driver: Driver): string {
 /** Does this driver push the forecast up (worse) overall? */
 export function raisesRisk(driver: Driver): boolean {
   return driver.delay_days + driver.overrun_pct * 5 > 0;
+}
+
+/** What an action saves on handover, as a range: "saves 4 to 9 days", "little effect on handover". */
+export function savedDaysText(effect: Effect): string {
+  const low = Math.round(effect.low);
+  const high = Math.round(effect.high);
+  if (high < 1) return "little effect on handover";
+  if (low === high) return `saves about ${String(high)} days`;
+  return `saves ${String(Math.max(low, 0))} to ${String(high)} days`;
+}
+
+/**
+ * What it does to cost, as a range. Positive is a saving. With entered action costs the plan can cost
+ * more than it saves: "adds 0.5% to 1.1% to cost", or "between saving 0.4% and adding 0.6% of cost".
+ */
+export function savedCostText(effect: Effect): string {
+  const { low, high } = effect;
+  if (Math.abs(low) < 0.05 && Math.abs(high) < 0.05) return "little effect on cost";
+  if (low >= 0) return `saves ${low.toFixed(1)}% to ${high.toFixed(1)}% of cost`;
+  if (high <= 0) return `adds ${(-high).toFixed(1)}% to ${(-low).toFixed(1)}% to cost`;
+  return `between adding ${(-low).toFixed(1)}% and saving ${high.toFixed(1)}% of cost`;
 }
