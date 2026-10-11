@@ -34,6 +34,10 @@ class ActionOut(BaseModel):
     closed_at: datetime | None
     request_id: uuid.UUID | None
     can_close: bool
+    # BR-11: for stop-work flags, what they stop.
+    stop_scope: Literal["tasks", "project"] | None = None
+    stop_task_ids: list[uuid.UUID] = Field(default_factory=list)
+    can_edit_scope: bool = False  # the PM, while the flag is open
 
 
 class ReportIssues(BaseModel):
@@ -71,6 +75,9 @@ class ActionsIn(BaseModel):
     material_request: bool = False  # draft a material request (needs a material delay)
     pm_alert: bool = False  # alert the project managers (needs a high-severity issue)
     stop_work: bool = False  # flag stop-work (needs a safety issue; BR-11)
+    # Phase 9: what the stop-work flag stops: chosen tasks (at least one), or the whole project.
+    stop_work_scope: Literal["tasks", "project"] = "tasks"
+    stop_work_task_ids: list[uuid.UUID] = Field(default_factory=list, max_length=500)
 
 
 class ConfirmIn(BaseModel):
@@ -84,3 +91,12 @@ class CloseActionIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     resolution: Literal["done", "dismissed"]
+
+
+class StopScopeIn(BaseModel):
+    """The PM changes what an open stop-work flag stops (BR-11)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    scope: Literal["tasks", "project"]
+    task_ids: list[uuid.UUID] = Field(default_factory=list, max_length=500)

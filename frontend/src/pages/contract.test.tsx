@@ -256,7 +256,8 @@ describe("Variation orders (BR-09)", () => {
           weight_total: "100.00",
           tasks: [{ id: TASK, project_id: PID, code: "T1", name: "Basement slab", boq_section_id: SA, boq_section_code: "A",
                     planned_start: "2026-09-01", planned_end: "2026-11-30", weight: "100.00", percent_complete: "40.00",
-                    is_critical: false, position: 1, planned_percent_today: 50, state: "behind", progress_updated_at: null }],
+                    is_critical: false, position: 1, planned_percent_today: 50, state: "behind", progress_updated_at: null,
+                    is_concrete_pour: false, stopped: false, actual_start: "2026-09-01", actual_finish: null }],
         }),
       ...extra,
     });  // fmt: skip

@@ -1,6 +1,7 @@
 """Programme tasks and progress. Access always goes through the task's project (site scoping)."""
 
 import uuid
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -22,7 +23,7 @@ from app.schemas.schedule import (
     TaskState,
     TaskUpdate,
 )
-from app.services import audit, project_service
+from app.services import audit, network_service, project_service
 from app.services.audit import AuditAction, RequestMeta
 from app.services.progress import TaskPlan, actual_percent, planned_fraction, planned_percent, progress_curve
 
@@ -51,7 +52,12 @@ def _state(task: Task, planned_today: float) -> TaskState:
     return "behind" if done + BEHIND_TOLERANCE < planned_today else "on_track"
 
 
-def to_task_out(task: Task, section_codes: dict[uuid.UUID, str]) -> TaskOut:
+def to_task_out(
+    task: Task,
+    section_codes: dict[uuid.UUID, str],
+    critical: set[uuid.UUID] | None = None,
+    stopped: set[uuid.UUID] | None = None,
+) -> TaskOut:
     planned_today = round(planned_fraction(_plan(task), clock.site_today()) * 100, 1)
     return TaskOut(
         id=task.id,
@@ -65,7 +71,11 @@ def to_task_out(task: Task, section_codes: dict[uuid.UUID, str]) -> TaskOut:
         # Always two places, whether the value was just set in Python or read back from NUMERIC(5,2).
         weight=task.weight.quantize(CENTI),
         percent_complete=task.percent_complete.quantize(CENTI),
-        is_critical=task.is_critical,
+        is_critical=task.id in (critical or set()),
+        is_concrete_pour=task.is_concrete_pour,
+        stopped=task.id in (stopped or set()),
+        actual_start=task.actual_start,
+        actual_finish=task.actual_finish,
         position=task.position,
         planned_percent_today=planned_today,
         state=_state(task, planned_today),
@@ -81,10 +91,21 @@ def section_codes(db: Session, project: Project) -> dict[uuid.UUID, str]:
 def list_tasks(db: Session, project: Project) -> TaskList:
     tasks = _tasks(db, project)
     codes = section_codes(db, project)
+    network = network_service.analyse(db, project)
+    critical = {t.task_id for t in network.tasks if t.is_critical}
+    stopped = {t.task_id for t in network.tasks if t.stopped}
     return TaskList(
-        tasks=[to_task_out(t, codes) for t in tasks],
+        tasks=[to_task_out(t, codes, critical, stopped) for t in tasks],
         weight_total=sum((t.weight for t in tasks), Decimal(0)).quantize(CENTI),
     )
+
+
+def task_out(db: Session, project: Project, task: Task) -> TaskOut:
+    """One task with its place on the forecast network (critical, stopped)."""
+    network = network_service.analyse(db, project)
+    critical = {t.task_id for t in network.tasks if t.is_critical}
+    stopped = {t.task_id for t in network.tasks if t.stopped}
+    return to_task_out(task, section_codes(db, project), critical, stopped)
 
 
 def get_task(db: Session, user: User, task_id: uuid.UUID) -> tuple[Task, Project]:
@@ -112,6 +133,32 @@ def record_snapshot(db: Session, project: Project) -> None:
     )
 
 
+def apply_progress(db: Session, task: Task, value: Decimal, *, on: date | None = None) -> bool:
+    """Set a task's percent complete and its actual dates. Returns whether it changed.
+
+    BR-11: refused while a stop-work flag stops the task (or the whole project).
+    """
+    if value == task.percent_complete:
+        return False
+    if network_service.is_stopped(db, task):
+        error = BusinessRuleError(
+            f"{task.code or task.name} is stopped by a stop-work flag; "
+            "the project manager must clear it first (BR-11)."
+        )
+        error.code = "stop_work"
+        raise error
+    on = on or clock.site_today()
+    task.percent_complete = value
+    task.progress_updated_at = clock.utcnow()
+    if value <= 0:
+        task.actual_start = task.actual_finish = None
+        return True
+    if task.actual_start is None or task.actual_start > on:
+        task.actual_start = on
+    task.actual_finish = (task.actual_finish or on) if value >= 100 else None
+    return True
+
+
 def _check_section(db: Session, project: Project, section_id: uuid.UUID | None) -> None:
     if section_id is None:
         return
@@ -135,9 +182,14 @@ def create_task(db: Session, project: Project, data: TaskCreate, *, actor: User,
         raise BusinessRuleError(f"A project can have at most {MAX_TASKS_PER_PROJECT} tasks.")
     _check_section(db, project, data.boq_section_id)
     position = (db.scalar(select(func.max(Task.position)).where(Task.project_id == project.id)) or 0) + 1
-    task = Task(project_id=project.id, position=position, **data.model_dump())
-    if task.percent_complete > 0:
+    values = data.model_dump()
+    initial = values.pop("percent_complete")
+    task = Task(project_id=project.id, position=position, percent_complete=Decimal(0), **values)
+    if initial > 0:  # progress entered with a new task: started on its planned start (or today)
+        task.percent_complete = initial
         task.progress_updated_at = clock.utcnow()
+        task.actual_start = min(task.planned_start, clock.site_today())
+        task.actual_finish = clock.site_today() if initial >= 100 else None
     _check_dates(project, task)
     db.add(task)
     try:
@@ -156,6 +208,8 @@ def create_task(db: Session, project: Project, data: TaskCreate, *, actor: User,
         details={"project": project.code, "name": task.name, "weight": str(task.weight)},
     )
     db.commit()
+    if task.is_concrete_pour:
+        network_service.check_pours_after_change(db, project)  # BR-06
     return task
 
 
@@ -172,7 +226,14 @@ def update_task(
     changes = data.model_dump(exclude_unset=True)
     if not can_manage and set(changes) - {"percent_complete"}:
         raise ForbiddenError("You can update a task's percent complete only.")
-    for required in ("name", "planned_start", "planned_end", "weight", "percent_complete", "is_critical"):
+    for required in (
+        "name",
+        "planned_start",
+        "planned_end",
+        "weight",
+        "percent_complete",
+        "is_concrete_pour",
+    ):
         if required in changes and changes[required] is None:
             raise BusinessRuleError(f"{required.replace('_', ' ').capitalize()} cannot be empty.")
     if "boq_section_id" in changes:
@@ -180,13 +241,15 @@ def update_task(
 
     before = task.percent_complete
     changed = {k: v for k, v in changes.items() if getattr(task, k) != v}
+    progress_value = changed.pop("percent_complete", None)
     for key, value in changed.items():
         setattr(task, key, value)
+    if progress_value is not None:
+        apply_progress(db, task, progress_value)
+        changed["percent_complete"] = progress_value
     if not changed:
         return task
     _check_dates(project, task)
-    if "percent_complete" in changed:
-        task.progress_updated_at = clock.utcnow()
     try:
         db.flush()
     except IntegrityError as exc:
@@ -207,6 +270,13 @@ def update_task(
         db, action, meta=meta, actor_id=actor.id, target_type="task", target_id=task.id, details=details
     )
     db.commit()
+    if task.is_concrete_pour and set(changed) & {
+        "planned_start",
+        "planned_end",
+        "is_concrete_pour",
+        "percent_complete",
+    }:
+        network_service.check_pours_after_change(db, project)  # BR-06 for the new window
     return task
 
 

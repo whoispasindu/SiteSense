@@ -36,10 +36,12 @@ from app.models import (
     IssueStatus,
     Project,
     ReportAction,
+    ReportActionTask,
     ReportIssue,
+    Task,
     User,
 )
-from app.schemas.issues import ActionOut, ConfirmIn, IssueOut, ReportIssues
+from app.schemas.issues import ActionOut, ConfirmIn, IssueOut, ReportIssues, StopScopeIn
 from app.services import audit, notification_service, project_service, report_service, risk_service
 from app.services.audit import AuditAction, RequestMeta
 from app.services.notification_service import NewNotification
@@ -111,6 +113,11 @@ def action_out(action: ReportAction, user: User, project: Project, author_id: uu
         closed_at=action.closed_at,
         request_id=action.request_id,
         can_close=_can_close(action, user, project, author_id),
+        stop_scope=action.stop_scope,
+        stop_task_ids=sorted(t.task_id for t in action.stop_tasks),
+        can_edit_scope=action.kind == ActionKind.STOP_WORK.value
+        and action.status == ActionStatus.OPEN.value
+        and user.role == Role.PROJECT_MANAGER.value,
     )
 
 
@@ -264,8 +271,9 @@ def _create_actions(
     categories = {i.category for i in confirmed}
     created: list[ReportAction] = []
 
-    def add(kind: ActionKind, summary: str, *, open_: bool) -> ReportAction:
+    def add(kind: ActionKind, summary: str, *, open_: bool, stop_scope: str | None = None) -> ReportAction:
         action = ReportAction(
+            stop_scope=stop_scope,
             report_id=report.id,
             project_id=project.id,
             kind=kind.value,
@@ -299,7 +307,14 @@ def _create_actions(
     if wanted.stop_work:
         if "safety" not in categories:
             raise BusinessRuleError("Stop-work follows from a confirmed safety issue.")
-        add(ActionKind.STOP_WORK, _summary(confirmed, category="safety"), open_=True)
+        ids = _validated_scope(db, project, wanted.stop_work_scope, wanted.stop_work_task_ids)
+        flag = add(
+            ActionKind.STOP_WORK,
+            _summary(confirmed, category="safety"),
+            open_=True,
+            stop_scope=wanted.stop_work_scope,
+        )
+        flag.stop_tasks = [ReportActionTask(task_id=i) for i in sorted(ids)]
         _notify_pms(
             db,
             project,
@@ -309,6 +324,60 @@ def _create_actions(
             _summary(confirmed, category="safety"),
         )
     return created
+
+
+def _validated_scope(db: Session, project: Project, scope: str, task_ids: list[uuid.UUID]) -> set[uuid.UUID]:
+    """BR-11: what a stop-work flag stops. "tasks" needs at least one task of this project.
+
+    Validated before the flag is added, so no half-made flag is flushed by the query.
+    """
+    if scope != "tasks":
+        return set()
+    ids = set(task_ids)
+    if not ids:
+        raise BusinessRuleError("Choose the tasks the stop-work stops, or stop the whole project.")
+    found = set(db.scalars(select(Task.id).where(Task.id.in_(ids), Task.project_id == project.id)).all())
+    if found != ids:
+        raise BusinessRuleError("Every stopped task must be in this project's programme.")
+    return ids
+
+
+def set_stop_scope(
+    db: Session, user: User, action_id: uuid.UUID, data: StopScopeIn, *, meta: RequestMeta
+) -> ActionOut:
+    """The PM changes what an open stop-work flag stops (BR-11). Re-scores the project's risk."""
+    action = db.scalars(
+        select(ReportAction).where(ReportAction.id == action_id).with_for_update(of=ReportAction)
+    ).first()
+    if action is None:
+        raise NotFoundError("Action not found.")
+    report, project = report_service.get_report(db, user, action.report_id)  # 404 outside the user's sites
+    if action.kind != ActionKind.STOP_WORK.value:
+        raise BusinessRuleError("Only a stop-work flag stops tasks.")
+    if action.status != ActionStatus.OPEN.value:
+        raise ConflictError("This stop-work flag has been cleared.")
+    if user.role != Role.PROJECT_MANAGER.value:
+        raise ForbiddenError("Only the project manager changes what a stop-work flag stops.")
+    before = {"scope": action.stop_scope, "tasks": sorted(str(t.task_id) for t in action.stop_tasks)}
+    ids = _validated_scope(db, project, data.scope, data.task_ids)
+    action.stop_scope = data.scope
+    action.stop_tasks = [ReportActionTask(task_id=i) for i in sorted(ids)]
+    audit.record(
+        db,
+        AuditAction.STOP_WORK_SCOPE_CHANGED,
+        meta=meta,
+        actor_id=user.id,
+        target_type="report_action",
+        target_id=action.id,
+        details={
+            "before": before,
+            "after": {"scope": data.scope, "tasks": sorted(str(i) for i in ids)},
+        },
+    )
+    db.commit()
+    risk_service.rescore_after_report(db, project)  # stopped work changes the forecast
+    db.refresh(action)
+    return action_out(action, user, project, report.author_id)
 
 
 def _notify_pms(db: Session, project: Project, report: DailyReport, kind: str, title: str, body: str) -> None:
@@ -359,6 +428,8 @@ def close_action(
         details={"kind": action.kind, "resolution": resolution, "report_id": str(report.id)},
     )
     db.commit()
+    if action.kind == ActionKind.STOP_WORK.value:
+        risk_service.rescore_after_report(db, project)  # BR-11: the stopped tasks can move again
     return action_out(action, user, project, report.author_id)
 
 

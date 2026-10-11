@@ -29,7 +29,7 @@ const TASK: Task = {
   id: TID, project_id: PID, code: "T-040", name: "Frame: ground to level 4", boq_section_id: null,
   boq_section_code: null, planned_start: "2026-06-15", planned_end: "2026-12-30", weight: "17.10",
   percent_complete: "71.20", is_critical: true, position: 1, planned_percent_today: 84.8, state: "behind",
-  progress_updated_at: null,
+  progress_updated_at: null, is_concrete_pour: true, stopped: false, actual_start: "2026-06-15", actual_finish: null,
 };
 
 const WEATHER: Weather = {
@@ -416,7 +416,8 @@ describe("report helpers", () => {
     expect(summaryIcon("Thunderstorm with hail")).toBe("storm");
     expect(summaryIcon("Clear sky")).toBe("sun");
     expect(isHeavyRain({ rain_mm: "10.1" }, "10.0")).toBe(true);
-    expect(isHeavyRain({ rain_mm: "10.0" }, "10.0")).toBe(false);
+    expect(isHeavyRain({ rain_mm: "10.0" }, "10.0")).toBe(true); // BR-06: 10 mm or more
+    expect(isHeavyRain({ rain_mm: "9.9" }, "10.0")).toBe(false);
     expect(isHeavyRain({ rain_mm: null }, "10.0")).toBe(false);
   });
 

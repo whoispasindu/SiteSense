@@ -39,7 +39,19 @@ const baseSchema = z.object({
     .trim()
     .refine((v) => v === "" || (/^\d{1,4}$/.test(v) && Number(v) >= 1 && Number(v) <= 5000), "Enter a whole number of people, 1 to 5000.")
     .transform((v) => (v === "" ? null : Number(v))),
+  // Phase 9: the days the site works, as ISO weekdays ("123456" = Monday to Saturday).
+  working_week: z.string().regex(/^[1-7]{1,7}$/, "Choose at least one working day."),
 });
+
+const WEEKDAYS = [
+  ["1", "Mon"],
+  ["2", "Tue"],
+  ["3", "Wed"],
+  ["4", "Thu"],
+  ["5", "Fri"],
+  ["6", "Sat"],
+  ["7", "Sun"],
+] as const;
 
 const createSchema = baseSchema.extend({
   code: z
@@ -75,7 +87,9 @@ export function ProjectFormDialog({ open, onClose, project }: ProjectFormDialogP
 
   function onSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    const raw = Object.fromEntries(new FormData(event.currentTarget));
+    const form = new FormData(event.currentTarget);
+    const days = form.getAll("working_day").filter((v): v is string => typeof v === "string");
+    const raw = { ...Object.fromEntries(form), working_week: days.join("") };
     const parsed = (editing ? baseSchema : createSchema).safeParse(raw);
     const next: Partial<Record<Field, string>> = {};
     if (!parsed.success) {
@@ -163,6 +177,28 @@ export function ProjectFormDialog({ open, onClose, project }: ProjectFormDialogP
             error={errors.planned_end}
           />
         </div>
+
+        <fieldset>
+          <legend className="text-sm font-medium text-ink">Working week</legend>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {WEEKDAYS.map(([value, day]) => (
+              <label key={value} className="flex min-h-9 items-center gap-1.5 rounded-md border border-rule-strong px-2.5 text-sm">
+                <input
+                  type="checkbox"
+                  name="working_day"
+                  value={value}
+                  defaultChecked={(project?.working_week ?? "123456").includes(value)}
+                  className="size-4 accent-[var(--color-ink)]"
+                />
+                {day}
+              </label>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-ink-faint">
+            The critical path and forecasts count these days, less the company holidays.
+          </p>
+          {errors.working_week ? <p className="mt-1 text-sm text-signal-high">{errors.working_week}</p> : null}
+        </fieldset>
 
         <TextField
           label="Planned crew (optional)"

@@ -11,7 +11,7 @@ takes its neutral value and a note says so, so the score is still produced but t
     progress_rate_trend    change in that gap per week over the last three weeks
     late_deliveries_count  order lines delivered after, or still overdue past, their expected date
     avg_lateness_days      mean lateness of those lines
-    rain_days_next_14      forecast days with heavy rain (BR-06: over 10 mm) in the next 14 days
+    rain_days_next_14      forecast days with heavy rain (BR-06: 10 mm or more) in the next 14 days
     budget_variance_pct    committed cost against the budgeted value of the same work, % over
     crew_vs_plan_pct       average reported crew over the last 14 days against the planned crew, %
     missing_reports_14     working days (Mon to Sat) in the last 14 without a daily report (BR-07)

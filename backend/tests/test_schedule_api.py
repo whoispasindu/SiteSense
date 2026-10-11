@@ -189,12 +189,15 @@ def test_pm_replans_a_task(api: TestClient, project: Project, pm: dict[str, str]
     task = add_task(api, project, pm)
     url = f"/api/v1/tasks/{task['id']}"
 
-    updated = api.patch(url, json={"planned_end": "2026-03-20", "is_critical": True}, headers=pm)
+    updated = api.patch(url, json={"planned_end": "2026-03-20", "is_concrete_pour": True}, headers=pm)
+    by_hand = api.patch(url, json={"is_critical": True}, headers=pm)
     backwards = api.patch(url, json={"planned_end": "2026-02-01"}, headers=pm)
     null_weight = api.patch(url, json={"weight": None}, headers=pm)
 
     assert updated.status_code == 200
-    assert updated.json()["is_critical"] is True
+    assert updated.json()["is_concrete_pour"] is True
+    assert updated.json()["is_critical"] is True  # calculated: the only task is the critical path
+    assert by_hand.status_code == 422  # Phase 9: never set by hand
     assert backwards.status_code == 422
     assert null_weight.status_code == 422
 

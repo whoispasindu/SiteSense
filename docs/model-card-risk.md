@@ -101,6 +101,11 @@ records first, and real issues may carry more than simulated ones; real data wil
   point, so "4 points behind" can lower a forecast if typical projects are further behind by then.
   The screen says so.
 - **No ranges yet.** Likely ranges (quantile models) arrive with risk model v2 (Phase 10).
+- **Rain barely counts.** `rain_days_next_14` holds 0.0% of the delay model's gain, because the
+  simulator only slows work for rain beyond a town's usual weather for the month. The programme
+  forecast and BR-06 react to rain since Phase 9; the simulator's rain effect is to be reviewed before
+  the Phase 10 retrain ([#27](https://github.com/whoispasindu/SiteSense/issues/27)). Stopped working
+  days (BR-11) do reach the model, through the progress gap.
 
 ## Responsible use
 

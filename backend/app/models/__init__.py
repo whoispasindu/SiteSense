@@ -16,6 +16,7 @@ from app.models.issues import (
     IssueSeverity,
     IssueStatus,
     ReportAction,
+    ReportActionTask,
     ReportIssue,
 )
 from app.models.materials import (
@@ -32,7 +33,7 @@ from app.models.materials import (
 from app.models.project import BoqItem, BoqSection, BudgetLine, Project, ProjectStatus, ProjectType
 from app.models.report import DailyReport, Notification, ReportPhoto, ReportProgress, WeatherForecast
 from app.models.risk import RiskScore
-from app.models.schedule import ProgressSnapshot, Task
+from app.models.schedule import Holiday, ProgressSnapshot, Task, TaskDependency
 from app.models.user import RefreshToken, RoleRecord, Site, User, user_site_assignments
 
 __all__ = [
@@ -48,6 +49,7 @@ __all__ = [
     "DailyReport",
     "Delivery",
     "DocumentCounter",
+    "Holiday",
     "IssueCategory",
     "IssueSeverity",
     "IssueStatus",
@@ -64,6 +66,7 @@ __all__ = [
     "PurchaseOrderStatus",
     "RefreshToken",
     "ReportAction",
+    "ReportActionTask",
     "ReportIssue",
     "ReportPhoto",
     "ReportProgress",
@@ -73,6 +76,7 @@ __all__ = [
     "Site",
     "Supplier",
     "Task",
+    "TaskDependency",
     "User",
     "VariationEvent",
     "VariationOrder",

@@ -112,6 +112,21 @@ answers `404`, exactly like a missing record.
 
 Scores are written only by the scheduler, after daily reports and by the CLI; no endpoint writes them.
 
+## Phase 9 endpoints
+
+| Method and path | Who | Notes |
+| --- | --- | --- |
+| `GET /api/v1/projects/{id}/network` | PM, QS, Site Engineer | Critical path, forecast and slip per task, links, open stop-work flags, rain on pour days, warnings. 404 on other sites |
+| `POST /api/v1/projects/{id}/dependencies` | PM | Finish-to-start, lag 0–365 working days; both tasks in the project; a loop is refused (`422 dependency_loop`); a duplicate is 409 |
+| `DELETE /api/v1/dependencies/{id}` | PM | Site-scoped (404 otherwise) |
+| `GET /api/v1/admin/holidays`, `POST /api/v1/admin/holidays`, `DELETE /api/v1/admin/holidays/{id}` | Company Admin | The company's holidays (2000 to 2100), audited; warns when next year has none |
+| `PUT /api/v1/report-actions/{id}/stop-scope` | **Project manager only** (BR-11) | What an open stop-work flag stops: chosen tasks or the whole project. Others with report access get 403; a cleared flag 409. Re-scores the project's risk |
+
+A stopped task refuses progress (`422 stop_work`) through `PATCH /api/v1/tasks/{id}` and daily
+reports alike, until the project manager clears the flag. `POST /api/v1/reports/{id}/issues/confirm`
+now takes `stop_work_scope` (`tasks` or `project`) and `stop_work_task_ids`. Projects carry a
+`working_week` (ISO weekday digits, Monday to Saturday by default), set when the project is created or edited.
+
 ## Phase 8 endpoints
 
 | Method and path | Who | Notes |

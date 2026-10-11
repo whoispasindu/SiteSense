@@ -65,6 +65,8 @@ class Permission(StrEnum):
     VARIATIONS_APPROVE = "variations:approve"  # the PM approves those that do not need the client
     # BR-09: the variation limit of each project. Company Admin only, audited.
     VARIATION_LIMITS_MANAGE = "variation_limits:manage"
+    # Phase 9: the company's holidays (the working calendar). Company Admin only, audited.
+    HOLIDAYS_MANAGE = "holidays:manage"
     # Client portal (Phase 12)
     CLIENT_PORTAL = "client:portal"
     VARIATIONS_CLIENT_DECIDE = "variations:client_decide"
@@ -75,7 +77,14 @@ P = Permission
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     # Sets up the company. Deliberately has no project approvals (segregation of duties).
     Role.ADMIN: frozenset(
-        {P.USERS_MANAGE, P.SITES_MANAGE, P.AUDIT_READ, P.DASHBOARD_VIEW, P.VARIATION_LIMITS_MANAGE}
+        {
+            P.USERS_MANAGE,
+            P.SITES_MANAGE,
+            P.AUDIT_READ,
+            P.DASHBOARD_VIEW,
+            P.VARIATION_LIMITS_MANAGE,
+            P.HOLIDAYS_MANAGE,
+        }
     ),
     Role.PROJECT_MANAGER: frozenset(
         {

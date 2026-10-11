@@ -71,6 +71,12 @@ class AuditAction:
     VARIATION_APPLIED = "variation.applied"
     VARIATION_WITHDRAWN = "variation.withdrawn"
     VARIATION_LIMIT_CHANGED = "project.variation_limit_changed"
+    # Phase 9: the programme network, holidays and stop-work scope
+    DEPENDENCY_ADDED = "task.dependency_added"
+    DEPENDENCY_REMOVED = "task.dependency_removed"
+    HOLIDAY_ADDED = "holiday.added"
+    HOLIDAY_REMOVED = "holiday.removed"
+    STOP_WORK_SCOPE_CHANGED = "report_action.stop_scope_changed"
 
 
 def record(

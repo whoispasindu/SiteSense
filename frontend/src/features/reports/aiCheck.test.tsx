@@ -39,7 +39,8 @@ const SUGGESTED: ReportIssues = {
 
 const action = (over: Partial<ReportAction>): ReportAction => ({
   id: A1, report_id: RID, kind: "material_request", status: "open", summary: "Cement not delivered again",
-  created_at: "2026-10-11T03:20:00+00:00", closed_at: null, request_id: null, can_close: true, ...over,
+  created_at: "2026-10-11T03:20:00+00:00", closed_at: null, request_id: null, can_close: true,
+  stop_scope: null, stop_task_ids: [], can_edit_scope: false, ...over,
 });  // fmt: skip
 
 const CONFIRMED: ReportIssues = {
@@ -48,6 +49,15 @@ const CONFIRMED: ReportIssues = {
   actions: [action({}), action({ id: "44444444-4444-4444-8444-444444444444", kind: "stop_work", summary: "Helper fell", can_close: false })],
 };  // fmt: skip
 
+const task = (id: string, code: string, pct: string) => ({
+  id, project_id: PID, code, name: `Task ${code}`, boq_section_id: null, boq_section_code: null,
+  planned_start: "2026-09-01", planned_end: "2026-12-31", weight: "15.00", percent_complete: pct, is_critical: false,
+  is_concrete_pour: false, stopped: false, actual_start: pct === "0.00" ? null : "2026-09-01", actual_finish: null,
+  position: 1, planned_percent_today: 30, state: "on_track", progress_updated_at: null,
+});  // fmt: skip
+const SLAB = task("55555555-5555-4555-8555-555555555555", "T-040", "40.00"); // under way: pre-ticked
+const PILING = task("66666666-6666-4666-8666-666666666666", "T-020", "0.00");
+
 function reportApi(role: Role, issues: () => Response, extra: Record<string, (url: string, init?: RequestInit) => Response> = {}) {
   return mockApi({
     ...sessionApi(makeMe(role)),
@@ -55,6 +65,7 @@ function reportApi(role: Role, issues: () => Response, extra: Record<string, (ur
     [`/api/v1/reports/${RID}/issues`]: issues,
     [`/api/v1/reports/${RID}/analyze`]: () => jsonResponse(SUGGESTED),
     [`/api/v1/reports/${RID}/issues/confirm`]: () => jsonResponse(CONFIRMED),
+    [`/api/v1/projects/${PID}/tasks`]: () => jsonResponse({ tasks: [SLAB, PILING], weight_total: "30.00" }),
     ...extra,
   });
 }
@@ -103,7 +114,10 @@ describe("AI check on a daily report", () => {
           { suggestion_id: I1, category: "material_delay", severity: "medium" },
           { category: "safety", severity: "high", snippet: "A helper slipped on the stairs" },
         ],
-        actions: { material_request: true, pm_alert: false, stop_work: true },
+        actions: {
+          material_request: true, pm_alert: false, stop_work: true,
+          stop_work_scope: "tasks", stop_work_task_ids: [SLAB.id], // pre-ticked: the task under way (BR-11)
+        },  // fmt: skip
       });
     });
     expect(await screen.findByRole("list", { name: "Confirmed issues" })).toHaveTextContent("Material delay");

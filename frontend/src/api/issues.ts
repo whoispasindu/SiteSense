@@ -52,8 +52,13 @@ const actionSchema = z.object({
   closed_at: z.iso.datetime({ offset: true }).nullable(),
   request_id: z.uuid().nullable(),
   can_close: z.boolean(),
+  // BR-11 (Phase 9): what a stop-work flag stops.
+  stop_scope: z.enum(["tasks", "project"]).nullable(),
+  stop_task_ids: z.array(z.uuid()),
+  can_edit_scope: z.boolean(),
 });
 export type ReportAction = z.infer<typeof actionSchema>;
+export type StopScope = "tasks" | "project";
 
 const reportIssuesSchema = z.object({
   report_id: z.uuid(),
@@ -68,7 +73,13 @@ export type ReportIssues = z.infer<typeof reportIssuesSchema>;
 
 export interface ConfirmInput {
   issues: { suggestion_id?: string; category: IssueCategory; severity: IssueSeverity; snippet?: string }[];
-  actions: { material_request: boolean; pm_alert: boolean; stop_work: boolean };
+  actions: {
+    material_request: boolean;
+    pm_alert: boolean;
+    stop_work: boolean;
+    stop_work_scope?: StopScope;
+    stop_work_task_ids?: string[];
+  };
 }
 
 export const issueKeys = {
@@ -105,6 +116,8 @@ export function useConfirmIssues(reportId: string, projectId: string) {
       // Confirmed issues feed the risk score and may notify the project managers.
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: issueKeys.projectActions(projectId) }),
+        queryClient.invalidateQueries({ queryKey: ["projects", projectId, "network"] }),
+        queryClient.invalidateQueries({ queryKey: ["projects", projectId, "tasks"] }),
         queryClient.invalidateQueries({ queryKey: riskKeys.project(projectId) }),
         queryClient.invalidateQueries({ queryKey: riskKeys.ranking }),
         queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
@@ -134,6 +147,21 @@ export function useCloseAction() {
         queryClient.invalidateQueries({ queryKey: issueKeys.report(action.report_id) }),
         queryClient.invalidateQueries({ queryKey: ["projects"] }),
         queryClient.invalidateQueries({ queryKey: materialKeys.all }),
+      ]),
+  });
+}
+
+/** BR-11: the PM changes what an open stop-work flag stops. */
+export function useSetStopScope() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; scope: StopScope; task_ids: string[] }) =>
+      apiRequest(`/report-actions/${encodeURIComponent(id)}/stop-scope`, actionSchema, { method: "PUT", body }).then((r) => r.data),
+    onSuccess: (action) =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: issueKeys.report(action.report_id) }),
+        queryClient.invalidateQueries({ queryKey: ["projects"] }),
+        queryClient.invalidateQueries({ queryKey: ["risk"] }),
       ]),
   });
 }

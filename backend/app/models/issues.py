@@ -12,7 +12,7 @@ from decimal import Decimal
 from enum import StrEnum
 
 from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Numeric, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, UUIDPrimaryKeyMixin
 
@@ -117,12 +117,33 @@ class ReportAction(UUIDPrimaryKeyMixin, Base):
     request_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("material_requests.id", ondelete="SET NULL"), nullable=True
     )
+    # BR-11 (Phase 9): what a stop-work flag stops: chosen tasks, or the whole project.
+    stop_scope: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    stop_tasks: Mapped[list["ReportActionTask"]] = relationship(cascade="all, delete-orphan", lazy="selectin")
 
     __table_args__ = (
         CheckConstraint(f"kind IN ({_values(ActionKind)})", name="kind_values"),
         CheckConstraint(f"status IN ({_values(ActionStatus)})", name="status_values"),
         # A PM alert is sent at once, so it is recorded as done when it is created.
         CheckConstraint("(status = 'open') = (closed_at IS NULL)", name="closed_when_not_open"),
+        CheckConstraint(
+            "(kind = 'stop_work') = (stop_scope IS NOT NULL) "
+            "AND (stop_scope IS NULL OR stop_scope IN ('tasks', 'project'))",
+            name="stop_scope_for_stop_work",
+        ),
         Index("ix_report_actions_project_open", "project_id", "kind", "status"),
         Index("ix_report_actions_report", "report_id"),
+    )
+
+
+class ReportActionTask(Base):
+    """A task stopped by a stop-work flag whose scope is "tasks" (BR-11)."""
+
+    __tablename__ = "report_action_tasks"
+
+    action_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("report_actions.id", ondelete="CASCADE"), primary_key=True
+    )
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True, index=True
     )

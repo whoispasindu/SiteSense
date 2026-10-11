@@ -22,7 +22,7 @@ from app.core.database import Database
 from app.core.logging import get_logger
 from app.integrations.weather import WeatherClient, WeatherUnavailableError
 from app.models import Site
-from app.services import cost_service, report_service, risk_service, weather
+from app.services import cost_service, network_service, report_service, risk_service, weather
 
 log = get_logger(__name__)
 
@@ -56,6 +56,11 @@ def run_risk_scoring(session_factory: Callable[[], Session]) -> int:
     return len(scored)
 
 
+def run_pour_check(session_factory: Callable[[], Session]) -> int:
+    with session_factory() as db:
+        return network_service.check_all_pours(db)
+
+
 def run_variance_check(session_factory: Callable[[], Session]) -> int:
     with session_factory() as db:
         return cost_service.check_all(db)
@@ -84,6 +89,12 @@ def build_scheduler(settings: Settings, database: Database, client: WeatherClien
         _guarded("weather_refresh", lambda: refresh_weather(database.session_factory, client)),
         CronTrigger(hour=5, minute=30, timezone=clock.SITE_TIME_ZONE),
         id="weather_refresh",
+        **common,
+    )
+    scheduler.add_job(
+        _guarded("pour_check", lambda: run_pour_check(database.session_factory)),
+        CronTrigger(hour=5, minute=45, timezone=clock.SITE_TIME_ZONE),  # BR-06, after the weather
+        id="pour_check",
         **common,
     )
     scheduler.add_job(

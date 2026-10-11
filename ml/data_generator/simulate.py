@@ -38,7 +38,7 @@ DEFAULT_OUTPUT = HERE.parent / "data" / "snapshots.csv"
 # --- Shared definitions (mirrored in backend/app/ai/risk/features.py) --------------------------------
 
 PROJECT_TYPES = ("residential", "commercial", "mixed_use", "industrial", "institutional")
-HEAVY_RAIN_MM = 10.0  # BR-06: heavy rain is more than 10 mm in a day
+HEAVY_RAIN_MM = 10.0  # BR-06: heavy rain is 10 mm or more in a day
 WORKING_DAYS = 6  # Monday to Saturday, the usual site week in Sri Lanka
 
 FEATURES = (

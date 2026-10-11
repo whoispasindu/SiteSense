@@ -225,6 +225,7 @@ def project_detail(db: Session, project: Project) -> ProjectDetail:
             **_summary(project, boq_total, budget_total, items, variations),
             "description": project.description,
             "planned_crew": project.planned_crew,
+            "working_week": project.working_week,
             "contract_locked": contract_locked(db, project),
             "sections": sections,
             "team": _team(db, project),

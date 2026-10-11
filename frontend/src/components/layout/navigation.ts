@@ -46,6 +46,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     items: [
       { label: "Users", path: "/admin/users", icon: "users", phase: 1, permission: "users:manage" },
       { label: "Sites", path: "/admin/sites", icon: "sites", phase: 1, permission: "sites:manage" },
+      { label: "Holidays", path: "/admin/holidays", icon: "schedule", phase: 9, permission: "holidays:manage" },
       { label: "Variation limits", path: "/admin/variation-limits", icon: "cost", phase: 8, permission: "variation_limits:manage" },
       { label: "Audit log", path: "/admin/audit", icon: "audit", phase: 1, permission: "audit:read" },
     ],

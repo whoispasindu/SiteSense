@@ -169,7 +169,7 @@ class WeatherOut(BaseModel):
     fetched_at: datetime | None
     message: str | None
     days: list[WeatherDayOut]
-    # BR-06 groundwork: days with heavy rain forecast (more than 10 mm).
+    # BR-06: days with heavy rain forecast (10 mm or more).
     heavy_rain_threshold_mm: Decimal
 
 

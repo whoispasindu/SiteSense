@@ -17,12 +17,15 @@ import {
   type ReportAction,
   type ReportIssues,
 } from "../../api/issues";
+import { useTasks } from "../../api/schedule";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { SectionHeading } from "../../components/ui/SectionHeading";
 import { Sheet } from "../../components/ui/Sheet";
 import { StatusBadge, type Tone } from "../../components/ui/StatusBadge";
 import { errorText } from "../admin/adminUtils";
+import { stopScopeValid, tasksInProgress, type StopScopeValue } from "./stopScope";
+import { StopScopeFields } from "./StopScopeFields";
 
 const SEVERITY_TONES: Record<IssueSeverity, Tone> = { low: "idle", medium: "warn", high: "down" };
 const selectClass =
@@ -67,6 +70,12 @@ function Editor({ data, reportId, projectId }: { data: ReportIssues; reportId: s
   const [error, setError] = useState<string | null>(null);
   const kept = rows.filter((r) => r.keep);
   const allowed = allowedActions(kept);
+  const tasks = useTasks(projectId);
+  const [stopScope, setStopScope] = useState<StopScopeValue | null>(null);
+  const programme = tasks.data?.tasks ?? [];
+  // Pre-ticked: the tasks under way, until the author changes the choice (BR-11).
+  const scope = stopScope ?? { scope: "tasks" as const, taskIds: tasksInProgress(programme) };
+  const stopping = actions.stop_work && allowed.stop_work;
 
   function update(key: string, change: Partial<Row>) {
     setRows((current) => current.map((r) => (r.key === key ? { ...r, ...change } : r)));
@@ -97,7 +106,8 @@ function Editor({ data, reportId, projectId }: { data: ReportIssues; reportId: s
       actions: {
         material_request: actions.material_request && allowed.material_request,
         pm_alert: actions.pm_alert && allowed.pm_alert,
-        stop_work: actions.stop_work && allowed.stop_work,
+        stop_work: stopping,
+        ...(stopping ? { stop_work_scope: scope.scope, stop_work_task_ids: scope.scope === "tasks" ? scope.taskIds : [] } : {}),
       },
     });
   }
@@ -220,11 +230,12 @@ function Editor({ data, reportId, projectId }: { data: ReportIssues; reportId: s
             </span>
           </label>
         ))}
+        {stopping ? <StopScopeFields tasks={programme} value={scope} onChange={setStopScope} idPrefix={`stop-${reportId}`} /> : null}
       </fieldset>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-4">
         <p className="text-xs text-ink-faint">Suggestions only: nothing is saved until you confirm. Confirmed issues feed the project's risk score.</p>
-        <Button variant="primary" onClick={submit} disabled={confirm.isPending}>
+        <Button variant="primary" onClick={submit} disabled={confirm.isPending || (stopping && !stopScopeValid(scope))}>
           {confirm.isPending ? "Confirming…" : `Confirm ${String(kept.length)} ${kept.length === 1 ? "tag" : "tags"}`}
         </Button>
       </div>
