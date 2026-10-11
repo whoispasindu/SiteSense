@@ -5,6 +5,7 @@
     python -m app.cli send-reminders      # missing daily report reminders now (BR-07)
     python -m app.cli refresh-weather     # fetch the 14-day forecast for every active site
     python -m app.cli score-risk          # score every open project's risk now
+    python -m app.cli check-variance      # forecast final cost per section; alert new overruns
 
 ``create-admin`` prints a one-time temporary password; the admin must change it at first sign-in.
 ``seed-dev`` creates demo sites and one account per role using SITESENSE_DEMO_PASSWORD, and
@@ -21,13 +22,12 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.ai.nlp import model as text_model
 from app.ai.nlp.tagger import tag_problems
 from app.core import clock
 from app.core.config import get_settings
 from app.core.database import Database
 from app.core.permissions import Role
-from app.core.scheduler import refresh_weather, run_report_reminders, run_risk_scoring
+from app.core.scheduler import refresh_weather, run_report_reminders, run_risk_scoring, run_variance_check
 from app.core.security import (
     PasswordPolicyError,
     generate_temporary_password,
@@ -40,6 +40,7 @@ from app.models import (
     BoqSection,
     DailyReport,
     MaterialRequest,
+    ProgressClaim,
     ProgressSnapshot,
     Project,
     PurchaseOrder,
@@ -50,8 +51,24 @@ from app.models import (
     Task,
     User,
 )
+from app.schemas.contract import (
+    ClaimDecisionIn,
+    ClaimIn,
+    ClaimPaymentIn,
+    ClaimSectionIn,
+    VariationDecisionIn,
+    VariationIn,
+)
 from app.schemas.materials import DecisionIn, DeliveryIn, OrderLineIn, PurchaseOrderCreate, RequestCreate
-from app.services import audit, materials_service, procurement_service, risk_service
+from app.services import (
+    audit,
+    claim_service,
+    cost_service,
+    materials_service,
+    procurement_service,
+    risk_service,
+    variation_service,
+)
 from app.services.audit import RequestMeta
 from app.services.auth_service import normalize_email
 from app.services.boq_import import parse_boq
@@ -278,7 +295,9 @@ def seed_dev() -> int:
         _seed_materials(db)
         _seed_risk_inputs(db)
         _seed_issues(db)
+        _seed_contract(db)
         risk_service.score_all(db)
+        cost_service.check_all(db)
     database.dispose()
     print(
         f"Seeded {len(DEMO_SITES)} sites, {created} new demo users and {new_projects} new projects "
@@ -506,11 +525,92 @@ def _seed_issues(db: Session) -> None:
                     category=tag.category, severity=tag.severity, status="confirmed", source="ai",
                     ai_category=tag.category, ai_severity=tag.severity,
                     confidence=Decimal(str(tag.confidence)), low_confidence=False,
-                    model_version=text_model.CURRENT_VERSION,
+                    model_version=tag.model_version,
                     position=position, created_at=now, confirmed_by=report.author_id, confirmed_at=now,
                 )
             )  # fmt: skip
     db.commit()
+
+
+def _seed_contract(db: Session) -> None:
+    """Havelock's claims and variations at every stage, through the services (BR-08, BR-09).
+
+    Claims: one approved and paid, one waiting for the PM. Certified progress follows the programme's
+    progress in each BOQ section. Variations: one the PM approved (small, raised by the QS), one with
+    a time impact waiting for the client, and one the PM raised that the QS has still to price.
+    """
+    project = db.scalar(select(Project).where(Project.code == "HR-2026-01"))
+    if project is None or db.scalar(select(ProgressClaim.id).where(ProgressClaim.project_id == project.id)):
+        return
+    people = {
+        u.email.split("@")[0]: u
+        for u in db.scalars(select(User).where(User.email.like("%@sitesense.example")))
+    }
+    qs, pm = people["qs"], people["pm"]
+    meta = RequestMeta(ip_address=None, user_agent="seed-dev")
+    sections = list(
+        db.scalars(
+            select(BoqSection).where(BoqSection.project_id == project.id).order_by(BoqSection.position)
+        )
+    )
+    progress: dict[object, Decimal] = {}
+    for section in sections:
+        tasks = list(db.scalars(select(Task).where(Task.boq_section_id == section.id)))
+        weight = sum((t.weight for t in tasks), Decimal(0))
+        done = sum((t.weight * t.percent_complete for t in tasks), Decimal(0))
+        progress[section.id] = (done / weight).quantize(Decimal("1")) if weight else Decimal(0)
+
+    def claim(share: Decimal) -> ClaimIn:
+        return ClaimIn(
+            sections=[
+                ClaimSectionIn(
+                    section_id=s.id, certified_pct=(progress[s.id] * share).quantize(Decimal("0.5"))
+                )
+                for s in sections
+            ]
+        )
+
+    if any(progress.values()):
+        first = claim_service.create(db, qs, project.id, claim(Decimal("0.7")), meta=meta)
+        claim_service.decide(db, pm, first.id, ClaimDecisionIn(decision="approve"), meta=meta)
+        claim_service.record_payment(db, qs, first.id, ClaimPaymentIn(paid_on=clock.site_today()), meta=meta)
+        claim_service.create(db, qs, project.id, claim(Decimal("1")), meta=meta)
+
+    by_code = {s.code: s for s in sections}
+    first_section, last_section = sections[0], by_code.get("C", sections[-1])
+    slab = db.scalar(
+        select(Task).where(Task.project_id == project.id, Task.boq_section_id == last_section.id)
+    )
+    small = variation_service.raise_variation(
+        db, qs, project.id,
+        VariationIn(
+            title="Extra waterproofing to the basement retaining wall",
+            description="Ground water is higher than surveyed; a second membrane layer is needed.",
+            section_id=first_section.id, contract_change=Decimal("850000"), budget_change=Decimal("680000"),
+        ),
+        meta=meta,
+    )  # fmt: skip
+    variation_service.decide(db, pm, small.id, VariationDecisionIn(decision="approve"), meta=meta)
+    if slab is not None:
+        variation_service.raise_variation(
+            db, qs, project.id,
+            VariationIn(
+                title="Additional plant room on the roof",
+                description="The client asked for a roof-top plant room for future solar inverters.",
+                section_id=last_section.id, task_id=slab.id, time_impact_days=10,
+                contract_change=Decimal("4200000"), budget_change=Decimal("3300000"),
+            ),
+            meta=meta,
+        )  # fmt: skip
+    variation_service.raise_variation(
+        db, pm, project.id,
+        VariationIn(
+            title="Granite floor in the main lobby",
+            description="Upgrade the lobby floor finish from homogeneous tiles to polished granite.",
+            section_id=last_section.id,
+        ),
+        meta=meta,
+    )  # fmt: skip
 
 
 def send_reminders() -> int:
@@ -538,6 +638,14 @@ def score_risk() -> int:
     return 0
 
 
+def check_variance() -> int:
+    database = Database(get_settings())
+    alerts = run_variance_check(database.session_factory)
+    database.dispose()
+    print(f"Checked cost forecasts: {alerts} new overrun alerts.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -548,6 +656,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("send-reminders", help="remind sites missing today's daily report")
     sub.add_parser("refresh-weather", help="fetch the 14-day forecast for every active site")
     sub.add_parser("score-risk", help="score every open project's risk now")
+    sub.add_parser("check-variance", help="forecast final cost per section and alert new overruns")
     args = parser.parse_args(argv)
 
     if args.command == "create-admin":
@@ -558,6 +667,8 @@ def main(argv: list[str] | None = None) -> int:
         return refresh_site_weather()
     if args.command == "score-risk":
         return score_risk()
+    if args.command == "check-variance":
+        return check_variance()
     return seed_dev()
 
 

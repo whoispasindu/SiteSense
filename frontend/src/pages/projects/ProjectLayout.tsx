@@ -60,7 +60,7 @@ export function ProjectLayout() {
         ) : null}
       </header>
 
-      <nav aria-label="Project sections" className="mt-6 flex gap-6 border-b border-rule">
+      <nav aria-label="Project sections" className="mt-6 flex gap-6 overflow-x-auto overflow-y-hidden border-b border-rule [scrollbar-width:none]">
         <NavLink
           to={`/projects/${p.id}`}
           end
@@ -82,6 +82,22 @@ export function ProjectLayout() {
             }
           >
             Reports
+          </NavLink>
+        ) : null}
+        {can("cost:read") ? (
+          <NavLink
+            to={`/projects/${p.id}/claims`}
+            className={({ isActive }) => `${TAB} ${isActive ? "border-accent-line text-ink" : "border-transparent text-ink-faint hover:border-rule-strong hover:text-ink"}`}
+          >
+            Claims
+          </NavLink>
+        ) : null}
+        {can("variations:manage") ? (
+          <NavLink
+            to={`/projects/${p.id}/variations`}
+            className={({ isActive }) => `${TAB} ${isActive ? "border-accent-line text-ink" : "border-transparent text-ink-faint hover:border-rule-strong hover:text-ink"}`}
+          >
+            Variations
           </NavLink>
         ) : null}
         {can("schedule:read") ? (

@@ -204,10 +204,25 @@ const budgetFigures = {
   // Cumulative: every approved, ordered or delivered request once, at its latest value (BR-13).
   committed: decimal,
   remaining: decimal, // budget - committed
+  // Phase 8: committed plus the remaining budget at the cost trend so far.
+  forecast_final: decimal,
+  variance: decimal, // budget - forecast (negative: forecast overrun)
+  variance_pct: decimal.nullable(),
+  trend: decimal.nullable(), // committed / budgeted value of the committed work; null: nothing committed
+  basis_pct: decimal, // % of the budget the trend rests on
+  over_alert_line: z.boolean(), // forecast more than 5% over budget
 };
 const budgetSchema = z.object({
   project_id: z.uuid(),
-  lines: z.array(z.object({ section_id: z.uuid(), code: z.string(), name: z.string(), ...budgetFigures })),
+  lines: z.array(
+    z.object({
+      section_id: z.uuid(),
+      code: z.string(),
+      name: z.string(),
+      over_budget_since: z.iso.date().nullable(),
+      ...budgetFigures,
+    }),
+  ),
   totals: z.object(budgetFigures),
 });
 export type Budget = z.infer<typeof budgetSchema>;

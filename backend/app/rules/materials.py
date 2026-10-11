@@ -58,7 +58,7 @@ def check_quantity(
     """Block when everything requested for the item would exceed the BOQ quantity plus 3%.
 
     ``already_requested`` counts every live request for the item (not rejected or cancelled).
-    ``approved_variation`` is extra quantity from approved variations (Phase 8); until then 0.
+    ``approved_variation`` is extra quantity from approved variation orders on the item (Phase 8).
     """
     allowance = boq_quantity * (1 + QUANTITY_TOLERANCE) + approved_variation
     total = already_requested + requested
@@ -67,6 +67,7 @@ def check_quantity(
         "allowance": str(allowance.quantize(Decimal("0.001"))),
         "already_requested": str(already_requested),
         "total_after_request": str(total),
+        "approved_variation": str(approved_variation),
     }
     if total > allowance:
         over = total - boq_quantity
@@ -76,6 +77,14 @@ def check_quantity(
             f"This would bring requests for the item to {_qty(total)} against a BOQ quantity of "
             f"{_qty(boq_quantity)} "
             f"({_pct(over / boq_quantity)} over; the limit is 3%). An approved variation is needed first.",
+            facts,
+        )
+    if total > boq_quantity * (1 + QUANTITY_TOLERANCE):
+        return RuleResult(
+            "BR-02",
+            "pass",
+            f"Covered by approved variations: {_qty(total)} requested against a BOQ quantity of "
+            f"{_qty(boq_quantity)} plus {_qty(approved_variation)} from variations.",
             facts,
         )
     if total > boq_quantity:

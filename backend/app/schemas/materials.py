@@ -395,12 +395,20 @@ class BudgetFigures(BaseModel):
     # Cumulative: every approved, ordered or delivered request once, at its latest value (BR-13).
     committed: Decimal
     remaining: Decimal  # budget - committed (negative: over budget)
+    # Phase 8: committed plus the remaining budget at the cost trend so far (app.rules.cost).
+    forecast_final: Decimal
+    variance: Decimal  # budget - forecast (negative: forecast overrun)
+    variance_pct: Decimal | None  # variance as a % of the budget (None for a zero budget)
+    trend: Decimal | None  # committed / budgeted value of the committed work (None: nothing committed)
+    basis_pct: Decimal  # % of the budget the trend is based on
+    over_alert_line: bool  # forecast more than 5% over budget
 
 
 class BudgetLineOut(BudgetFigures):
     section_id: uuid.UUID
     code: str
     name: str
+    over_budget_since: date | None  # when the variance alert was sent (cleared when back under)
 
 
 class BudgetOut(BaseModel):

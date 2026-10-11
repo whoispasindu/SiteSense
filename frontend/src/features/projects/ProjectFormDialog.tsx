@@ -65,6 +65,7 @@ export function ProjectFormDialog({ open, onClose, project }: ProjectFormDialogP
   const save = useSaveProject(project?.id);
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const editing = project !== undefined;
+  const locked = project?.contract_locked === true;
 
   function close() {
     setErrors({});
@@ -145,12 +146,22 @@ export function ProjectFormDialog({ open, onClose, project }: ProjectFormDialogP
           defaultValue={project?.contract_value}
           placeholder="1114000000.00"
           className="tabular"
+          readOnly={locked}
+          hint={locked ? "Changes through approved variations now that the project is under way." : undefined}
           error={errors.contract_value}
         />
 
         <div className="grid gap-5 sm:grid-cols-2">
           <TextField label="Start date" name="start_date" type="date" defaultValue={project?.start_date} error={errors.start_date} />
-          <TextField label="Planned end" name="planned_end" type="date" defaultValue={project?.planned_end} error={errors.planned_end} />
+          <TextField
+            label="Planned end"
+            name="planned_end"
+            type="date"
+            defaultValue={project?.planned_end}
+            readOnly={locked}
+            hint={locked ? "Moves with approved variations' time impact." : undefined}
+            error={errors.planned_end}
+          />
         </div>
 
         <TextField

@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     admin,
     auth,
+    contract,
     health,
     issues,
     materials,
@@ -23,6 +24,7 @@ api_router.include_router(schedule.router)
 api_router.include_router(reports.router)
 api_router.include_router(issues.router)
 api_router.include_router(materials.router)
+api_router.include_router(contract.router)
 api_router.include_router(risk.router)
 api_router.include_router(notifications.router)
 api_router.include_router(admin.router)

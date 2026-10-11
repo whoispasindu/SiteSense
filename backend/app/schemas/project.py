@@ -91,6 +91,8 @@ class ProjectSummary(ProjectCard):
     contract_value: Decimal
     boq_total: Decimal
     budget_total: Decimal
+    # Contract change of approved variations (Phase 8): margins compare BOQ + variations with the budget.
+    variations_total: Decimal = Decimal("0.00")
 
 
 class SectionBasics(BaseModel):
@@ -104,6 +106,7 @@ class SectionTotals(SectionBasics):
     amount: Decimal
     budget_line_id: uuid.UUID
     budget_amount: Decimal
+    variation_amount: Decimal = Decimal("0.00")  # approved variations' contract change in the section
 
 
 class TeamMember(BaseModel):
@@ -125,6 +128,9 @@ class ProjectDetailBasics(ProjectCard):
 class ProjectDetail(ProjectSummary):
     description: str | None
     planned_crew: int | None
+    # Past planning (or with claims or variations): contract value and planned end change only through
+    # approved variations.
+    contract_locked: bool = False
     sections: list[SectionTotals]
     team: list[TeamMember]
     created_at: datetime
@@ -166,6 +172,7 @@ class BoqOut(BaseModel):
     sections: list[BoqSectionOut]
     boq_total: Decimal
     budget_total: Decimal
+    variations_total: Decimal = Decimal("0.00")
     item_count: int
 
 

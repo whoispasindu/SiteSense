@@ -19,10 +19,11 @@ export function ProjectOverview() {
   const costs = useBudget(p.id, can("cost:read") && p.item_count > 0);
   // Rates and amounts arrive only for roles with "rates:read"; site engineers get none of them.
   const priced = p.contract_value !== undefined;
-  const boq = toNumber(p.boq_total ?? 0);
+  // Contract side includes approved variations, as the budget does (Phase 8).
+  const boq = toNumber(p.boq_total ?? 0) + toNumber(p.variations_total ?? 0);
   const budget = toNumber(p.budget_total ?? 0);
   const margin = boq > 0 ? ((boq - budget) / boq) * 100 : 0;
-  const coverage = percent(p.boq_total ?? 0, p.contract_value ?? 0);
+  const coverage = percent(boq, p.contract_value ?? 0);
   const largest = Math.max(...p.sections.map((s) => toNumber(s.amount ?? 0)), 1);
 
   const titleRows: [string, string][] = [

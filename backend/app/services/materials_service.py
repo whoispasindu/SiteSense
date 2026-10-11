@@ -35,8 +35,10 @@ from app.models import (
     ReportAction,
     RequestStatus,
     User,
+    VariationOrder,
 )
 from app.rules import materials as rules
+from app.rules.variations import VariationStatus
 from app.schemas.materials import (
     Action,
     BoqItemOption,
@@ -163,11 +165,22 @@ def section_costs(db: Session, project_id: uuid.UUID) -> dict[uuid.UUID, Section
 
 
 def committed_against_budget(db: Session, project_id: uuid.UUID) -> tuple[Decimal, Decimal]:
-    """(committed cost, budgeted value of the same quantities) over the project's committed requests.
+    """(committed cost, budgeted value of the same quantities) over the whole project.
 
-    Each request counts once at its latest value, as in ``section_costs``. Its budgeted value is its
-    quantity at the item's budgeted rate (the item's share of the section's budget line). The risk
-    model uses the ratio as its cost-variance feature.
+    The risk model uses the ratio as its cost-variance feature.
+    """
+    by_section = committed_against_budget_by_section(db, project_id).values()
+    return sum((c for c, _ in by_section), ZERO), sum((b for _, b in by_section), ZERO)
+
+
+def committed_against_budget_by_section(
+    db: Session, project_id: uuid.UUID
+) -> dict[uuid.UUID, tuple[Decimal, Decimal]]:
+    """Per BOQ section: (committed cost, budgeted value of the same quantities).
+
+    Each committed request counts once at its latest value, as in ``section_costs``. Its budgeted
+    value is its quantity at the item's budgeted rate (the item's share of the section's budget
+    line). The cost forecast (Phase 8) uses the ratio per section as the cost trend.
     """
     section_amounts = dict(
         db.execute(
@@ -202,24 +215,25 @@ def committed_against_budget(db: Session, project_id: uuid.UUID) -> tuple[Decima
         .outerjoin(delivered, delivered.c.line_id == PurchaseOrderLine.id)
         .where(MaterialRequest.project_id == project_id, MaterialRequest.status.in_(COMMITTED_STATUSES))
     ).all()
-    committed = ZERO
-    budgeted = ZERO
+    out: dict[uuid.UUID, tuple[Decimal, Decimal]] = {}
     for section_id, item_rate, quantity, price, ordered_qty, order_price, order_amount, done in rows:
         rate = rules.item_budget_rate(
             item_rate=item_rate,
             section_amount=Decimal(section_amounts.get(section_id) or 0),
             line_budget=Decimal(line_budgets.get(section_id) or 0),
         )
-        budgeted += rules.money(quantity * rate)
+        budgeted = rules.money(quantity * rate)
         if order_amount is None:
-            committed += rules.money(quantity * (price or ZERO))
-            continue
-        spent = rules.money(Decimal(done) * order_price)
-        fully = Decimal(done) >= ordered_qty
-        committed += latest_value(
-            approved_amount=None, order_amount=order_amount, delivered=spent if fully else None
-        )
-    return committed, budgeted
+            committed = rules.money(quantity * (price or ZERO))
+        else:
+            spent = rules.money(Decimal(done) * order_price)
+            fully = Decimal(done) >= ordered_qty
+            committed = latest_value(
+                approved_amount=None, order_amount=order_amount, delivered=spent if fully else None
+            )
+        so_far = out.get(section_id, (ZERO, ZERO))
+        out[section_id] = (so_far[0] + committed, so_far[1] + budgeted)
+    return out
 
 
 # --- Facts for the rules -----------------------------------------------------------------------------
@@ -232,6 +246,7 @@ class ItemFacts:
     line_budget: Decimal
     line_committed: Decimal  # the section's committed cost, this request excluded
     already_requested: Decimal
+    approved_variation: Decimal = ZERO  # extra quantity from approved variations (BR-02)
 
     @property
     def budget_rate(self) -> Decimal:
@@ -280,6 +295,15 @@ def item_facts(
         line_budget=Decimal(line_budget or 0),
         line_committed=committed,
         already_requested=Decimal(db.scalar(requested_stmt) or 0),
+        approved_variation=Decimal(
+            db.scalar(
+                select(func.coalesce(func.sum(VariationOrder.quantity_change), 0)).where(
+                    VariationOrder.boq_item_id == item.id,
+                    VariationOrder.status == VariationStatus.APPROVED.value,
+                )
+            )
+            or 0
+        ),
     )
 
 
@@ -291,7 +315,10 @@ def evaluate(facts: ItemFacts, quantity: Decimal, unit_price: Decimal | None) ->
     """All rules for a request. Without a price (pending) BR-01 and BR-13 report "pending"."""
     amount = amount_of(quantity, unit_price)
     quantity_result = rules.check_quantity(
-        boq_quantity=facts.item.quantity, already_requested=facts.already_requested, requested=quantity
+        boq_quantity=facts.item.quantity,
+        already_requested=facts.already_requested,
+        requested=quantity,
+        approved_variation=facts.approved_variation,
     )
     level, routing, fired = rules.route_approval(
         unit_price=unit_price,
@@ -836,5 +863,9 @@ def decide(
     if target == RequestStatus.PM_APPROVAL.value:
         _notify_approvers(db, request, project)
     db.commit()
+    if target == RequestStatus.APPROVED.value:
+        from app.services import cost_service  # here, not at the top: cost_service imports this module
+
+        cost_service.check_after_change(db, project)  # an approval commits cost (Phase 8 variance)
     db.refresh(request)
     return request

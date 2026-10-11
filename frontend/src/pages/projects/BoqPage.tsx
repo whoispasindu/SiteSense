@@ -56,7 +56,8 @@ function SectionSheet({ projectId, section, canEdit }: { projectId: string; sect
   const [editing, setEditing] = useState(false);
   // Rates and amounts arrive only for roles with "rates:read" (not site engineers).
   const priced = section.amount !== undefined;
-  const amount = toNumber(section.amount ?? 0);
+  // Contract side includes approved variations, as the budget line does (Phase 8).
+  const amount = toNumber(section.amount ?? 0) + toNumber(section.variation_amount ?? 0);
   const margin = amount > 0 ? ((amount - toNumber(section.budget_amount ?? 0)) / amount) * 100 : 0;
   const panelId = `section-${section.id}`;
 
@@ -191,13 +192,15 @@ export function BoqPage() {
   if (boq.isPending) return <p className="py-10 text-center text-ink-faint">Loading BOQ…</p>;
   if (boq.isError) return <Alert tone="error">{errorText(boq.error)}</Alert>;
   const data = boq.data;
-  const total = toNumber(data.boq_total ?? 0);
+  const varied = toNumber(data.variations_total ?? 0);
+  const total = toNumber(data.boq_total ?? 0) + varied;
   const margin = total > 0 ? ((total - toNumber(data.budget_total ?? 0)) / total) * 100 : 0;
   const figures: [string, string][] =
     data.boq_total !== undefined && data.budget_total !== undefined
       ? [
           ["Items", String(data.item_count)],
           ["BOQ value (LKR)", formatAmount(data.boq_total)],
+          ...(varied !== 0 ? ([["Approved variations (LKR)", formatAmount(varied)]] as [string, string][]) : []),
           ["Cost budget (LKR)", formatAmount(data.budget_total)],
           ["Margin", `${margin.toFixed(1)}%`],
         ]
