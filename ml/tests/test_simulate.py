@@ -11,7 +11,7 @@ import pytest
 from data_generator import simulate
 from train import export_model
 
-BACKEND_MODEL = Path(__file__).parents[2] / "backend" / "app" / "ai" / "risk" / "models" / "risk-v1.0.0.json"
+BACKEND_MODEL = Path(__file__).parents[2] / "backend" / "app" / "ai" / "risk" / "models" / "risk-v1.1.0.json"
 
 
 @pytest.fixture(scope="module")

@@ -43,7 +43,7 @@ from data_generator.simulate import FEATURES, TARGETS, risk_score
 ML = Path(__file__).parent
 DATA = ML / "data" / "snapshots.csv"
 BACKEND_MODELS = ML.parent / "backend" / "app" / "ai" / "risk" / "models"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 SEED = 2026
 BANDS = ("low", "medium", "high")
 
@@ -57,12 +57,16 @@ MONOTONE: dict[str, dict[str, int]] = {
         "rain_days_next_14": 1,
         "crew_vs_plan_pct": -1,
         "missing_reports_14": 1,
+        "issues_material_14": 1,
+        "issues_safety_14": 1,
+        "issues_design_14": 1,
     },
     "overrun_pct": {
         "progress_gap_pct": -1,
         "budget_variance_pct": 1,
         "late_deliveries_count": 1,
         "avg_lateness_days": 1,
+        "issues_design_14": 1,
     },
 }
 BASE_PARAMS: dict[str, Any] = {

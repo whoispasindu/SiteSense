@@ -1,4 +1,4 @@
-# Simulator assumptions (risk model v1)
+# Simulator assumptions (risk model v1.x)
 
 The risk model is trained on **simulated projects**. Nothing here comes from a real contractor's
 records yet. Each assumption below is a number someone with site experience can check and correct.
@@ -52,6 +52,7 @@ run reasonably well, a tail is not). The model never sees it, only its symptoms.
 | Cost variance | Committed cost against the budgeted value of the same work: price drift, rework and expediting so far, ± 1.5 points. Overheads are not visible (the app does not track them yet) |
 | Crew against plan | Average reported crew over the last 12 working days against the planned crew, each report ± 8% |
 | Missing reports | Each working day's report is missing with chance 0.02 + 0.30 × (1 − quality)² |
+| Confirmed report issues (v1.1) | Per week, Poisson counts scaled by the share of reports filed: material delays 0.1 + 0.5 per overdue delivery; safety 0.05 + 0.6 × (1 − quality)²; design 0.08 plus 1.5 after each variation, fading by 40% a week. The model sees the last two weeks. Drawn from their own random stream, so adding them left every other number unchanged |
 
 ## Outcomes
 

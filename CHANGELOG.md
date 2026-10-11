@@ -4,6 +4,40 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Phase 7, report issue classifier ([model card](docs/model-card-report-issues.md),
+  [ADR 0010](docs/adr/0010-report-issue-classifier.md)):
+  - After filing a daily report, its author gets an **AI check**: each sentence of the problems
+    text is tagged with a category, a severity and a confidence. Tags under 0.6 are highlighted.
+    The author keeps, edits, removes or adds tags and confirms; nothing happens before that.
+  - Follow-ups the author can tick (all start unticked): draft a material request (prefilled, and
+    closed when the request is raised), alert the project managers, or flag stop-work, which stays
+    on the project as a banner until a project manager clears it (BR-11, in part).
+  - Names of people are replaced with `[PERSON]` before tagging and storage, including common Sri
+    Lankan names written without a title, in any case (#23).
+  - The classifier: DistilBERT for the category (macro F1 0.80 on 199 hand-written test sentences,
+    against 0.73 for the TF-IDF baseline) and TF-IDF with the labelling guide's rules for severity
+    (0.50; DistilBERT did not beat it). DistilBERT runs as ONNX; the TF-IDF model is the fallback.
+  - Model weights are attached to a GitHub Release, pinned by SHA-256 in a committed manifest, and
+    fetched with `scripts/fetch_models.py`.
+  - Risk model 1.1.0 adds confirmed material, safety and design issues of the last 14 days.
+    Confirming re-scores the project.
+  - Endpoints: `GET /reports/{id}/issues`, `POST /reports/{id}/analyze`,
+    `POST /reports/{id}/issues/confirm`, `POST /report-actions/{id}/close`,
+    `GET /projects/{id}/report-actions`.
+  - Training code, synthetic data generator and labelling guide in `ml/nlp/`.
+
+### Security
+
+- onnxruntime's usage telemetry to Microsoft is switched off before it is imported.
+- Analysing a report is rate limited per client; confirmations lock the report so a double submit
+  cannot duplicate follow-ups.
+- The transformer training dependencies are pinned and audited in CI.
+- A test lists every module that can call out of the server; a new one fails until reviewed.
+
 ## [0.1.0] - 2026-10-10
 
 ### Changed

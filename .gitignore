@@ -46,3 +46,10 @@ Thumbs.db
 prof/
 *.bak
 *.cpuprofile
+
+# Transformer weights and tokenizers stay out of git (GitHub Release or Git LFS if they ship)
+ml/models/report-nlp/distilbert/
+*.safetensors
+*.onnx
+ml/models/report-nlp/onnx/
+backend/app/ai/nlp/models/report-issues-category/

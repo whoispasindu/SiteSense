@@ -17,7 +17,7 @@ boundaries can be tested directly; services gather the facts and apply the resul
 | BR-08 | Claim value cannot exceed certified progress × contract value, minus previous claims and 5% retention | Phase 8 | | |
 | BR-09 | Variations above a threshold, or with any time impact, need client approval before work starts | Phase 8 | | |
 | BR-10 | Risk score 70+ is High (automatic PM alert), 40–69 Medium, under 40 Low | Phase 6 | `ai/risk/scoring.py: level`, `services/risk_service.py` | `test_br10_bands`, `test_br10_alerts_the_project_managers_when_a_project_enters_high`, `test_br10_does_not_repeat_while_the_project_stays_high` |
-| BR-11 | A safety issue marked stop-work blocks related tasks until the PM clears it | Phase 7/9 | | |
+| BR-11 | A safety issue marked stop-work blocks related tasks until the PM clears it | Partly (Phase 7): the flag, the PM alert, the project banner and PM-only clearing. Blocking the related tasks comes with the advanced schedule (Phase 9) | `services/issue_service.py: _can_close, close_action` | `test_stop_work_is_cleared_only_by_the_project_manager`, `test_follow_ups_must_match_a_confirmed_issue` |
 | BR-12 | If a supplier's predicted on-time chance is under 50% for a critical-path item, suggest an alternative | Phase 10 | | |
 | BR-13 | If the section's committed cost plus this request exceeds its budget line, the project manager approves. Checked at approval and again at purchase-order issue | Phase 5 (added at the project owner's request: the section check that was part of BR-01) | `rules/materials.py: check_section_budget`, `services/procurement_service.py: create_order` | `test_rules_materials.py` (`test_br13_*`), `test_qs_approval_rechecks_routing_with_current_figures`, `test_two_requests_that_fit_alone_exceed_the_line_together_at_approval`, `test_two_lines_that_fit_alone_exceed_the_line_together_at_po_issue` |
 | BR-14 | A purchase-order unit price more than 5% above the approved price sends the request back for project manager approval | Phase 5 (added at the project owner's request) | `rules/materials.py: check_order_price`, `services/procurement_service.py: create_order` | `test_rules_materials.py` (`test_br14_*`), `test_order_price_more_than_five_percent_above_approval_goes_back_to_the_pm` |
@@ -123,6 +123,34 @@ completion and cost overrun at completion every morning, and again after a daily
 | Re-scored the same day, or still High tomorrow | No new alert | `test_br10_does_not_repeat_while_the_project_stays_high` |
 | Back to Low, then High again | Alerts again | `test_br10_alerts_again_after_the_project_recovers` |
 | Medium | No alert | `test_medium_risk_does_not_alert` |
+
+## Report issues: TC-06 and BR-11
+
+After filing a report, its author asks the classifier to tag the problems (see the
+[model card](model-card-report-issues.md)). Tags are suggestions; nothing happens until the author
+confirms them, on the day of the report. Follow-ups must match a confirmed issue:
+
+- **Material request:** needs a confirmed material delay. Opens a prefilled request form; closes when
+  a request is raised from it, or the author dismisses it.
+- **PM alert:** needs a confirmed high severity. Notifies the site's project managers at once.
+- **Stop-work (BR-11):** needs a confirmed safety issue. Notifies the project managers and shows a
+  banner on the project until a project manager clears it. Nobody else can clear it, including the
+  author. Blocking the related programme tasks arrives in Phase 9.
+
+Confirming re-scores the project's risk, because confirmed material, safety and design issues of the
+last 14 days are risk model inputs.
+
+| Case | Expected | Test |
+| --- | --- | --- |
+| TC-06: "cement not delivered again" | Material delay, high, not low-confidence; confirming re-scores risk with one material issue | `test_tc06_cement_not_delivered_again` |
+| Confidence under 0.6 | Tag flagged for the author to check | `test_low_confidence_tags_are_flagged` |
+| A worker's name in the problems | Stored as `[PERSON]` | `test_names_are_redacted_before_storage` |
+| Someone other than the author, or the next day | 403, nothing changes | `test_only_the_author_on_the_day_checks_issues` |
+| Confirming twice | 409 | `test_confirming_twice_is_refused` |
+| Stop-work without a confirmed safety issue (and the other follow-ups) | 422 | `test_follow_ups_must_match_a_confirmed_issue` |
+| Engineer or author clears stop-work / PM clears it | 403 / cleared, once | `test_stop_work_is_cleared_only_by_the_project_manager` |
+| Material request raised from a follow-up | Follow-up closed with the request linked | `test_a_material_request_raised_from_a_follow_up_closes_it` |
+| Suggested but unconfirmed issues | Not counted by the risk model | `test_only_confirmed_issues_in_the_last_14_days_count` |
 
 ## BR-02 in detail
 

@@ -1,0 +1,200 @@
+text,category,severity
+cement not delivered again,material_delay,high
+"supplier says the rebar lorry broke down, nothing came today so the slab crew sat idle",material_delay,high
+waiting on 40mm aggregate since monday,material_delay,medium
+tiles for level 2 bathrooms arrived one day late,material_delay,low
+ready mix plant couldnt send the second truck and we had to stop the pour halfway,material_delay,high
+we are short of 200 blocks for the east wall,material_delay,medium
+paint delivery came at 4pm instead of 9am,material_delay,low
+3rd day without sand on site,material_delay,high
+binding wire finished by lunch and new stock only tomorrow,material_delay,medium
+door frames still not supplied by the joinery,material_delay,medium
+"cement awa naha, masons idle after 11",material_delay,high
+plumbing fittings partially delivered - elbows missing,material_delay,medium
+glass panels for the facade postponed another week by the importer,material_delay,high
+small delay on conduit pipes but enough stock for today,material_delay,low
+formwork ply did not arrive so column boxes could not be started,material_delay,high
+electrical cables expected friday not here yet,material_delay,medium
+lorry with steel stuck at the port again,material_delay,high
+the GI sheets came but count was short by 30,material_delay,medium
+ordered cement came in the evening which was a bit late,material_delay,low
+no bricks for the boundary wall today,material_delay,medium
+waterproofing chemical out of stock at supplier,material_delay,medium
+scaffold couplers short so only one face could be erected,material_delay,medium
+tile adhesive delivery slipped by half a day,material_delay,low
+concrete for footing F7 never turned up and the excavation is filling with water,material_delay,high
+pipes came 2 hrs late,material_delay,low
+only 8 masons today out of 20,labour,high
+two carpenters absent,labour,low
+"tiling subcontractor didnt show up, bathrooms on hold",labour,high
+crew left early for the temple festival,labour,medium
+we need a qualified welder - nobody on site can do the column splices,labour,medium
+labour gang refused to work over unpaid wages,labour,high
+half the helpers on leave for avurudu,labour,high
+painters arrived late but caught up,labour,low
+night shift could not be arranged so the pour must wait,labour,high
+steel fixers slow today as the foreman was off sick,labour,medium
+new labourers need induction before starting,labour,low
+electrician sub sent only one man instead of four,labour,medium
+masons walked off at 3 after argument with baas,labour,medium
+shortage of skilled tilers in the area this month,labour,medium
+plasterers did not come at all today,labour,high
+work slow - wrkrs tired after yesterdays long pour,labour,low
+subcontractor changed his team and the new men dont know the drawings,labour,medium
+"only 4 people turned up, everything stopped",labour,high
+security guard didnt report for night duty,labour,low
+we are 6 men short on the block work gang,labour,medium
+heavy rain all morning so no concreting,weather,high
+light drizzle in the afternoon slowed the plastering outside,weather,low
+"storm last night, site flooded and pumps running since 6am",weather,high
+too hot after 1pm so the roof crew stopped early,weather,medium
+continuous rain - excavation walls collapsing,weather,high
+showers on and off but we managed the brickwork under cover,weather,low
+strong wind meant the tower crane could not lift,weather,high
+rain delayed the start by two hours,weather,medium
+"wet day again, third day this week we lost",weather,high
+monsoon rain made the access road muddy and lorries got stuck,weather,medium
+waterlogging near grid A after overnight rain,weather,medium
+slab pour cancelled due to forecast heavy rain,weather,high
+humidity high so paint drying slowly,weather,low
+lightning so all work at height stopped for an hour,weather,medium
+bit of rain at noon no real impact,weather,low
+rained heavily from 10 till close,weather,high
+flooding in the basement from yesterdays downpour,weather,high
+drizzle - covered the fresh concrete with polythene,weather,low
+roads blocked by floods so half the crew couldnt reach site,weather,high
+afternoon thunder showers stopped external rendering,weather,medium
+crane out of order with hydraulic leak,equipment,high
+concrete mixer broke down at noon,equipment,high
+vibrator poker not working - borrowed one from next site,equipment,low
+generator ran out of diesel for 2 hours,equipment,medium
+the hoist keeps tripping so material goes up by hand,equipment,medium
+excavator tyre puncture fixed by lunch,equipment,low
+"bar bending machine down, cutting rebar manually",equipment,medium
+pump truck didnt arrive for the slab so we used the crane bucket,equipment,medium
+total station needs calibration,equipment,low
+tower crane operator says the brakes are faulty,equipment,high
+compactor broken so backfilling stopped,equipment,high
+grinder discs finished,equipment,low
+the JCB is still at the workshop - 4th day,equipment,high
+welding plant faulty and splices postponed,equipment,medium
+power cut at site so all power tools idle for the afternoon,equipment,medium
+water pump burnt out and the pit keeps flooding,equipment,high
+scaffold tower wheels broken,equipment,low
+batching plant computer failure delayed concrete by 3 hrs,equipment,medium
+drilling machine bits worn out,equipment,low
+lift for materials stuck between floors,equipment,medium
+dumper truck brake issue so it is parked,equipment,medium
+the only vibrator broke during the column pour,equipment,high
+worker fell from the scaffold on level 4 and was taken to hospital,safety,high
+no harnesses being used on the roof,safety,high
+near miss - a plank fell from level 5 but no one hurt,safety,medium
+some helpers without helmets this morning,safety,medium
+open edge on level 3 slab not barricaded,safety,high
+electric shock from a damaged extension cord - minor,safety,high
+fire extinguisher at the store is empty,safety,low
+excavation more than 2m with no shoring - stopped work in the trench,safety,high
+labourer cut his hand on rebar - first aid given,safety,high
+scaffold base on soft ground looks unsafe,safety,medium
+crane lifting over people again,safety,high
+safety nets missing on the east side,safety,medium
+toolbox talk not held this week,safety,low
+gas cylinders stored next to the welding area,safety,medium
+"man slipped on wet formwork, sprained ankle",safety,high
+stop work ordered on level 6 after the guardrail came loose,safety,high
+first aid box needs refilling,safety,low
+dust masks not available for the cutting crew,safety,medium
+loose wiring hanging in the stairwell,safety,medium
+heat stroke - a helper fainted at 2pm,safety,high
+signage at the gate damaged,safety,low
+the hoist gate does not lock,safety,high
+two workers on the roof without permits for hot work,safety,medium
+"rebar starter bars uncapped, someone could get impaled",safety,medium
+beam B12 detail clashes with the AC duct,design,high
+still waiting for revised stair drawings from the architect,design,medium
+column schedule and plan show different sizes for C7,design,high
+RFI on the parapet height not answered for 10 days,design,medium
+client changed the kitchen layout again,design,high
+structural engineer has not approved the shop drawings for the canopy,design,medium
+door schedule missing on the latest set,design,low
+"MEP drawings dont match architecture, plumbing stack clashes with beam",design,high
+slab level difference not shown in the section,design,medium
+consultant asked to hold the lift core pending redesign,design,high
+minor dimension errors on the window drawings,design,low
+no detail for the balcony waterproofing,design,medium
+foundation design changed after soil report so footings on hold,design,high
+setting out drawing grid lines dont close by 50mm,design,medium
+waiting for colour approval for the facade,design,low
+electrical layout revision C not issued yet,design,medium
+the drawing shows a window where there is a shear wall,design,high
+we built per rev B but rev D is on site now,design,medium
+awaiting approval for the alternative rebar size,design,low
+architect visit postponed so ceiling details still open,design,medium
+landscape drawings not ready,design,low
+cube test results failed at 7 days for the level 2 slab,quality,high
+honeycombing on column C4 - needs repair,quality,medium
+plaster cracking in the ground floor rooms,quality,medium
+tiles laid out of level in the lobby must be redone,quality,medium
+consultant rejected the rebar spacing on the raft,quality,high
+some blocks delivered broken,quality,low
+wrong grade of cement supplied for the structure,quality,high
+concrete slump too high so the truck was sent back,quality,medium
+paint shade does not match the approved sample,quality,low
+water leaking through the roof slab construction joint,quality,high
+brickwork not plumb on the north wall,quality,medium
+rusty rebar delivered for the beams,quality,medium
+cover blocks missing in the slab reinforcement,quality,medium
+grout bleeding in the tiling,quality,low
+inspection failed for the plumbing pressure test,quality,high
+form joints leaked and the column surface is rough,quality,low
+doors warped after installation,quality,medium
+screed thickness short in several places,quality,medium
+welds on the steel roof look poor and must be tested,quality,medium
+the waterproofing membrane was torn during backfilling,quality,high
+minor chipping on the stair nosings,quality,low
+level 3 slab deflection more than allowed - engineer to check,quality,high
+grade 30 tested as 22 at 28 days,quality,high
+mortar mix too weak this morning - corrected,quality,low
+police stopped our lorries at the gate for permits,other,medium
+neighbours complained about noise so we stopped at 6pm,other,low
+water board cut supply to the site,other,medium
+client visit took the engineers away for the morning,other,low
+municipal council inspector halted work pending approval,other,high
+electricity board disconnected temporary power,other,high
+access road closed for a procession,other,medium
+site office broken into last night,other,medium
+waiting for the building permit extension,other,medium
+union meeting at the gate delayed the start,other,low
+the land owner next door blocked the access lane,other,high
+internet down at the site office,other,low
+bank holiday tomorrow so suppliers closed,other,low
+traffic police not allowing heavy vehicles before 8pm,other,medium
+temple loudspeaker noise complaint from residents,other,low
+the client has not paid the last bill and wants to talk,other,medium
+survey pegs removed by someone overnight,other,medium
+garbage collection didnt happen for a week,other,low
+utility cables found during excavation - CEB to divert,other,high
+road widening works blocking our gate,other,medium
+visitors from head office walking through the site,other,low
+stray dogs in the store area,other,low
+fuel price increase - transporter asking more,other,low
+cement late,material_delay,medium
+cement late again!!,material_delay,high
+no labour,labour,high
+rain,weather,medium
+mixer down,equipment,high
+helmet missing,safety,medium
+drawing missing,design,medium
+crack in wall,quality,low
+permit issue,other,medium
+sand nd metal not recievd,material_delay,medium
+mesons not came today,labour,high
+heavey rain stoped work,weather,high
+genarator faild,equipment,medium
+no hardhats on 3rd flor,safety,medium
+detial wrong for lintel,design,medium
+plstr cracks agn,quality,medium
+neibours complaing,other,low
+"blocks naha, heta enawalu",material_delay,medium
+"ada wessa nisa wada nathuwa giya",weather,high
+baas says crane eka kadila,equipment,high

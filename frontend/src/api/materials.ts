@@ -286,6 +286,8 @@ export function checkRequest(body: RequestCheckInput, signal?: AbortSignal): Pro
 export interface RequestInput extends RequestCheckInput {
   needed_by: string;
   notes: string | null;
+  /** Raised from a daily report's follow-up: the follow-up is closed and linked to the request. */
+  report_action_id?: string;
 }
 
 /** Anything that changes a request also moves counts, budgets, the ordering queue and notifications. */

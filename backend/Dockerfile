@@ -4,6 +4,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
+# No usage telemetry from onnxruntime to Microsoft (also set in app/ai/nlp/transformer.py).
+ENV ORT_DISABLE_TELEMETRY=1
 
 WORKDIR /app
 

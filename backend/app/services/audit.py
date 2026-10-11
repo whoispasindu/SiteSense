@@ -57,6 +57,8 @@ class AuditAction:
     SUPPLIER_UPDATED = "supplier.updated"
     PURCHASE_ORDER_ISSUED = "purchase_order.issued"
     DELIVERY_RECORDED = "delivery.recorded"
+    REPORT_ISSUES_CONFIRMED = "report.issues_confirmed"
+    REPORT_ACTION_CLOSED = "report_action.closed"
 
 
 def record(

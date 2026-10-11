@@ -71,6 +71,8 @@ class Settings(BaseSettings):
     max_photos_per_report: int = Field(default=12, ge=1, le=50)
     # Photo decoding is CPU-heavy: a per-IP budget.
     photo_upload_rate_per_minute: int = Field(default=60, ge=1)
+    # Analysing a report runs the text classifier (up to 0.4 s of CPU): a per-IP budget.
+    analyze_rate_per_minute: int = Field(default=30, ge=1)
     # Open-Meteo forecast (free, no key). Off: the app uses cached forecasts only.
     weather_enabled: bool = True
     weather_cache_hours: int = Field(default=3, ge=1, le=48)

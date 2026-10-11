@@ -2,6 +2,15 @@
 
 from app.models.audit_log import AuditLog
 from app.models.base import Base
+from app.models.issues import (
+    ActionKind,
+    ActionStatus,
+    IssueCategory,
+    IssueSeverity,
+    IssueStatus,
+    ReportAction,
+    ReportIssue,
+)
 from app.models.materials import (
     Approval,
     Delivery,
@@ -20,6 +29,8 @@ from app.models.schedule import ProgressSnapshot, Task
 from app.models.user import RefreshToken, RoleRecord, Site, User, user_site_assignments
 
 __all__ = [
+    "ActionKind",
+    "ActionStatus",
     "Approval",
     "AuditLog",
     "Base",
@@ -29,6 +40,9 @@ __all__ = [
     "DailyReport",
     "Delivery",
     "DocumentCounter",
+    "IssueCategory",
+    "IssueSeverity",
+    "IssueStatus",
     "MaterialRequest",
     "Notification",
     "ProgressSnapshot",
@@ -39,6 +53,8 @@ __all__ = [
     "PurchaseOrderLine",
     "PurchaseOrderStatus",
     "RefreshToken",
+    "ReportAction",
+    "ReportIssue",
     "ReportPhoto",
     "ReportProgress",
     "RequestStatus",

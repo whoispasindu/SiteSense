@@ -1,0 +1,131 @@
+{
+  "targets": {
+    "delay_days": {
+      "params": {
+        "num_leaves": 15,
+        "min_child_samples": 100,
+        "learning_rate": 0.05
+      },
+      "rounds": 105,
+      "cv_rmse": 23.745,
+      "test": {
+        "mae": 19.8,
+        "rmse": 29.18,
+        "r2": 0.584
+      },
+      "baseline_test": {
+        "mae": 25.46,
+        "rmse": 34.57,
+        "r2": 0.415
+      },
+      "importance_gain_pct": {
+        "progress_gap_pct": 31.2,
+        "planned_duration_days": 21.1,
+        "elapsed_pct": 19.0,
+        "contract_value_m": 11.4,
+        "avg_lateness_days": 5.2,
+        "crew_vs_plan_pct": 3.6,
+        "late_deliveries_count": 2.5,
+        "type_residential": 2.4,
+        "missing_reports_14": 1.8,
+        "type_institutional": 0.5,
+        "budget_variance_pct": 0.4,
+        "type_mixed_use": 0.4,
+        "type_commercial": 0.2,
+        "issues_safety_14": 0.1,
+        "type_industrial": 0.1,
+        "rain_days_next_14": 0.0,
+        "issues_design_14": 0.0
+      }
+    },
+    "overrun_pct": {
+      "params": {
+        "num_leaves": 7,
+        "min_child_samples": 100,
+        "learning_rate": 0.05
+      },
+      "rounds": 88,
+      "cv_rmse": 5.289,
+      "test": {
+        "mae": 5.53,
+        "rmse": 7.73,
+        "r2": 0.226
+      },
+      "baseline_test": {
+        "mae": 5.66,
+        "rmse": 7.98,
+        "r2": 0.177
+      },
+      "importance_gain_pct": {
+        "contract_value_m": 26.1,
+        "budget_variance_pct": 21.6,
+        "progress_gap_pct": 20.1,
+        "elapsed_pct": 13.6,
+        "planned_duration_days": 9.2,
+        "type_residential": 4.9,
+        "issues_design_14": 2.1,
+        "progress_rate_trend": 1.0,
+        "type_institutional": 0.8,
+        "avg_lateness_days": 0.3,
+        "crew_vs_plan_pct": 0.1,
+        "type_industrial": 0.1,
+        "type_mixed_use": 0.1
+      }
+    }
+  },
+  "risk_class": {
+    "f1_high": 0.609,
+    "f1_high_baseline": 0.462,
+    "f1_macro": 0.578,
+    "confusion_matrix": {
+      "labels": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "rows_true_cols_predicted": [
+        [
+          853,
+          619,
+          3
+        ],
+        [
+          159,
+          625,
+          114
+        ],
+        [
+          135,
+          485,
+          574
+        ]
+      ]
+    }
+  },
+  "backtest": {
+    "high_projects": 16,
+    "flagged": 15,
+    "median_flagged_at_elapsed_pct": 53.5,
+    "median_weeks_before_planned_end": 28.0,
+    "low_projects": 28,
+    "low_projects_ever_flagged_high": 1
+  },
+  "delay_mae_by_elapsed": {
+    "0-25%": 29.0,
+    "25-50%": 23.0,
+    "50-75%": 16.2,
+    "75-100%": 13.3,
+    "late": 16.9
+  },
+  "version": "1.1.0",
+  "trained_at": "2026-10-10T18:22:11+00:00",
+  "data_sha256": "9bd1534d5f94b910a57ff7edadd1b951ae8302b86090f810d04bd27c4c4cf500",
+  "split": {
+    "train_projects": 240,
+    "test_projects": 60,
+    "train_rows": 14762,
+    "test_rows": 3567
+  },
+  "model_file": "backend/app/ai/risk/models/risk-v1.1.0.json",
+  "model_sha256": "fee4c68bc7f3d9753ed0ced6e67d6a3b5ce6f2e6df7eb229466d0196ddfa5329"
+}

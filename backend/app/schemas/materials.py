@@ -48,6 +48,8 @@ class RequestCreate(BaseModel):
     unit_price: Price | None = None
     needed_by: date
     notes: Notes | None = None
+    # Raised from a daily report's follow-up (Phase 7): that follow-up is closed and linked to it.
+    report_action_id: uuid.UUID | None = None
 
     _notes = field_validator("notes")(_blank_to_none)
 

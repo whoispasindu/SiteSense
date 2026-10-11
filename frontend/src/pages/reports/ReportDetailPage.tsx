@@ -17,6 +17,7 @@ import { Dialog } from "../../components/ui/Dialog";
 import { TextAreaField, TextField } from "../../components/ui/Field";
 import { Icon } from "../../components/ui/icons";
 import { SectionHeading } from "../../components/ui/SectionHeading";
+import { AiCheck } from "../../features/reports/AiCheck";
 import { Sheet } from "../../components/ui/Sheet";
 import { errorText } from "../../features/admin/adminUtils";
 import { formatDate } from "../../features/projects/dates";
@@ -206,6 +207,7 @@ export function ReportDetailPage() {
               <p className="leading-relaxed whitespace-pre-line text-ink">{r.problems}</p>
             </section>
           ) : null}
+          <AiCheck reportId={r.id} projectId={r.project_id} hasProblems={Boolean(r.problems)} />
           {r.progress.length ? (
             <Sheet className="relative overflow-x-auto">
               <table className="w-full text-sm">

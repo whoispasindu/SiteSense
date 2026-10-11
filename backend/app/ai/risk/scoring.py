@@ -52,6 +52,9 @@ _LABELS: dict[str, tuple[str, str]] = {
     "budget_variance_pct": ("Committed cost against budget", "signal"),
     "crew_vs_plan_pct": ("Crew against plan", "signal"),
     "missing_reports_14": ("Missing daily reports", "signal"),
+    "issues_material_14": ("Material issues reported", "signal"),
+    "issues_safety_14": ("Safety issues reported", "signal"),
+    "issues_design_14": ("Design issues reported", "signal"),
     "elapsed_pct": ("Time elapsed", "context"),
     "planned_duration_days": ("Planned duration", "context"),
     "contract_value_m": ("Contract size", "context"),
@@ -87,6 +90,8 @@ def describe(feature: str, values: dict[str, float]) -> str:
         return f"{v:+.0f}% over the last 14 days"
     if feature == "missing_reports_14":
         return _plural(v, "day") + " in the last 14"
+    if feature.startswith("issues_"):
+        return _plural(v, "issue") + " in the last 14 days"
     if feature == "elapsed_pct":
         return f"{v:.0f}% of the planned duration"
     if feature == "planned_duration_days":

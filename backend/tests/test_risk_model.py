@@ -251,6 +251,8 @@ def test_drivers_are_limited() -> None:
         ("budget_variance_pct", 3.1, "+3.1%"),
         ("crew_vs_plan_pct", -12, "-12% over the last 14 days"),
         ("missing_reports_14", 1, "1 day in the last 14"),
+        ("issues_safety_14", 2, "2 issues in the last 14 days"),
+        ("issues_design_14", 1, "1 issue in the last 14 days"),
         ("elapsed_pct", 48.2, "48% of the planned duration"),
         ("planned_duration_days", 364, "52 weeks"),
         ("contract_value_m", 380, "LKR 380 M"),
