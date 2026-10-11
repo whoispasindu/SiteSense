@@ -18,7 +18,7 @@ SiteSense tells a construction company which site will slip before it does, and 
 > reports, materials and approvals, and the first AI feature: a daily delay and cost-overrun risk
 > score. More arrives phase by phase (see [Roadmap](#roadmap)). Not production-ready yet. The risk
 > model is trained on simulated projects (see the [model card](docs/model-card-risk.md)). The report
-> issue classifier (Phase 7, in review) is trained on synthetic sentences and tested on sentences
+> issue classifier (Phase 7) is trained on synthetic sentences and tested on sentences
 > written by the project, not real site reports, so its scores are not yet evidence about real sites
 > (see its [model card](docs/model-card-report-issues.md)).
 
@@ -103,12 +103,12 @@ Every account uses the password in `SITESENSE_DEMO_PASSWORD` in your `.env`
 
 | Role | Email | Try this |
 | --- | --- | --- |
-| Project Manager | `pm@sitesense.example` | Dashboard ranked by risk; open Havelock Residences for the forecast and its drivers; approve requests sent to the PM |
-| Quantity Surveyor | `qs@sitesense.example` | Enter the quoted price at the QS check and watch BR-01 and BR-13 decide who approves; BOQ and budget |
+| Project Manager | `pm@sitesense.example` | Dashboard ranked by risk; Cost & claims: approve the waiting progress claim; open Havelock Residences for the forecast and its drivers; approve requests sent to the PM |
+| Quantity Surveyor | `qs@sitesense.example` | Enter the quoted price at the QS check and watch BR-01 and BR-13 decide who approves; price variation VO-0003; make a progress claim and see BR-08 calculate it; budget forecast |
 | Site Engineer | `engineer@sitesense.example` | File today's daily report for Havelock and write a problem or two: the AI check tags them for you to confirm; raise a material request |
 | Procurement Officer | `procurement@sitesense.example` | Order approved requests, record deliveries, manage suppliers |
-| Company Admin | `admin@sitesense.example` | Users, sites and the audit log |
-| Client | `client@sitesense.example` | Client portal (arrives in Phase 12) |
+| Company Admin | `admin@sitesense.example` | Users, sites, each project's variation limit (BR-09) and the audit log |
+| Client | `client@sitesense.example` | Variations: approve or query VO-0002, a roof plant room with a 10-day time impact (TC-10). The full portal arrives in Phase 12 |
 
 <p>
   <img src="docs/media/engineer-daily-report.gif" alt="A site engineer files today's report: weather filled in from the forecast, work done, problems and task progress" width="49%">
@@ -140,6 +140,10 @@ docker compose exec backend python -m app.cli refresh-weather
 
 ```bash
 docker compose exec backend python -m app.cli score-risk
+```
+
+```bash
+docker compose exec backend python -m app.cli check-variance
 ```
 
 Run `refresh-weather` once after seeding to fill in the 14-day forecast (weather in reports and
@@ -266,8 +270,8 @@ docs/           architecture, decision records, security reviews, model cards
 | 4 | Daily site reports | Done |
 | 5 | Materials, approvals and rules engine | Done |
 | 6 | Demo data and risk model v1 → **v0.1 MVP** | Done |
-| 7 | Report NLP classifier | In review |
-| 8 | Cost control, claims and variations | Planned |
+| 7 | Report NLP classifier | Done |
+| 8 | Cost control, claims and variations | In review |
 | 9 | Advanced schedule | Planned |
 | 10 | Risk model v2, what-if planner and supplier model | Planned |
 | 11 | Dashboard, alerts and AI briefing | Planned |

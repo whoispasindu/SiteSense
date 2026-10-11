@@ -112,6 +112,31 @@ answers `404`, exactly like a missing record.
 
 Scores are written only by the scheduler, after daily reports and by the CLI; no endpoint writes them.
 
+## Phase 8 endpoints
+
+| Method and path | Who | Notes |
+| --- | --- | --- |
+| `GET /api/v1/cost/overview` | PM, QS | Projects on the caller's sites: contract, budget, forecast, claims; what waits for the caller |
+| `GET /api/v1/projects/{id}/budget` | PM, QS | Now with forecast final cost, variance and trend per section |
+| `GET /api/v1/projects/{id}/claims` | PM, QS | Claims, and the sections a new claim starts from |
+| `POST /api/v1/projects/{id}/claims/check` | QS | BR-08 calculation for a draft, nothing saved |
+| `POST /api/v1/projects/{id}/claims` | QS | One waits for the PM at a time (409) |
+| `GET /api/v1/claims/{id}` | PM, QS | |
+| `POST /api/v1/claims/{id}/decision` | PM | Approve, or return with a comment |
+| `POST /api/v1/claims/{id}/payment` | QS | Approved claims; date between approval and today |
+| `GET /api/v1/projects/{id}/variations`, `GET /api/v1/variations/{id}` | PM, QS | |
+| `POST /api/v1/projects/{id}/variations` | PM, QS | Only the QS may include the price |
+| `POST /api/v1/variations/{id}/price` | QS | Routes by BR-09 |
+| `POST /api/v1/variations/{id}/revision` | The raiser, or a QS | Queried variations only; priced again |
+| `POST /api/v1/variations/{id}/decision` | PM, never on their own variation | Approve, query or reject |
+| `POST /api/v1/variations/{id}/withdraw` | The raiser | Open variations only |
+| `GET /api/v1/client/variations`, `GET /api/v1/client/variations/{id}` | Client | Only those sent to them, on their sites; no internal costs or comments (404 otherwise) |
+| `POST /api/v1/variations/{id}/client-decision` | Client | Approve or query (TC-10) |
+| `GET /api/v1/admin/variation-limits`, `PUT /api/v1/admin/projects/{id}/variation-limit` | Company Admin | BR-09 limit; a reason is required and audited |
+
+`PATCH /api/v1/projects/{id}` no longer changes the contract value or planned end once the project
+is past planning (or has a claim or variation): those change through approved variations.
+
 ## Phase 7 endpoints
 
 | Method and path | Who | Notes |

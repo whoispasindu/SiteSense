@@ -8,7 +8,7 @@ Committed and spent cost are derived from order lines and deliveries (``section_
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -34,6 +34,7 @@ from app.models import (
     User,
 )
 from app.rules import materials as rules
+from app.rules.cost import Forecast, forecast_final_cost
 from app.schemas.materials import (
     BudgetFigures,
     BudgetLineOut,
@@ -50,9 +51,15 @@ from app.schemas.materials import (
     SupplierOut,
     SupplierUpdate,
 )
-from app.services import audit, notification_service
+from app.services import audit, cost_service, notification_service
 from app.services.audit import AuditAction, RequestMeta
-from app.services.materials_service import SectionCosts, next_number, own_committed, section_costs
+from app.services.materials_service import (
+    SectionCosts,
+    committed_against_budget,
+    next_number,
+    own_committed,
+    section_costs,
+)
 from app.services.notification_service import NewNotification
 
 ZERO = Decimal(0)
@@ -421,6 +428,7 @@ def create_order(db: Session, user: User, data: PurchaseOrderCreate, *, meta: Re
         )
     db.commit()
     if po is not None:
+        cost_service.check_after_change(db, po.project)  # the order price may move the forecast
         db.refresh(po)
     return OrderOutcome(po, returned)
 
@@ -520,6 +528,7 @@ def record_delivery(
         ],
     )
     db.commit()
+    cost_service.check_after_change(db, po.project)  # a finished delivery fixes the spent value
     db.refresh(po)
     return po
 
@@ -527,18 +536,33 @@ def record_delivery(
 # --- Budget ---------------------------------------------------------------------------------------------
 
 
+def _project_trend(db: Session, project_id: uuid.UUID) -> Decimal | None:
+    """Whole-project cost trend: all committed cost over the budgeted value of the same quantities."""
+    committed, budgeted = committed_against_budget(db, project_id)
+    return committed / budgeted if budgeted > ZERO else None
+
+
 def project_budget(db: Session, project: Project) -> BudgetOut:
     costs = section_costs(db, project.id)
+    forecasts = cost_service.forecasts(db, project.id)
     rows = db.execute(
-        select(BoqSection, func.coalesce(func.sum(BoqItem.amount), 0), BudgetLine.budget_amount)
+        select(
+            BoqSection,
+            func.coalesce(func.sum(BoqItem.amount), 0),
+            BudgetLine.budget_amount,
+            BudgetLine.over_budget_since,
+        )
         .join(BudgetLine, BudgetLine.section_id == BoqSection.id)
         .outerjoin(BoqItem, BoqItem.section_id == BoqSection.id)
         .where(BoqSection.project_id == project.id)
-        .group_by(BoqSection.id, BudgetLine.budget_amount)
+        .group_by(BoqSection.id, BudgetLine.budget_amount, BudgetLine.over_budget_since)
         .order_by(BoqSection.position)
     ).all()
 
-    def figures(boq: Decimal, budget: Decimal, c: SectionCosts) -> dict[str, Decimal]:
+    def pct(value: Decimal | None) -> Decimal | None:
+        return None if value is None else (value * 100).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+
+    def figures(boq: Decimal, budget: Decimal, c: SectionCosts, f: Forecast) -> dict[str, object]:
         return {
             "boq_amount": rules.money(boq),
             "budget": rules.money(budget),
@@ -547,26 +571,46 @@ def project_budget(db: Session, project: Project) -> BudgetOut:
             "spent": rules.money(c.spent),
             "committed": rules.money(c.committed),
             "remaining": rules.money(budget - c.committed),
+            "forecast_final": f.final_cost,
+            "variance": rules.money(f.variance),
+            "variance_pct": pct(f.variance_share),
+            "trend": None if f.trend is None else f.trend.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP),
+            "basis_pct": pct(f.basis_share) or ZERO,
+            "over_alert_line": f.over_alert_line,
         }
 
     lines = []
     total = SectionCosts()
-    total_boq = total_budget = ZERO
-    for section, boq, budget in rows:
+    total_boq = total_budget = total_final = total_basis = ZERO
+    for section, boq, budget, over_since in rows:
         c = costs.get(section.id, SectionCosts())
+        f = forecasts.get(section.id) or forecast_final_cost(
+            budget=budget, committed=c.committed, committed_budget_value=ZERO
+        )
         total.add(c)
         total_boq += Decimal(boq)
         total_budget += budget
+        total_final += f.final_cost
+        total_basis += f.basis_share * budget
         lines.append(
             BudgetLineOut(
                 section_id=section.id,
                 code=section.code,
                 name=section.name,
-                **figures(Decimal(boq), budget, c),
+                over_budget_since=over_since,
+                **figures(Decimal(boq), budget, c, f),
             )
         )
+    totals = Forecast(
+        budget=total_budget,
+        final_cost=total_final,
+        trend=_project_trend(db, project.id),
+        basis_share=total_basis / total_budget if total_budget > ZERO else ZERO,
+    )
     return BudgetOut(
-        project_id=project.id, lines=lines, totals=BudgetFigures(**figures(total_boq, total_budget, total))
+        project_id=project.id,
+        lines=lines,
+        totals=BudgetFigures(**figures(total_boq, total_budget, total, totals)),
     )
 
 

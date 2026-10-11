@@ -422,30 +422,40 @@ describe("Cost control on the BOQ tab", () => {
     sections: [{ ...detail.sections[0]!, items: [] }],
   };
   const figures = { boq_amount: "5500000.00", budget: "4400000.00", approved: "100000.00", on_order: "117000.00", spent: "78000.00",
-                    committed: "295000.00", remaining: "4105000.00" };
+                    committed: "295000.00", remaining: "4105000.00", forecast_final: "4620000.00", variance: "-220000.00",
+                    variance_pct: "-5.0", trend: "1.050", basis_pct: "6.4", over_alert_line: false };
 
   function boqApi(role: Role) {
     return materialsApi(role, {
       [`/api/v1/projects/${PID}`]: () => jsonResponse(detail),
       [`/api/v1/projects/${PID}/boq`]: () => jsonResponse(boq),
       [`/api/v1/projects/${PID}/budget`]: () =>
-        jsonResponse({ project_id: PID, lines: [{ section_id: detail.sections[0]!.id, code: "A", name: "Materials", ...figures }], totals: figures }),
+        jsonResponse({
+          project_id: PID,
+          lines: [{ section_id: detail.sections[0]!.id, code: "A", name: "Materials", over_budget_since: null, ...figures }],
+          totals: figures,
+        }),
     });
   }
 
-  it("shows budget, spent, committed and what is left to cost readers", async () => {
+  it("shows budget, committed, the forecast final cost and the variance to cost readers", async () => {
     boqApi("quantity_surveyor");
     renderRoute(`/projects/${PID}/boq`);
 
     expect(await screen.findByRole("heading", { name: "Cost control" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Committed" })).toHaveTextContent("LKR 295 k");
-    expect(screen.getByRole("group", { name: "Committed" })).toHaveTextContent("Spent + on order + approved");
-    expect(screen.getByRole("group", { name: "Spent" })).toHaveTextContent("On order LKR 117 k");
-    expect(screen.getByRole("group", { name: "Left in budget" })).toHaveTextContent("LKR 4.11 M");
-    const table = screen.getByRole("table", { name: /Cost budget, spent/ });
-    expect(within(table).getByRole("columnheader", { name: "On order" })).toBeInTheDocument();
-    expect(within(table).getByRole("columnheader", { name: "Committed" })).toBeInTheDocument();
-    expect(screen.getByRole("table", { name: /Cost budget, spent/ })).toHaveTextContent("Materials");
+    expect(screen.getByRole("group", { name: "Committed" })).toHaveTextContent("Spent LKR 78 k · on order LKR 117 k");
+    const forecast = screen.getByRole("group", { name: "Forecast final cost" });
+    expect(forecast).toHaveTextContent("LKR 4.62 M");
+    expect(forecast).toHaveTextContent("Trend 1.05 on 6.4% of the budget");
+    const overrun = screen.getByRole("group", { name: "Forecast overrun" });
+    expect(overrun).toHaveTextContent("LKR 220 k");
+    expect(overrun).toHaveTextContent("Over budget, within 5% in every section");
+    const table = screen.getByRole("table", { name: /forecast final cost and variance/ });
+    expect(within(table).getByRole("columnheader", { name: "Forecast" })).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "Variance" })).toBeInTheDocument();
+    expect(table).toHaveTextContent("LKR 220 k over · 5%");
+    expect(table).toHaveTextContent("trend 1.05");
   });
 
   it("is hidden from roles without cost access", async () => {
@@ -541,7 +551,8 @@ describe("Materials edge cases", () => {
 
   it("flags a section that will end over budget", async () => {
     const over = { boq_amount: "5500000.00", budget: "100000.00", approved: "0.00", on_order: "50000.00", spent: "80000.00",
-                   committed: "130000.00", remaining: "-30000.00" };
+                   committed: "130000.00", remaining: "-30000.00", forecast_final: "160000.00", variance: "-60000.00",
+                   variance_pct: "-60.0", trend: "1.300", basis_pct: "100.0", over_alert_line: true };
     const detail: ProjectDetail = {
       ...PROJECT, description: null, planned_crew: null, team: [], created_at: "2026-10-01T08:00:00+00:00", updated_at: "2026-10-01T08:00:00+00:00",
       sections: [{ id: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d", code: "A", name: "Materials", item_count: 2, amount: "5500000.00",
@@ -552,12 +563,20 @@ describe("Materials edge cases", () => {
       [`/api/v1/projects/${PID}/boq`]: () =>
         jsonResponse({ project_id: PID, item_count: 2, boq_total: "5500000.00", budget_total: "100000.00", sections: [{ ...detail.sections[0]!, items: [] }] }),
       [`/api/v1/projects/${PID}/budget`]: () =>
-        jsonResponse({ project_id: PID, lines: [{ section_id: detail.sections[0]!.id, code: "A", name: "Materials", ...over }], totals: over }),
+        jsonResponse({
+          project_id: PID,
+          lines: [{ section_id: detail.sections[0]!.id, code: "A", name: "Materials", over_budget_since: "2026-10-11", ...over }],
+          totals: over,
+        }),
     });
     renderRoute(`/projects/${PID}/boq`);
 
-    expect(await screen.findByRole("group", { name: "Over budget" })).toHaveTextContent("LKR 30 k");
-    expect(screen.getByRole("table", { name: /Cost budget, spent/ })).toHaveTextContent("LKR 30 k over");
+    const overrun = await screen.findByRole("group", { name: "Forecast overrun" });
+    expect(overrun).toHaveTextContent("LKR 60 k");
+    expect(overrun).toHaveTextContent("1 section more than 5% over");
+    const table = screen.getByRole("table", { name: /forecast final cost and variance/ });
+    expect(table).toHaveTextContent("LKR 60 k over · 60%");
+    expect(table).toHaveTextContent("Forecast more than 5% over · PM and QS alerted 11 Oct 2026");
   });
 });
 

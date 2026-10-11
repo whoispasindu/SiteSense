@@ -9,6 +9,8 @@ export interface NavItem {
   phase: number;
   /** Permission needed to see the item. Omitted: every signed-in user. */
   permission?: string;
+  /** Other path prefixes that belong to this item (for the page title), e.g. /variations under Cost. */
+  aliases?: readonly string[];
 }
 
 export interface NavGroup {
@@ -32,8 +34,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: "Control",
     items: [
-      { label: "Risk & what-if", path: "/risk", icon: "risk", phase: 6, permission: "risk:read" },
-      { label: "Cost & claims", path: "/cost", icon: "cost", phase: 8, permission: "cost:read" },
+      // Risk is on the dashboard and project pages since Phase 6; this page arrives with the what-if planner.
+      { label: "Risk & what-if", path: "/risk", icon: "risk", phase: 10, permission: "risk:read" },
+      { label: "Cost & claims", path: "/cost", icon: "cost", phase: 8, permission: "cost:read", aliases: ["/variations"] },
+      { label: "Variations", path: "/client/variations", icon: "cost", phase: 8, permission: "client:portal" },
       { label: "Client portal", path: "/client", icon: "client", phase: 12, permission: "client:portal" },
     ],
   },
@@ -42,6 +46,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     items: [
       { label: "Users", path: "/admin/users", icon: "users", phase: 1, permission: "users:manage" },
       { label: "Sites", path: "/admin/sites", icon: "sites", phase: 1, permission: "sites:manage" },
+      { label: "Variation limits", path: "/admin/variation-limits", icon: "cost", phase: 8, permission: "variation_limits:manage" },
       { label: "Audit log", path: "/admin/audit", icon: "audit", phase: 1, permission: "audit:read" },
     ],
   },
@@ -56,7 +61,8 @@ export function findNavItem(pathname: string): NavItem | undefined {
   const items = NAV_GROUPS.flatMap((group) => group.items);
   return (
     items.find((item) => item.path === pathname) ??
-    items.find((item) => item.path !== "/" && pathname.startsWith(`${item.path}/`))
+    items.find((item) => item.path !== "/" && pathname.startsWith(`${item.path}/`)) ??
+    items.find((item) => item.aliases?.some((alias) => pathname === alias || pathname.startsWith(`${alias}/`)))
   );
 }
 

@@ -21,10 +21,12 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.engine.default import DefaultExecutionContext
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 from app.models.user import Site
+from app.rules.variations import default_limit
 
 MONEY = Numeric(16, 2)
 QUANTITY = Numeric(14, 3)
@@ -47,6 +49,12 @@ class ProjectType(StrEnum):
     INSTITUTIONAL = "institutional"
 
 
+def _default_variation_limit(context: DefaultExecutionContext) -> Decimal:
+    """BR-09 default when a project is created: 1% of its contract value."""
+    parameters: dict[str, object] = context.get_current_parameters()  # type: ignore[no-untyped-call]
+    return default_limit(Decimal(str(parameters["contract_value"])))
+
+
 class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "projects"
 
@@ -62,6 +70,9 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Planned average crew on site: the risk model compares reported crews with it (Phase 6).
     planned_crew: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # BR-09: variations above this (either way) need the client's approval. Set to 1% of the contract
+    # value when the project is created; only the Company Admin can change it (audited).
+    variation_limit: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=_default_variation_limit)
 
     site: Mapped[Site] = relationship(lazy="joined")
     sections: Mapped[list["BoqSection"]] = relationship(
@@ -72,6 +83,7 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint("contract_value > 0", name="contract_value_positive"),
         CheckConstraint("planned_end >= start_date", name="dates_in_order"),
         CheckConstraint("planned_crew IS NULL OR planned_crew BETWEEN 1 AND 5000", name="planned_crew_range"),
+        CheckConstraint("variation_limit >= 0", name="variation_limit_non_negative"),
         CheckConstraint(
             "status IN ('planning', 'active', 'on_hold', 'completed', 'cancelled')", name="status_valid"
         ),
@@ -145,6 +157,9 @@ class BudgetLine(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ForeignKey("boq_sections.id", ondelete="CASCADE"), nullable=False, unique=True
     )
     budget_amount: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
+    # Set when the section's forecast first went more than 5% over budget (the alert was sent then);
+    # cleared when it comes back. So the PM and QS are alerted once per overrun, not every day.
+    over_budget_since: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     section: Mapped[BoqSection] = relationship(back_populates="budget_line")
 

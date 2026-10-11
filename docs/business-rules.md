@@ -14,8 +14,8 @@ boundaries can be tested directly; services gather the facts and apply the resul
 | BR-05 | No purchase order until the approval chain is complete | Phase 5 | `rules/materials.py: check_can_order` | `test_unapproved_requests_cannot_be_ordered` |
 | BR-06 | Concrete pours on days with heavy rain forecast (over 10 mm) are flagged and the PM alerted | Partly: the weather strip flags heavy-rain days (Phase 4); pour flagging comes with the advanced schedule (Phase 9) | `api/v1/reports.py` (threshold) | `reports.test.tsx` |
 | BR-07 | Each active site submits a daily report by 18:00; missing reports trigger reminders and count as a risk factor | Reminders: Phase 4. Risk factor: Phase 6 (`missing_reports_14`) | `services/report_service.py`, `core/scheduler.py`, `ai/risk/features.py` | `test_reminders_notifications.py`, `test_crew_and_missing_reports_over_the_last_14_days` |
-| BR-08 | Claim value cannot exceed certified progress × contract value, minus previous claims and 5% retention | Phase 8 | | |
-| BR-09 | Variations above a threshold, or with any time impact, need client approval before work starts | Phase 8 | | |
+| BR-08 | Claim value cannot exceed certified progress × contract value, minus previous claims and 5% retention | Phase 8 | `rules/claims.py: calculate, check`, `services/claim_service.py`; a database check makes the stored figures add up | `test_rules_cost.py` (`test_br08_*`), `test_br08_claim_is_calculated_with_retention`, `test_br08_previous_claims_are_deducted_once_approved` |
+| BR-09 | Variations above the project's limit (1% of the contract value by default; Company Admin only, audited), or with any time impact, need client approval before work starts | Phase 8 | `rules/variations.py: needs_client, route`, `services/variation_service.py` | `test_rules_cost.py` (`test_br09_*`), `test_br09_limit_boundary`, TC-10 `test_tc10_client_approves_a_variation_with_time_impact` |
 | BR-10 | Risk score 70+ is High (automatic PM alert), 40–69 Medium, under 40 Low | Phase 6 | `ai/risk/scoring.py: level`, `services/risk_service.py` | `test_br10_bands`, `test_br10_alerts_the_project_managers_when_a_project_enters_high`, `test_br10_does_not_repeat_while_the_project_stays_high` |
 | BR-11 | A safety issue marked stop-work blocks related tasks until the PM clears it | Partly (Phase 7): the flag, the PM alert, the project banner and PM-only clearing. Blocking the related tasks comes with the advanced schedule (Phase 9) | `services/issue_service.py: _can_close, close_action` | `test_stop_work_is_cleared_only_by_the_project_manager`, `test_follow_ups_must_match_a_confirmed_issue` |
 | BR-12 | If a supplier's predicted on-time chance is under 50% for a critical-path item, suggest an alternative | Phase 10 | | |
@@ -151,6 +151,77 @@ last 14 days are risk model inputs.
 | Engineer or author clears stop-work / PM clears it | 403 / cleared, once | `test_stop_work_is_cleared_only_by_the_project_manager` |
 | Material request raised from a follow-up | Follow-up closed with the request linked | `test_a_material_request_raised_from_a_follow_up_closes_it` |
 | Suggested but unconfirmed issues | Not counted by the risk model | `test_only_confirmed_issues_in_the_last_14_days_count` |
+
+## BR-08: progress claims
+
+The QS certifies a percentage complete for each BOQ section. The claim is calculated, never typed
+in, so it cannot exceed the limit:
+
+    certified %      = the sections' percentages weighted by their contract value
+    certified value  = certified % × contract value (gross, to date)
+    retention        = 5% of the certified value (held, to date)
+    this claim       = certified value − retention − previous claims
+
+A section's contract value is its BOQ amount plus approved variations in it. "Previous claims" are
+the amounts of claims the PM approved (paid or not). Certified progress cannot go below the last
+approved claim, one claim waits for the PM at a time, and a claim with nothing new is refused. The
+PM approves or returns it with a comment; the QS records the payment date.
+
+| Case | Expected | Test |
+| --- | --- | --- |
+| 40% of LKR 10 M, first claim | 4,000,000 certified, 200,000 retained, 3,800,000 claimed | `test_br08_claim_is_calculated_with_retention` |
+| Then 60% | 6,000,000 − 300,000 − 3,800,000 = 1,900,000 | `test_br08_previous_claims_are_deducted_once_approved` |
+| Sections 2 M at 100% and 6 M at 25% | 43.75% certified | `test_br08_sections_are_weighted_by_their_contract_value` |
+| BOQ total differs from the contract value | Progress × *contract value* | `test_br08_uses_the_contract_value_when_the_boq_total_differs` |
+| Rounding, any amount | Claim never above the BR-08 limit; the figures add up | `test_br08_rounding_never_lets_a_claim_exceed_the_limit` |
+| Below the last approved %, or nothing new | Refused (422) | `test_br08_progress_cannot_go_back_or_claim_nothing` |
+| Two claims at once | One accepted, the other 409 | `test_one_claim_waits_for_the_pm_at_a_time`; checked live against the API |
+| A returned claim | Does not count as a previous claim | `test_a_returned_claim_does_not_count` |
+
+## BR-09: variation orders and TC-10
+
+A PM or QS raises a variation; **the QS prices every one** (the change to the contract value, and to
+the section's cost budget). Then:
+
+- any time impact, or a contract change above the project's limit (additions and omissions alike),
+  goes to **the client**;
+- otherwise a variation raised by the QS goes to **a project manager**;
+- a variation raised by a project manager goes to the client, so **nobody approves their own**;
+- once a variation has been with the client, a revision goes back to the client.
+
+The limit is set to 1% of the contract value when a project is created. Only the Company Admin can
+change it, with a reason, and every change is audited. The client sees the limit. A variation keeps
+the limit it was routed with.
+
+The PM approves, queries or rejects; the client approves or queries. A query sends it back to the
+raiser or QS to revise (it is priced again) or withdraw. **On approval**, in one transaction: the
+contract value changes, the section's budget line changes, the linked task and the project's planned
+end move by the time impact, extra quantity on a BOQ item raises its BR-02 allowance, an audit entry
+records before and after, and the project's risk is re-scored.
+
+Once a project is past planning (or has any claim or variation), its contract value and planned end
+change **only** through approved variations.
+
+| Case | Expected | Test |
+| --- | --- | --- |
+| QS variation, LKR 90,000 (limit 100,000), no time | PM approves; contract, budget and BR-02 allowance change | `test_br09_a_small_qs_variation_goes_to_the_pm_and_applies` |
+| Exactly the limit / 1 cent over / a large omission | PM / client / client | `test_br09_limit_boundary` |
+| Any time impact | Client | `test_br09_routing` |
+| Raised by a PM | Priced by the QS, then the client | `test_br09_a_pm_variation_is_priced_by_the_qs_and_goes_to_the_client` |
+| **TC-10**: client approves a variation | Contract value, budget and schedule update; audit entry created | `test_tc10_client_approves_a_variation_with_time_impact` |
+| Client queries, QS revises below the limit | Back to the client, not the PM | `test_the_client_queries_and_a_revision_goes_back_to_the_client` |
+| Admin changes the limit | Audited with from, to and reason; applies to the next pricing | `test_only_the_admin_changes_the_limit_and_it_is_audited`, `test_a_new_limit_applies_to_the_next_pricing_only` |
+| PM edits the contract value directly once under way | 422 `contract_locked` | `test_the_contract_changes_only_through_variations_once_under_way` |
+
+## Forecast final cost and variance alerts
+
+Per BOQ section: forecast = committed + (budget − budgeted value of the committed work) × cost trend,
+where the trend is committed ÷ budgeted value of the same quantities. With nothing committed the
+forecast is the budget. A section forecast more than 5% over its budget alerts the site's PM and QS
+once, when it goes over (`budget_lines.over_budget_since`); coming back under clears it. Checked
+every morning at 06:10, after approvals, orders, deliveries and variations, and with
+`python -m app.cli check-variance`. Tests: `test_rules_cost.py`, `test_budget_shows_the_forecast_and_alerts_an_overrun_once`,
+`test_a_section_still_over_the_next_day_does_not_alert_again`.
 
 ## BR-02 in detail
 

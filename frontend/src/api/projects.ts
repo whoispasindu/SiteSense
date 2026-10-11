@@ -44,6 +44,8 @@ export const projectSummarySchema = z.object({
   contract_value: decimal.optional(),
   boq_total: decimal.optional(),
   budget_total: decimal.optional(),
+  // Approved variations' contract change (Phase 8): margins use BOQ + variations.
+  variations_total: decimal.optional(),
 });
 export type ProjectSummary = z.infer<typeof projectSummarySchema>;
 
@@ -55,6 +57,7 @@ const sectionTotalsSchema = z.object({
   amount: decimal.optional(),
   budget_line_id: z.uuid().optional(),
   budget_amount: decimal.optional(),
+  variation_amount: decimal.optional(),
 });
 export type SectionTotals = z.infer<typeof sectionTotalsSchema>;
 
@@ -62,6 +65,8 @@ export const projectDetailSchema = projectSummarySchema.extend({
   description: z.string().nullable(),
   // Planned average crew on site; the risk model compares reported crews with it.
   planned_crew: z.number().int().nullable(),
+  // Past planning, or with claims or variations: the contract changes only through approved variations.
+  contract_locked: z.boolean().optional(),
   sections: z.array(sectionTotalsSchema),
   team: z.array(z.object({ id: z.uuid(), full_name: z.string(), role: roleSchema, role_label: z.string() })),
   created_at: z.iso.datetime({ offset: true }),
@@ -87,6 +92,8 @@ export const boqSchema = z.object({
   sections: z.array(sectionTotalsSchema.extend({ items: z.array(boqItemSchema) })),
   boq_total: decimal.optional(),
   budget_total: decimal.optional(),
+  // Approved variations' contract change (Phase 8): margins use BOQ + variations.
+  variations_total: decimal.optional(),
   item_count: z.number().int(),
 });
 export type Boq = z.infer<typeof boqSchema>;

@@ -8,6 +8,22 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Phase 8, cost control, claims and variations ([ADR 0011](docs/adr/0011-claims-variations-forecast.md)):
+  - **Forecast final cost** per BOQ section: committed cost plus the remaining budget at the cost trend
+    so far. The budget panel shows forecast, variance and trend; a section forecast more than 5% over
+    budget alerts the PM and QS once (daily at 06:10, after cost events, `app.cli check-variance`).
+  - **Progress claims (BR-08):** the QS certifies a percentage per section and the claim is calculated
+    with 5% retention, less previous claims; the PM approves or returns it; the QS records payment.
+  - **Variation orders (BR-09):** raised by a PM or QS, priced by the QS, routed to the PM or the
+    client (any time impact, above the project's limit, or raised by a PM). On approval the contract
+    value, budget line, task and planned end change, audited (TC-10). Extra quantity on a BOQ item
+    raises its BR-02 allowance.
+  - **The client** sees and decides on the variations sent to them, without internal costs.
+  - **The BR-09 limit** per project: 1% of the contract value by default; only the Company Admin
+    changes it, with a reason, audited.
+  - **Cost & claims** page: every project's forecast and claims, and what waits for you.
+  - Demo data: claims and variations at every stage on Havelock.
+
 - Phase 7, report issue classifier ([model card](docs/model-card-report-issues.md),
   [ADR 0010](docs/adr/0010-report-issue-classifier.md)):
   - After filing a daily report, its author gets an **AI check**: each sentence of the problems
@@ -32,6 +48,8 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- A project's contract value and planned end can no longer be edited directly once it is under way;
+  they change only through approved variations.
 - onnxruntime's usage telemetry to Microsoft is switched off before it is imported.
 - Analysing a report is rate limited per client; confirmations lock the report so a double submit
   cannot duplicate follow-ups.

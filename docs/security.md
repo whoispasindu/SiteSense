@@ -36,7 +36,110 @@ here, newest first. The baseline design is in [ADR 0003](adr/0003-security-basel
 | Large model files | ONNX weights live in a GitHub Release, not the repository; a committed manifest pins SHA-256 and size; `fetch_models.py` verifies before moving a file into place and the backend verifies again before onnxruntime parses it; plain file names only; 300 MB cap; mismatch or missing means the TF-IDF fallback; ONNX is an operator graph, not pickled code | `scripts/fetch_models.py`, `ai/nlp/transformer.py` | `test_report_transformer.py` (tamper, size, names, fallback, parity), CI fetches and runs them with `SITESENSE_REQUIRE_MODELS=1` |
 | Outbound calls (ML runtime) | onnxruntime's telemetry to Microsoft is switched off before it is imported, in code and in the image | `ai/nlp/transformer.py`, `backend/Dockerfile` | `test_onnxruntime_telemetry_is_off_before_onnxruntime_is_imported`; checked in the container: no connection |
 | Personal data in free text | Names of site people, the author, titled names and common Sri Lankan names (any case) become `[PERSON]` before classification and storage; only the weather client may call out of the server | `ai/nlp/text.py: redact`, `ai/nlp/names_lk.txt`, `services/issue_service.py` | `test_names_are_redacted_before_storage`, `test_report_nlp.py`, `test_outbound_calls.py`, ML `test_the_name_list_holds_no_word_from_the_report_data` |
+| Contract changes | The contract value and planned end change only through approved variations once a project is under way; claims are calculated (BR-08) and a database check keeps their figures consistent; one claim waits at a time (partial unique index and a project lock); variation approval locks the variation, project and budget line and applies everything in one transaction, audited before and after; each variation keeps the BR-09 limit it was routed with; only the Company Admin changes a limit (reason audited) | `rules/claims.py`, `rules/variations.py`, `services/claim_service.py`, `services/variation_service.py`, `services/project_service.py: contract_locked`, migration 0010 | `test_rules_cost.py`, `test_contract_api.py`, `test_the_contract_changes_only_through_variations_once_under_way` |
+| Client view | Separate schema with no internal cost or comment; only variations sent to the client, on their sites (404 otherwise); the client never reaches budgets, claims or the cost overview (TC-07) | `schemas/contract.py: ClientVariationOut`, `services/variation_service.py: client_out` | `test_the_client_queries_and_a_revision_goes_back_to_the_client`, `test_the_client_sees_only_their_sites`, role matrix |
 | Supply chain | Pinned deps, Dependabot (pip, npm, actions, docker), pip-audit, npm audit, dependency review, CodeQL `security-extended`, actions pinned to SHAs, `permissions: contents: read`, `persist-credentials: false` | `.github/` | CI |
+
+## Phase 8 review: 2026-10-11
+
+Scope: cost forecasts and variance alerts (`rules/cost.py`, `services/cost_service.py`), progress
+claims (BR-08), variation orders (BR-09, TC-10), the client's variation view, the Company Admin's
+variation limit, migration 0010, the cost overview, the budget, claims, variations, client and admin
+screens, and the demo seed.
+
+### OWASP Top 10 (2021) walk-through
+
+- **A01 Broken access control.** The 19 new endpoints are in the role matrix for every role.
+  - Claims: only a QS submits and records payment; only a PM approves; both read.
+  - Variations: the PM and QS raise and read; only the QS prices; only a PM decides, and never on a
+    variation they raised; only the raiser withdraws; the raiser or a QS revises.
+  - The client sees and decides only on variations sent to them, on their own sites; anything else
+    answers 404.
+  - The BR-09 limit needs `variation_limits:manage`, which only the Company Admin holds.
+  - Every project route goes through the site scope.
+  - Mutation-checked (below).
+- **A03 Injection.** Titles, descriptions and comments are stored as text and rendered by React.
+  Amounts and percentages are validated decimal strings with fixed precision.
+- **A04 Insecure design.**
+  - The claim amount is calculated, never accepted from the client, so BR-08 cannot be exceeded; a
+    database check keeps the stored figures consistent.
+  - The contract changes only through approved variations once work starts (fixed, below).
+  - Approval re-checks that the contract and budget stay positive.
+  - A revision of a variation the client has seen goes back to the client.
+  - A limit change never re-routes work already sent.
+  - Races were tested against the running API (below).
+- **A05 / DoS.** Claims are capped at 200 sections, with percentages from 0 to 100 at two decimals.
+  Money changes are within ±10¹³ at two decimals. Time impact is at most 3,650 days. Text is limited
+  to 5,000 characters for descriptions, 1,000 for comments and 500 for a limit reason. The overview
+  makes a few indexed queries per project on the caller's sites.
+- **A06 Vulnerable components.** No new dependencies. pip-audit **0**, npm audit **0**.
+- **A08 Data integrity.** Every claim and variation step is audited:
+  - `claim.submitted`, `claim.decided` and `claim.paid`;
+  - `variation.raised`, `.priced`, `.revised`, `.decided`, `.client_decided` and `.withdrawn`;
+  - `variation.applied`, with the contract value, budget line, planned end and task end before and
+    after;
+  - `project.variation_limit_changed`, with from, to and reason.
+- **A09 Logging.** A failed variance check is logged with the project code and never undoes the
+  approval, order or delivery that triggered it.
+
+### Privacy
+
+- The client's view carries no budget change, section budget or internal comment. Internal people
+  appear as "Contractor". TC-07 still holds: a client gets 403 on budgets, claims and the cost
+  overview.
+
+### Verification beyond unit tests
+
+- **Mutation checks: 23 of 23** deliberate faults fail a test. These cover:
+  - claims: no retention; progress allowed to go down; previous claims not deducted; the BOQ total
+    used instead of the contract value; an unapproved claim marked paid;
+  - BR-09: the limit boundary made inclusive; the time impact ignored; omissions ignored; a PM
+    approving their own variation, by routing or by decision; the client allowed to reject; a
+    revision skipping the client; a revision keeping the old price;
+  - approval: the planned end or the budget line not changed; BR-02 ignoring variations;
+  - the client: internal comments shown; unsent variations visible;
+  - the limit change not audited as such; the contract editable directly;
+  - the forecast ignoring committed work; the alert line at the budget; variance alerts repeating.
+
+  The first run caught 22. The survivor (alerts repeating) was hidden by the notifications'
+  same-day de-duplication; a next-day test now catches it.
+- **Races, against the running API:** two simultaneous claim submissions gave 201 and 409. Two
+  simultaneous client approvals of the same variation gave 200 and 409, and the contract changed
+  once.
+- **In the browser** (demo data):
+  - the PM approves a claim from the calculation sheet;
+  - the client sees why a variation needs them and approves it, and the contract value, planned
+    end, task and audit log update (TC-10);
+  - the QS prices a PM's variation and sees it routed to the client, with the reason;
+  - the QS's new-claim form recalculates as percentages are typed.
+
+### Findings fixed during the review
+
+1. **The contract could be changed without a variation.** Since Phase 2 a PM could edit an active
+   project's contract value and planned end directly. That bypassed the QS's price, BR-09 and the
+   client's approval. Now those fields change directly only while a project is in planning with no
+   claim or variation (`contract_locked`). The edit dialog shows them read-only, and both are tested
+   and mutation-checked.
+2. **Margins were understated after a variation.** The budget included the variation's budget
+   change, but the BOQ value did not include its contract change. Project and section totals now
+   carry approved variations, and every margin uses BOQ plus variations.
+3. **Locking a project row failed** ("FOR UPDATE cannot be applied to the nullable side of an outer
+   join", because the site is loaded with a join). Found by the tests before it shipped; the locks
+   now name the project table only.
+4. **Money totals could come back as "0" rather than "0.00"** when nothing had been summed. Every
+   money field in claim and variation responses is now rounded to cents.
+5. **Two navigation errors.** The phase marker was still 5, so finished modules showed as "Soon".
+   Moving it to 8 would have linked "Risk & what-if" to a page that does not exist yet; that item now
+   arrives with the what-if planner (Phase 10).
+
+### Open items
+
+- Retention release at practical completion (close-out).
+- The client portal (Phase 12) should decide whether clients also see variations the PM approved
+  under the limit; today they see only variations sent to them.
+- Committed cost covers materials only, so the forecast is a materials-led trend. Labour and plant
+  costs are not tracked yet.
+- Variation counts as a risk model input: risk model v2 (Phase 10).
 
 ## Phase 7 review: 2026-10-11
 

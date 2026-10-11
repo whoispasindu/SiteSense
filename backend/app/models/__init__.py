@@ -2,6 +2,13 @@
 
 from app.models.audit_log import AuditLog
 from app.models.base import Base
+from app.models.contract import (
+    ClaimStatus,
+    ProgressClaim,
+    ProgressClaimLine,
+    VariationEvent,
+    VariationOrder,
+)
 from app.models.issues import (
     ActionKind,
     ActionStatus,
@@ -37,6 +44,7 @@ __all__ = [
     "BoqItem",
     "BoqSection",
     "BudgetLine",
+    "ClaimStatus",
     "DailyReport",
     "Delivery",
     "DocumentCounter",
@@ -45,6 +53,8 @@ __all__ = [
     "IssueStatus",
     "MaterialRequest",
     "Notification",
+    "ProgressClaim",
+    "ProgressClaimLine",
     "ProgressSnapshot",
     "Project",
     "ProjectStatus",
@@ -64,6 +74,8 @@ __all__ = [
     "Supplier",
     "Task",
     "User",
+    "VariationEvent",
+    "VariationOrder",
     "WeatherForecast",
     "user_site_assignments",
 ]

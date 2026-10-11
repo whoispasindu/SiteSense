@@ -71,3 +71,16 @@ export function timeAgo(timestamp: string, now: Date = new Date()): string {
   const days = Math.round(hours / 24);
   return days === 1 ? "yesterday" : `${String(days)} days ago`;
 }
+
+/** "11 Oct 2026, 09:15" in site time: for histories that span days. */
+export function formatSiteDateTime(timestamp: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: SITE_TIME_ZONE,
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(timestamp));
+}

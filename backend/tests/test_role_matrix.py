@@ -51,6 +51,8 @@ REQUESTERS = frozenset({Role.PROJECT_MANAGER, Role.QUANTITY_SURVEYOR, Role.SITE_
 COST_READERS = frozenset({Role.PROJECT_MANAGER, Role.QUANTITY_SURVEYOR})
 RISK_READERS = frozenset({Role.PROJECT_MANAGER, Role.QUANTITY_SURVEYOR})
 PROCUREMENT = frozenset({Role.PROCUREMENT_OFFICER})
+VARIATION_MANAGERS = frozenset({Role.PROJECT_MANAGER, Role.QUANTITY_SURVEYOR})
+CLIENT_ONLY = frozenset({Role.CLIENT})
 BOQ_CSV = (
     b"Section Code,Section Name,Item Code,Description,Unit,Quantity,Rate\nA,Prelims,A.1,Setup,item,1,100\n"
 )
@@ -138,6 +140,32 @@ ENDPOINTS = [
     Endpoint("GET", "/api/v1/purchase-orders/{order_id}", MATERIAL_READERS),
     Endpoint("POST", "/api/v1/purchase-orders/{order_id}/deliveries", PROCUREMENT,
              {"request_id": "{request_id}", "quantity": "1", "delivered_on": "{today}"}),
+    Endpoint("GET", "/api/v1/cost/overview", COST_READERS),
+    Endpoint("GET", "/api/v1/projects/{project_id}/claims", COST_READERS),
+    Endpoint("POST", "/api/v1/projects/{project_id}/claims/check", QS_ONLY,
+             {"sections": [{"section_id": "{section_id}", "certified_pct": "10"}]}),
+    Endpoint("POST", "/api/v1/projects/{project_id}/claims", QS_ONLY,
+             {"sections": [{"section_id": "{section_id}", "certified_pct": "10"}]}),
+    Endpoint("GET", "/api/v1/claims/{claim_id}", COST_READERS),
+    Endpoint("POST", "/api/v1/claims/{claim_id}/decision", PM_ONLY, {"decision": "approve"}),
+    Endpoint("POST", "/api/v1/claims/{claim_id}/payment", QS_ONLY, {"paid_on": "{today}"}),
+    Endpoint("GET", "/api/v1/projects/{project_id}/variations", VARIATION_MANAGERS),
+    Endpoint("POST", "/api/v1/projects/{project_id}/variations", VARIATION_MANAGERS,
+             {"title": "Matrix variation", "description": "Matrix change", "section_id": "{section_id}"}),
+    Endpoint("GET", "/api/v1/variations/{variation_id}", VARIATION_MANAGERS),
+    Endpoint("POST", "/api/v1/variations/{variation_id}/price", QS_ONLY,
+             {"contract_change": "1.00", "budget_change": "1.00"}),
+    Endpoint("POST", "/api/v1/variations/{variation_id}/revision", VARIATION_MANAGERS,
+             {"title": "Matrix variation", "description": "Matrix change", "section_id": "{section_id}"}),
+    Endpoint("POST", "/api/v1/variations/{variation_id}/decision", PM_ONLY, {"decision": "approve"}),
+    Endpoint("POST", "/api/v1/variations/{variation_id}/withdraw", VARIATION_MANAGERS, {}),
+    Endpoint("POST", "/api/v1/variations/{variation_id}/client-decision", CLIENT_ONLY,
+             {"decision": "approve"}),
+    Endpoint("GET", "/api/v1/client/variations", CLIENT_ONLY),
+    Endpoint("GET", "/api/v1/client/variations/{variation_id}", CLIENT_ONLY),
+    Endpoint("GET", "/api/v1/admin/variation-limits", ADMIN_ONLY),
+    Endpoint("PUT", "/api/v1/admin/projects/{project_id}/variation-limit", ADMIN_ONLY,
+             {"variation_limit": "5.00", "reason": "Matrix check"}),
     Endpoint("GET", "/api/v1/projects/{project_id}/risk", RISK_READERS),
     Endpoint("GET", "/api/v1/risk/projects", RISK_READERS),
     Endpoint("GET", "/api/v1/notifications", ALL_ROLES),
@@ -245,6 +273,9 @@ def ids(make_user: Callable[..., User], make_site: Callable[..., Site], db: Sess
         "request_id": str(material.id),
         "supplier_id": str(supplier.id),
         "order_id": str(uuid.uuid4()),
+        "section_id": str(section.id),
+        "claim_id": str(uuid.uuid4()),
+        "variation_id": str(uuid.uuid4()),
     }
 
 

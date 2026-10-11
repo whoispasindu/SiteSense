@@ -170,7 +170,7 @@ def test_update_project_and_reject_bad_dates(
     headers = headers_for(api, make_user, Role.PROJECT_MANAGER, [colombo])
     url = f"{PROJECTS}/{project.id}"
 
-    updated = api.patch(url, json={"status": "on_hold", "contract_value": "1200000000.50"}, headers=headers)
+    updated = api.patch(url, json={"status": "on_hold", "name": "Renamed"}, headers=headers)
     bad_dates = api.patch(url, json={"planned_end": "2020-01-01"}, headers=headers)
     forever = api.patch(url, json={"planned_end": "9999-12-31"}, headers=headers)
     assert forever.status_code == 422
@@ -179,7 +179,6 @@ def test_update_project_and_reject_bad_dates(
 
     assert updated.status_code == 200
     assert updated.json()["status"] == "on_hold"
-    assert updated.json()["contract_value"] == "1200000000.50"
     assert bad_dates.status_code == 422
     assert cannot_move.status_code == 422
     assert null_name.status_code == 422
@@ -472,3 +471,30 @@ def test_budget_line_must_belong_to_the_project(
     )
 
     assert response.status_code == 404
+
+
+def test_the_contract_changes_only_through_variations_once_under_way(
+    api: TestClient,
+    make_user: Callable[..., User],
+    colombo: Site,
+    make_project: Callable[..., Project],
+    db: Session,
+) -> None:
+    """Phase 8 security review: a direct edit would bypass the QS's price, BR-09 and the client's approval."""
+    project = make_project(colombo)
+    headers = headers_for(api, make_user, Role.PROJECT_MANAGER, [colombo])
+    url = f"{PROJECTS}/{project.id}"
+
+    for change in ({"contract_value": "1200000000.50"}, {"planned_end": "2027-12-31"}):
+        refused = api.patch(url, json=change, headers=headers)
+        assert refused.status_code == 422
+        assert refused.json()["error"]["code"] == "contract_locked"
+    assert api.get(url, headers=headers).json()["contract_locked"] is True
+
+    project.status = "planning"
+    db.commit()
+    assert api.get(url, headers=headers).json()["contract_locked"] is False
+    corrected = api.patch(url, json={"contract_value": "1200000000.50"}, headers=headers)
+    assert corrected.json()["contract_value"] == "1200000000.50"
+    same = api.patch(url, json={"contract_value": "1200000000.50", "name": "Same value"}, headers=headers)
+    assert same.status_code == 200  # an unchanged value is not a change

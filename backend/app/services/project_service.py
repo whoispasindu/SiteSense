@@ -15,13 +15,16 @@ from app.models import (
     BoqSection,
     BudgetLine,
     MaterialRequest,
+    ProgressClaim,
     Project,
     ProjectStatus,
     RequestStatus,
     Site,
     User,
+    VariationOrder,
 )
 from app.models.user import user_site_assignments
+from app.rules.variations import VariationStatus
 from app.schemas.auth import SiteSummary
 from app.schemas.project import (
     MAX_PROJECT_DAYS,
@@ -69,8 +72,25 @@ def _budget_subquery() -> Subquery:
     )
 
 
+def _variations_subquery() -> Subquery:
+    """Approved variations' contract change per project (Phase 8)."""
+    return (
+        select(
+            VariationOrder.project_id.label("project_id"),
+            func.coalesce(func.sum(VariationOrder.contract_change), 0).label("variations_total"),
+        )
+        .where(VariationOrder.status == VariationStatus.APPROVED.value)
+        .group_by(VariationOrder.project_id)
+        .subquery()
+    )
+
+
 def _summary(
-    project: Project, boq_total: Decimal | None, budget_total: Decimal | None, items: int | None
+    project: Project,
+    boq_total: Decimal | None,
+    budget_total: Decimal | None,
+    items: int | None,
+    variations_total: Decimal | None = None,
 ) -> dict[str, object]:
     return {
         "id": project.id,
@@ -86,6 +106,7 @@ def _summary(
         "boq_total": Decimal(boq_total or 0).quantize(Decimal("0.01")),
         "budget_total": Decimal(budget_total or 0).quantize(Decimal("0.01")),
         "item_count": int(items or 0),
+        "variations_total": Decimal(variations_total or 0).quantize(Decimal("0.01")),
     }
 
 
@@ -94,10 +115,18 @@ def list_projects(
 ) -> list[ProjectSummary]:
     totals = _totals_subquery()
     budgets = _budget_subquery()
+    varied = _variations_subquery()
     stmt = (
-        select(Project, totals.c.boq_total, budgets.c.budget_total, totals.c.item_count)
+        select(
+            Project,
+            totals.c.boq_total,
+            budgets.c.budget_total,
+            totals.c.item_count,
+            varied.c.variations_total,
+        )
         .outerjoin(totals, totals.c.project_id == Project.id)
         .outerjoin(budgets, budgets.c.project_id == Project.id)
+        .outerjoin(varied, varied.c.project_id == Project.id)
     )
     stmt = scope_to_user_sites(stmt, Project.site_id, user)
     if status is not None:
@@ -115,7 +144,10 @@ def list_projects(
             )
         )
     rows = db.execute(stmt.order_by(Project.start_date.desc(), Project.code)).all()
-    return [ProjectSummary.model_validate(_summary(p, boq, budget, items)) for p, boq, budget, items in rows]
+    return [
+        ProjectSummary.model_validate(_summary(p, boq, budget, items, var))
+        for p, boq, budget, items, var in rows
+    ]
 
 
 def get_project(db: Session, user: User, project_id: uuid.UUID) -> Project:
@@ -144,6 +176,16 @@ def _section_totals(db: Session, project: Project) -> list[SectionTotals]:
         .group_by(BoqSection.id, BudgetLine.id)
         .order_by(BoqSection.position)
     )
+    varied = dict(
+        db.execute(
+            select(VariationOrder.section_id, func.sum(VariationOrder.contract_change))
+            .where(
+                VariationOrder.project_id == project.id,
+                VariationOrder.status == VariationStatus.APPROVED.value,
+            )
+            .group_by(VariationOrder.section_id)
+        ).all()
+    )
     return [
         SectionTotals(
             id=section.id,
@@ -153,6 +195,7 @@ def _section_totals(db: Session, project: Project) -> list[SectionTotals]:
             amount=Decimal(amount).quantize(Decimal("0.01")),
             budget_line_id=line_id,
             budget_amount=budget,
+            variation_amount=Decimal(varied.get(section.id) or 0).quantize(Decimal("0.01")),
         )
         for section, count, amount, line_id, budget in db.execute(stmt).all()
     ]
@@ -176,11 +219,13 @@ def project_detail(db: Session, project: Project) -> ProjectDetail:
     boq_total = sum((s.amount for s in sections), ZERO)
     budget_total = sum((s.budget_amount for s in sections), ZERO)
     items = sum(s.item_count for s in sections)
+    variations = sum((s.variation_amount for s in sections), ZERO)
     return ProjectDetail.model_validate(
         {
-            **_summary(project, boq_total, budget_total, items),
+            **_summary(project, boq_total, budget_total, items, variations),
             "description": project.description,
             "planned_crew": project.planned_crew,
+            "contract_locked": contract_locked(db, project),
             "sections": sections,
             "team": _team(db, project),
             "created_at": project.created_at,
@@ -219,6 +264,22 @@ def create_project(db: Session, data: ProjectCreate, *, actor: User, meta: Reque
     return project
 
 
+# The contract's price and completion date. Once work is under way they change only through approved
+# variations, so every change is priced by the QS, routed by BR-09 and audited with before and after.
+CONTRACT_FIELDS = frozenset({"contract_value", "planned_end"})
+
+
+def contract_locked(db: Session, project: Project) -> bool:
+    """True once the project is past planning, or has any claim or variation."""
+    if project.status != ProjectStatus.PLANNING.value:
+        return True
+    has_claim = db.scalar(select(ProgressClaim.id).where(ProgressClaim.project_id == project.id).limit(1))
+    has_variation = db.scalar(
+        select(VariationOrder.id).where(VariationOrder.project_id == project.id).limit(1)
+    )
+    return has_claim is not None or has_variation is not None
+
+
 def update_project(
     db: Session, project: Project, data: ProjectUpdate, *, actor: User, meta: RequestMeta
 ) -> Project:
@@ -236,6 +297,14 @@ def update_project(
         if required in changes and changes[required] is None:
             raise BusinessRuleError(f"{required.replace('_', ' ').capitalize()} cannot be empty.")
     changed = {k: v for k, v in changes.items() if getattr(project, k) != v}
+    locked = sorted(set(changed) & CONTRACT_FIELDS)
+    if locked and contract_locked(db, project):
+        error = BusinessRuleError(
+            "Once a project is under way, its contract value and planned end change only through approved "
+            "variations (BR-09)."
+        )
+        error.code = "contract_locked"
+        raise error
     for key, value in changed.items():
         setattr(project, key, value)
     if changed:
@@ -295,6 +364,7 @@ def get_boq(db: Session, project: Project) -> BoqOut:
         sections=out,
         boq_total=sum((s.amount for s in out), ZERO),
         budget_total=sum((s.budget_amount for s in out), ZERO),
+        variations_total=sum((s.variation_amount for s in out), ZERO),
         item_count=sum(s.item_count for s in out),
     )
 

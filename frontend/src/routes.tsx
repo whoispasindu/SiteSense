@@ -3,6 +3,9 @@ import type { RouteObject } from "react-router";
 import { AnonymousOnly, RequireAuth, RequirePermission } from "./auth/guards";
 import { AppLayout } from "./components/layout/AppLayout";
 import { AuditLogPage } from "./pages/admin/AuditLogPage";
+import { VariationLimitsPage } from "./pages/admin/VariationLimitsPage";
+import { ClientVariationPage, ClientVariationsPage } from "./pages/client/ClientVariationsPage";
+import { CostPage } from "./pages/cost/CostPage";
 import { SitesPage } from "./pages/admin/SitesPage";
 import { UsersPage } from "./pages/admin/UsersPage";
 import { ChangePasswordPage } from "./pages/auth/ChangePasswordPage";
@@ -12,10 +15,12 @@ import { NotFoundPage } from "./pages/NotFoundPage";
 import { BoqImportPage } from "./pages/projects/BoqImportPage";
 import { BoqPage } from "./pages/projects/BoqPage";
 import { ProjectLayout } from "./pages/projects/ProjectLayout";
+import { ProjectClaims } from "./pages/projects/ProjectClaims";
 import { ProjectOverview } from "./pages/projects/ProjectOverview";
 import { ProjectReports } from "./pages/projects/ProjectReports";
 import { ProjectSchedule } from "./pages/projects/ProjectSchedule";
 import { ProjectsPage } from "./pages/projects/ProjectsPage";
+import { ProjectVariations } from "./pages/projects/ProjectVariations";
 import { ReportDetailPage } from "./pages/reports/ReportDetailPage";
 import { ReportFormPage } from "./pages/reports/ReportFormPage";
 import { SiteReportsPage } from "./pages/reports/SiteReportsPage";
@@ -27,6 +32,7 @@ import { PurchaseOrdersPage } from "./pages/procurement/PurchaseOrdersPage";
 import { SuppliersPage } from "./pages/procurement/SuppliersPage";
 import { SchedulePage } from "./pages/schedule/SchedulePage";
 import { RouteErrorPage } from "./pages/RouteErrorPage";
+import { VariationDetailPage } from "./pages/variations/VariationDetailPage";
 
 export const routes: RouteObject[] = [
   {
@@ -130,6 +136,38 @@ export const routes: RouteObject[] = [
         ),
       },
       {
+        path: "cost",
+        element: (
+          <RequirePermission permission="cost:read">
+            <CostPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: "variations/:variationId",
+        element: (
+          <RequirePermission permission="variations:manage">
+            <VariationDetailPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: "client/variations",
+        element: (
+          <RequirePermission permission="client:portal">
+            <ClientVariationsPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: "client/variations/:variationId",
+        element: (
+          <RequirePermission permission="client:portal">
+            <ClientVariationPage />
+          </RequirePermission>
+        ),
+      },
+      {
         path: "reports/:reportId",
         element: (
           <RequirePermission permission="reports:read">
@@ -172,6 +210,22 @@ export const routes: RouteObject[] = [
             ),
           },
           {
+            path: "claims",
+            element: (
+              <RequirePermission permission="cost:read">
+                <ProjectClaims />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "variations",
+            element: (
+              <RequirePermission permission="variations:manage">
+                <ProjectVariations />
+              </RequirePermission>
+            ),
+          },
+          {
             path: "boq/import",
             element: (
               <RequirePermission permission="boq:manage">
@@ -194,6 +248,14 @@ export const routes: RouteObject[] = [
         element: (
           <RequirePermission permission="sites:manage">
             <SitesPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: "admin/variation-limits",
+        element: (
+          <RequirePermission permission="variation_limits:manage">
+            <VariationLimitsPage />
           </RequirePermission>
         ),
       },

@@ -59,6 +59,18 @@ class AuditAction:
     DELIVERY_RECORDED = "delivery.recorded"
     REPORT_ISSUES_CONFIRMED = "report.issues_confirmed"
     REPORT_ACTION_CLOSED = "report_action.closed"
+    # Phase 8: claims, variations and the BR-09 limit
+    CLAIM_SUBMITTED = "claim.submitted"
+    CLAIM_DECIDED = "claim.decided"
+    CLAIM_PAID = "claim.paid"
+    VARIATION_RAISED = "variation.raised"
+    VARIATION_PRICED = "variation.priced"
+    VARIATION_REVISED = "variation.revised"
+    VARIATION_DECIDED = "variation.decided"
+    VARIATION_CLIENT_DECIDED = "variation.client_decided"
+    VARIATION_APPLIED = "variation.applied"
+    VARIATION_WITHDRAWN = "variation.withdrawn"
+    VARIATION_LIMIT_CHANGED = "project.variation_limit_changed"
 
 
 def record(

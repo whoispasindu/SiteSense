@@ -60,7 +60,11 @@ class Permission(StrEnum):
     RATES_READ = "rates:read"
     CLAIMS_MANAGE = "claims:manage"
     CLAIMS_APPROVE = "claims:approve"
-    VARIATIONS_MANAGE = "variations:manage"
+    VARIATIONS_MANAGE = "variations:manage"  # raise and read variations (PM, QS)
+    VARIATIONS_PRICE = "variations:price"  # the QS prices every variation (Phase 8)
+    VARIATIONS_APPROVE = "variations:approve"  # the PM approves those that do not need the client
+    # BR-09: the variation limit of each project. Company Admin only, audited.
+    VARIATION_LIMITS_MANAGE = "variation_limits:manage"
     # Client portal (Phase 12)
     CLIENT_PORTAL = "client:portal"
     VARIATIONS_CLIENT_DECIDE = "variations:client_decide"
@@ -70,7 +74,9 @@ P = Permission
 
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     # Sets up the company. Deliberately has no project approvals (segregation of duties).
-    Role.ADMIN: frozenset({P.USERS_MANAGE, P.SITES_MANAGE, P.AUDIT_READ, P.DASHBOARD_VIEW}),
+    Role.ADMIN: frozenset(
+        {P.USERS_MANAGE, P.SITES_MANAGE, P.AUDIT_READ, P.DASHBOARD_VIEW, P.VARIATION_LIMITS_MANAGE}
+    ),
     Role.PROJECT_MANAGER: frozenset(
         {
             P.DASHBOARD_VIEW,
@@ -89,6 +95,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             P.RATES_READ,
             P.CLAIMS_APPROVE,
             P.VARIATIONS_MANAGE,
+            P.VARIATIONS_APPROVE,
         }
     ),
     Role.QUANTITY_SURVEYOR: frozenset(
@@ -106,6 +113,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             P.RATES_READ,
             P.CLAIMS_MANAGE,
             P.VARIATIONS_MANAGE,
+            P.VARIATIONS_PRICE,
         }
     ),
     Role.SITE_ENGINEER: frozenset(

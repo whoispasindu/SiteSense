@@ -270,3 +270,19 @@ def test_latest_value_counts_each_request_once() -> None:
     assert latest_value(approved_amount=D(100), order_amount=D(95), delivered=None) == D(95)
     assert latest_value(approved_amount=D(100), order_amount=D(95), delivered=D(95)) == D(95)
     assert latest_value(approved_amount=None, order_amount=None, delivered=None) == D(0)
+
+
+def test_a_quantity_covered_only_by_a_variation_says_so() -> None:
+    covered = rules.check_quantity(
+        boq_quantity=D(100), already_requested=D(0), requested=D(120), approved_variation=D(20)
+    )
+    tolerance = rules.check_quantity(
+        boq_quantity=D(100), already_requested=D(0), requested=D(102), approved_variation=D(20)
+    )
+    beyond = rules.check_quantity(
+        boq_quantity=D(100), already_requested=D(0), requested=D("123.01"), approved_variation=D(20)
+    )
+
+    assert (covered.severity, tolerance.severity, beyond.severity) == ("pass", "warn", "block")
+    assert "Covered by approved variations" in covered.message
+    assert "plus 20 from variations" in covered.message
