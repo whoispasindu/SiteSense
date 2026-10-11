@@ -26,7 +26,7 @@ const TASK: Task = {
   id: TID, project_id: PID, code: "T-040", name: "Frame: ground to level 4", boq_section_id: null,
   boq_section_code: null, planned_start: "2026-06-15", planned_end: "2026-10-30", weight: "17.10",
   percent_complete: "71.20", is_critical: true, position: 1, planned_percent_today: 84.8, state: "behind",
-  progress_updated_at: null,
+  progress_updated_at: null, is_concrete_pour: true, stopped: false, actual_start: "2026-06-15", actual_finish: null,
 };
 
 const PROGRESS: Progress = {
@@ -157,7 +157,7 @@ describe("Project schedule", () => {
     const post = fetchMock.mock.calls.find(([url, init]) => (url as string).endsWith("/tasks") && init?.method === "POST");
     expect(JSON.parse(post?.[1]?.body as string)).toEqual({
       code: null, name: "Piling", boq_section_id: null, planned_start: "2026-03-16", planned_end: "2026-04-30",
-      weight: "5.5", is_critical: false,
+      weight: "5.5", is_concrete_pour: false,
     });
 
     await user.click(screen.getByRole("button", { name: "Delete Frame: ground to level 4" }));

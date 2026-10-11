@@ -6,6 +6,7 @@
     python -m app.cli refresh-weather     # fetch the 14-day forecast for every active site
     python -m app.cli score-risk          # score every open project's risk now
     python -m app.cli check-variance      # forecast final cost per section; alert new overruns
+    python -m app.cli check-pours         # BR-06: alert PMs about pours on heavy-rain days
 
 ``create-admin`` prints a one-time temporary password; the admin must change it at first sign-in.
 ``seed-dev`` creates demo sites and one account per role using SITESENSE_DEMO_PASSWORD, and
@@ -27,7 +28,13 @@ from app.core import clock
 from app.core.config import get_settings
 from app.core.database import Database
 from app.core.permissions import Role
-from app.core.scheduler import refresh_weather, run_report_reminders, run_risk_scoring, run_variance_check
+from app.core.scheduler import (
+    refresh_weather,
+    run_pour_check,
+    run_report_reminders,
+    run_risk_scoring,
+    run_variance_check,
+)
 from app.core.security import (
     PasswordPolicyError,
     generate_temporary_password,
@@ -49,6 +56,7 @@ from app.models import (
     Site,
     Supplier,
     Task,
+    TaskDependency,
     User,
 )
 from app.schemas.contract import (
@@ -179,6 +187,19 @@ DEMO_PROGRAMMES: dict[str, list[tuple[str, str, str | None, date, date, Decimal]
 }
 # How far actual progress sits from plan in the demo (1.0 = exactly on plan).
 DEMO_PACE = {"HR-2026-01": 0.84, "PRO-2026-02": 1.06}
+# Concrete pours (BR-06) and finish-to-start links (predecessor, successor, lag in working days). Only
+# links the planned dates already satisfy: overlapping tasks are left unlinked.
+DEMO_POURS = {"HR-2026-01": {"T-020", "T-030", "T-040", "T-050"}, "PRO-2026-02": {"T-020", "T-030"}}
+DEMO_LINKS = {
+    "HR-2026-01": [
+        ("T-010", "T-030", 0),
+        ("T-020", "T-040", 5),
+        ("T-050", "T-100", 0),
+        ("T-070", "T-100", 0),
+        ("T-060", "T-110", 0),
+    ],
+    "PRO-2026-02": [("T-010", "T-030", 0), ("T-020", "T-040", 0), ("T-030", "T-050", 0)],
+}
 
 DEMO_USERS = [
     ("admin@sitesense.example", "Dilani Admin", Role.ADMIN, []),
@@ -319,25 +340,53 @@ def _seed_programme(
     }
 
     def done(plan: TaskPlan, on: date) -> Decimal:
-        value = min(planned_fraction(plan, on) * 100 * pace, 100.0)
+        # Work runs at ``pace`` of the plan's speed: a slow task finishes late, but it does finish.
+        days = (plan.planned_end - plan.planned_start).days
+        stretched = TaskPlan(
+            plan.planned_start, plan.planned_start + timedelta(days=round(days / pace)), plan.weight
+        )
+        value = min(planned_fraction(stretched, on) * 100, 100.0)
         return Decimal(str(round(value, 1)))
 
+    def finished_on(plan: TaskPlan) -> date:
+        day = plan.planned_start
+        while done(plan, day) < 100:
+            day += timedelta(days=1)
+        return day
+
     plans = [TaskPlan(start, end, weight) for _, _, _, start, end, weight in programme]
+    created: dict[str, Task] = {}
     for position, ((code, name, section, start, end, weight), plan) in enumerate(
         zip(programme, plans, strict=True)
     ):
+        progress = done(plan, today)
+        created[code] = Task(
+            project_id=project.id,
+            code=code,
+            name=name,
+            boq_section_id=sections.get(section or ""),
+            planned_start=start,
+            planned_end=end,
+            weight=weight,
+            percent_complete=progress,
+            position=position + 1,
+            is_concrete_pour=code in DEMO_POURS.get(project.code, set()),
+            actual_start=start if progress > 0 else None,
+            actual_finish=finished_on(plan) if progress >= 100 else None,
+        )
+        db.add(created[code])
+    db.flush()
+    pm = db.scalar(select(User).where(User.email == "pm@sitesense.example"))
+    assert pm is not None  # the demo users are created before the programmes
+    for before, after, lag in DEMO_LINKS.get(project.code, []):
         db.add(
-            Task(
+            TaskDependency(
                 project_id=project.id,
-                code=code,
-                name=name,
-                boq_section_id=sections.get(section or ""),
-                planned_start=start,
-                planned_end=end,
-                weight=weight,
-                percent_complete=done(plan, today),
-                position=position + 1,
-                is_critical=code in {"T-020", "T-040", "T-050", "T-090", "T-030"},
+                predecessor_id=created[before].id,
+                successor_id=created[after].id,
+                lag_days=lag,
+                created_by=pm.id,
+                created_at=clock.utcnow(),
             )
         )
     for on in week_dates(project.start_date, today):
@@ -646,6 +695,14 @@ def check_variance() -> int:
     return 0
 
 
+def check_pours() -> int:
+    database = Database(get_settings())
+    sent = run_pour_check(database.session_factory)
+    database.dispose()
+    print(f"Checked concrete pours against the forecast: {sent} alerts.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -657,6 +714,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("refresh-weather", help="fetch the 14-day forecast for every active site")
     sub.add_parser("score-risk", help="score every open project's risk now")
     sub.add_parser("check-variance", help="forecast final cost per section and alert new overruns")
+    sub.add_parser("check-pours", help="BR-06: alert PMs about concrete pours on heavy-rain days")
     args = parser.parse_args(argv)
 
     if args.command == "create-admin":
@@ -669,6 +727,8 @@ def main(argv: list[str] | None = None) -> int:
         return score_risk()
     if args.command == "check-variance":
         return check_variance()
+    if args.command == "check-pours":
+        return check_pours()
     return seed_dev()
 
 

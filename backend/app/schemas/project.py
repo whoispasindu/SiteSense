@@ -5,10 +5,19 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 
 from app.core.permissions import Role
 from app.models.project import ProjectStatus, ProjectType
+from app.rules.calendar import DEFAULT_WORKING_WEEK, CalendarError, parse_week
 from app.schemas.auth import SiteSummary
 
 
@@ -29,6 +38,18 @@ MAX_PROJECT_DAYS = 15 * 366
 PlannedCrew = Annotated[int, Field(ge=1, le=5000)]
 
 
+def _working_week(value: str) -> str:
+    """ISO weekdays each once, stored in order: "654321" -> "123456"."""
+    try:
+        return "".join(str(d) for d in sorted(parse_week(value)))
+    except CalendarError as exc:
+        raise ValueError(str(exc)) from exc
+
+
+# Phase 9: the days the site works (ISO weekdays, 1 = Monday). Default Monday to Saturday.
+WorkingWeek = Annotated[str, AfterValidator(_working_week)]
+
+
 class ProjectCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -43,6 +64,7 @@ class ProjectCreate(BaseModel):
     planned_end: date
     description: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)] | None = None
     planned_crew: PlannedCrew | None = None
+    working_week: WorkingWeek = DEFAULT_WORKING_WEEK
 
     @model_validator(mode="after")
     def _dates_in_order(self) -> "ProjectCreate":
@@ -67,6 +89,7 @@ class ProjectUpdate(BaseModel):
     planned_end: date | None = None
     description: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)] | None = None
     planned_crew: PlannedCrew | None = None
+    working_week: WorkingWeek | None = None
 
 
 # Each response comes in two shapes. The base classes carry no rates or amounts and are what site
@@ -119,6 +142,7 @@ class TeamMember(BaseModel):
 class ProjectDetailBasics(ProjectCard):
     description: str | None
     planned_crew: int | None
+    working_week: str = DEFAULT_WORKING_WEEK
     sections: list[SectionBasics]
     team: list[TeamMember]
     created_at: datetime
@@ -128,6 +152,7 @@ class ProjectDetailBasics(ProjectCard):
 class ProjectDetail(ProjectSummary):
     description: str | None
     planned_crew: int | None
+    working_week: str = DEFAULT_WORKING_WEEK
     # Past planning (or with claims or variations): contract value and planned end change only through
     # approved variations.
     contract_locked: bool = False

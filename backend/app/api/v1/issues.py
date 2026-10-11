@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends
 from app.api.deps import DbSession, Meta, rate_limit, require_permission
 from app.core.permissions import Permission
 from app.models import User
-from app.schemas.issues import ActionOut, CloseActionIn, ConfirmIn, ReportIssues
+from app.schemas.issues import ActionOut, CloseActionIn, ConfirmIn, ReportIssues, StopScopeIn
 from app.services import issue_service
 
 router = APIRouter(tags=["issues"])
@@ -48,6 +48,14 @@ def close_action(
     action_id: uuid.UUID, body: CloseActionIn, user: Reader, db: DbSession, meta: Meta
 ) -> ActionOut:
     return issue_service.close_action(db, user, action_id, body.resolution, meta=meta)
+
+
+@router.put("/report-actions/{action_id}/stop-scope", response_model=ActionOut)
+def set_stop_scope(
+    action_id: uuid.UUID, body: StopScopeIn, user: Reader, db: DbSession, meta: Meta
+) -> ActionOut:
+    """BR-11: the PM changes what an open stop-work flag stops (chosen tasks or the whole project)."""
+    return issue_service.set_stop_scope(db, user, action_id, body, meta=meta)
 
 
 @router.get("/projects/{project_id}/report-actions", response_model=list[ActionOut])

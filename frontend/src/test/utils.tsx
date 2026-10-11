@@ -57,7 +57,7 @@ export const healthyApi: Record<string, Handler> = {
 
 /** Mirrors app/core/permissions.py for the permissions the UI uses. */
 export const ROLE_PERMISSIONS: Record<Role, string[]> = {
-  admin: ["users:manage", "sites:manage", "audit:read", "dashboard:view", "variation_limits:manage"],
+  admin: ["users:manage", "sites:manage", "audit:read", "dashboard:view", "variation_limits:manage", "holidays:manage"],
   project_manager: [
     "dashboard:view", "projects:read", "projects:manage", "schedule:read", "schedule:manage", "schedule:progress",
     "reports:read", "materials:read", "materials:request", "materials:approve_pm", "risk:read", "risk:what_if",

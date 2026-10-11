@@ -12,12 +12,12 @@ boundaries can be tested directly; services gather the facts and apply the resul
 | BR-03 | Site engineers (and other site-scoped roles) only work on the sites they are assigned to | Phase 1 onward | `core/scoping.py`, every service | `test_site_scoping.py`, role matrix, "invisible" tests per module |
 | BR-04 | A requester cannot approve their own request (segregation of duties) | Phase 5 | `rules/materials.py: check_not_own_request` | TC-05 `test_requester_cannot_approve_their_own_request` |
 | BR-05 | No purchase order until the approval chain is complete | Phase 5 | `rules/materials.py: check_can_order` | `test_unapproved_requests_cannot_be_ordered` |
-| BR-06 | Concrete pours on days with heavy rain forecast (over 10 mm) are flagged and the PM alerted | Partly: the weather strip flags heavy-rain days (Phase 4); pour flagging comes with the advanced schedule (Phase 9) | `api/v1/reports.py` (threshold) | `reports.test.tsx` |
+| BR-06 | Concrete pours on days with heavy rain forecast (10 mm or more) are flagged and the PM alerted | Phase 9 (the weather strip has marked heavy-rain days since Phase 4). The threshold was "over 10 mm" until the project owner set it to 10 mm or more | `rules/schedule.py: is_heavy_rain, pour_rain_days`, `services/network_service.py: check_pours` | `test_heavy_rain_is_ten_mm_or_more`, TC-12 `test_tc12_heavy_rain_on_a_pour_day_flags_the_task_and_alerts_the_pm`, `test_a_new_rain_day_alerts_again_and_done_pours_are_left_alone` |
 | BR-07 | Each active site submits a daily report by 18:00; missing reports trigger reminders and count as a risk factor | Reminders: Phase 4. Risk factor: Phase 6 (`missing_reports_14`) | `services/report_service.py`, `core/scheduler.py`, `ai/risk/features.py` | `test_reminders_notifications.py`, `test_crew_and_missing_reports_over_the_last_14_days` |
 | BR-08 | Claim value cannot exceed certified progress × contract value, minus previous claims and 5% retention | Phase 8 | `rules/claims.py: calculate, check`, `services/claim_service.py`; a database check makes the stored figures add up | `test_rules_cost.py` (`test_br08_*`), `test_br08_claim_is_calculated_with_retention`, `test_br08_previous_claims_are_deducted_once_approved` |
 | BR-09 | Variations above the project's limit (1% of the contract value by default; Company Admin only, audited), or with any time impact, need client approval before work starts | Phase 8 | `rules/variations.py: needs_client, route`, `services/variation_service.py` | `test_rules_cost.py` (`test_br09_*`), `test_br09_limit_boundary`, TC-10 `test_tc10_client_approves_a_variation_with_time_impact` |
 | BR-10 | Risk score 70+ is High (automatic PM alert), 40–69 Medium, under 40 Low | Phase 6 | `ai/risk/scoring.py: level`, `services/risk_service.py` | `test_br10_bands`, `test_br10_alerts_the_project_managers_when_a_project_enters_high`, `test_br10_does_not_repeat_while_the_project_stays_high` |
-| BR-11 | A safety issue marked stop-work blocks related tasks until the PM clears it | Partly (Phase 7): the flag, the PM alert, the project banner and PM-only clearing. Blocking the related tasks comes with the advanced schedule (Phase 9) | `services/issue_service.py: _can_close, close_action` | `test_stop_work_is_cleared_only_by_the_project_manager`, `test_follow_ups_must_match_a_confirmed_issue` |
+| BR-11 | A safety issue marked stop-work blocks related tasks until the PM clears it | Phase 7 (the flag, the PM alert, the banner, PM-only clearing) and Phase 9 (the stopped tasks refuse progress; the author picks them, or the whole project; the PM can change them) | `services/issue_service.py: _can_close, close_action, set_stop_scope`, `services/schedule_service.py: apply_progress`, `services/network_service.py: stopped, stopped_days` | `test_stop_work_is_cleared_only_by_the_project_manager`, `test_br11_a_stopped_task_takes_no_progress_until_the_pm_clears_it`, `test_br11_the_whole_project_stops_daily_report_progress_too`, `test_br11_the_author_chooses_the_scope_and_the_pm_can_change_it` |
 | BR-12 | If a supplier's predicted on-time chance is under 50% for a critical-path item, suggest an alternative | Phase 10 | | |
 | BR-13 | If the section's committed cost plus this request exceeds its budget line, the project manager approves. Checked at approval and again at purchase-order issue | Phase 5 (added at the project owner's request: the section check that was part of BR-01) | `rules/materials.py: check_section_budget`, `services/procurement_service.py: create_order` | `test_rules_materials.py` (`test_br13_*`), `test_qs_approval_rechecks_routing_with_current_figures`, `test_two_requests_that_fit_alone_exceed_the_line_together_at_approval`, `test_two_lines_that_fit_alone_exceed_the_line_together_at_po_issue` |
 | BR-14 | A purchase-order unit price more than 5% above the approved price sends the request back for project manager approval | Phase 5 (added at the project owner's request) | `rules/materials.py: check_order_price`, `services/procurement_service.py: create_order` | `test_rules_materials.py` (`test_br14_*`), `test_order_price_more_than_five_percent_above_approval_goes_back_to_the_pm` |
@@ -135,7 +135,7 @@ confirms them, on the day of the report. Follow-ups must match a confirmed issue
 - **PM alert:** needs a confirmed high severity. Notifies the site's project managers at once.
 - **Stop-work (BR-11):** needs a confirmed safety issue. Notifies the project managers and shows a
   banner on the project until a project manager clears it. Nobody else can clear it, including the
-  author. Blocking the related programme tasks arrives in Phase 9.
+  author. Since Phase 9 it also stops programme tasks (see below).
 
 Confirming re-scores the project's risk, because confirmed material, safety and design issues of the
 last 14 days are risk model inputs.
@@ -151,6 +151,59 @@ last 14 days are risk model inputs.
 | Engineer or author clears stop-work / PM clears it | 403 / cleared, once | `test_stop_work_is_cleared_only_by_the_project_manager` |
 | Material request raised from a follow-up | Follow-up closed with the request linked | `test_a_material_request_raised_from_a_follow_up_closes_it` |
 | Suggested but unconfirmed issues | Not counted by the risk model | `test_only_confirmed_issues_in_the_last_14_days_count` |
+
+## The programme: critical path, BR-06 and BR-11 (Phase 9)
+
+**Working days.** Each project has a working week (Monday to Saturday unless set otherwise) and
+skips the company's holidays, which the Company Admin keeps (2026's Poya days and public holidays
+are seeded). Durations, lags, float and slip are all counted in working days. When a programme runs
+into a year with no holidays entered, the schedule page and the admin's holiday list say so.
+
+**Critical path** (`rules/schedule.py: analyse`). Tasks are linked finish-to-start, with an optional
+lag. A forward pass finds each task's earliest start (the working day after its latest predecessor
+finishes, plus lag, but never before its planned start). A backward pass from the last finish finds
+the latest dates. Float is the working days between the earliest and latest finish. Unfinished tasks
+with no float are critical: any delay to them moves handover.
+
+**Forecast.** The same analysis runs on what is actually happening:
+
+- finished tasks keep their actual dates;
+- tasks under way finish at their own rate so far (percent per active working day). Under 10% done
+  or under 5 working days in, the planned rate is used. The remaining time is capped at 10× the
+  planned duration;
+- tasks not started begin no earlier than today (tomorrow while stopped).
+
+Slip is the forecast finish against the planned end, in working days. If long lags or very slow work
+push the network more than 30 years out, tasks are shown on their own dates with no critical path,
+and a warning says why.
+
+**BR-06.** A task marked as a concrete pour, not finished, with a forecast day of work that has 10 mm
+or more of rain forecast, is flagged on the programme. The site's project managers are alerted, once
+per task and set of rain days, so a new rain day alerts again. The check runs daily at 05:45 after
+the forecast refresh, when a task is marked as a pour, and from `app.cli check-pours`.
+
+**BR-11.** A stop-work flag stops the tasks its author picks (in-progress tasks are suggested), or
+the whole project for serious cases. Only a project manager changes the choice or clears the flag.
+While stopped, a task refuses progress from the task list and from daily reports. Stopped working
+days do not count as work, so the forecast moves a working day later for each one, and the critical
+path and the risk model see the delay.
+
+| Case | Expected | Test |
+| --- | --- | --- |
+| A(3) → B(2), A → C(4), B and C → D(1) from Mon 5 Jan, Mon–Fri | Finish Wed 14 Jan; floats A 0, B 2, C 0, D 0; A, C, D critical | `test_forward_and_backward_pass_on_a_known_network`, `test_the_pm_links_tasks_and_the_network_finds_the_critical_path` |
+| A lag on A → B of 3 days | B and not C becomes critical | `test_a_lag_delays_the_successor_and_can_change_the_critical_path` |
+| A lag on a link with float | The predecessor's float shrinks by the lag | `test_a_lag_on_a_side_link_cuts_the_predecessors_float` |
+| A link that would make a loop | `422 dependency_loop` | `test_a_loop_is_refused`, `test_loops_are_found` |
+| Work under way at a slower rate than planned | Forecast later than planned, slip shown | `test_the_forecast_follows_the_rate_so_far_and_shows_slip` |
+| A holiday or rest day inside the work | Dates move past it | `test_the_working_week_and_holidays_shape_the_dates`, `test_a_holiday_moves_the_network` |
+| TC-12: heavy rain forecast on a pour day | Task flagged, the site's PMs alerted (BR-06) | `test_tc12_heavy_rain_on_a_pour_day_flags_the_task_and_alerts_the_pm` |
+| 9.9 mm / 10 mm | Not heavy / heavy | `test_heavy_rain_is_ten_mm_or_more` |
+| Same rain days next morning / a new rain day / a finished pour | No alert / alert / no alert | `test_a_new_rain_day_alerts_again_and_done_pours_are_left_alone` |
+| Progress on a stopped task, then the PM clears the flag | `422 stop_work`, then accepted | `test_br11_a_stopped_task_takes_no_progress_until_the_pm_clears_it` |
+| Whole-project stop and a daily report with progress | `422 stop_work` | `test_br11_the_whole_project_stops_daily_report_progress_too` |
+| Each stopped working day | Forecast one working day later; cleared days stop counting; two flags on a day count it once | `test_br11_each_stopped_working_day_moves_the_forecast_one_working_day`, `test_br11_a_cleared_flag_stops_counting_from_the_day_it_is_cleared`, `test_br11_two_flags_on_the_same_days_count_them_once` |
+| Stop-work with no task chosen / a task from elsewhere | 422 | `test_stop_work_names_its_tasks_or_the_whole_project` |
+| The engineer, or the PM, changes what a flag stops | 403 / changed, audited, risk re-scored | `test_br11_the_author_chooses_the_scope_and_the_pm_can_change_it` |
 
 ## BR-08: progress claims
 

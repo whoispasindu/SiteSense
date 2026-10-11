@@ -3,6 +3,7 @@ import type { RouteObject } from "react-router";
 import { AnonymousOnly, RequireAuth, RequirePermission } from "./auth/guards";
 import { AppLayout } from "./components/layout/AppLayout";
 import { AuditLogPage } from "./pages/admin/AuditLogPage";
+import { HolidaysPage } from "./pages/admin/HolidaysPage";
 import { VariationLimitsPage } from "./pages/admin/VariationLimitsPage";
 import { ClientVariationPage, ClientVariationsPage } from "./pages/client/ClientVariationsPage";
 import { CostPage } from "./pages/cost/CostPage";
@@ -248,6 +249,14 @@ export const routes: RouteObject[] = [
         element: (
           <RequirePermission permission="sites:manage">
             <SitesPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: "admin/holidays",
+        element: (
+          <RequirePermission permission="holidays:manage">
+            <HolidaysPage />
           </RequirePermission>
         ),
       },

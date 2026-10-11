@@ -9,6 +9,7 @@ import { Dialog } from "../../components/ui/Dialog";
 import { SelectField, TextField } from "../../components/ui/Field";
 import { percent } from "../../lib/money";
 import { errorText } from "../admin/adminUtils";
+import { DependencyEditor } from "./DependencyEditor";
 
 const taskFormSchema = z.object({
   code: z
@@ -27,7 +28,7 @@ const taskFormSchema = z.object({
     .string()
     .trim()
     .refine((v) => /^\d{1,3}(\.\d{1,2})?$/.test(v) && Number(v) > 0 && Number(v) <= 100, "A share between 0.01 and 100 %."),
-  is_critical: z.preprocess((v) => v === "on", z.boolean()),
+  is_concrete_pour: z.preprocess((v) => v === "on", z.boolean()),
 });
 
 type Field = keyof z.infer<typeof taskFormSchema>;
@@ -116,9 +117,18 @@ export function TaskFormDialog({ project, task, open, onClose }: TaskFormDialogP
           hint="All task weights together should add up to 100%."
         />
         <label className="flex min-h-11 items-center gap-3 text-sm">
-          <input type="checkbox" name="is_critical" defaultChecked={task?.is_critical} className="size-4 accent-[var(--color-ink)]" />
-          Critical task (delay here delays handover). Calculated automatically from Phase 9.
+          <input type="checkbox" name="is_concrete_pour" defaultChecked={task?.is_concrete_pour} className="size-4 accent-[var(--color-ink)]" />
+          <span>
+            Concrete pour
+            <span className="block text-xs text-ink-faint">
+              Flagged, and the PM alerted, when 10 mm or more of rain is forecast on a working day of it (BR-06).
+            </span>
+          </span>
         </label>
+        {task?.is_critical ? (
+          <p className="text-sm text-signal-high">On the critical path: any delay here moves the handover date.</p>
+        ) : null}
+        {task ? <DependencyEditor projectId={project.id} task={task} /> : null}
         <div className="flex justify-end gap-3 border-t border-rule pt-4">
           <Button onClick={close}>Cancel</Button>
           <Button type="submit" variant="primary" disabled={save.isPending}>

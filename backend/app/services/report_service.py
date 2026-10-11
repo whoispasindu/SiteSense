@@ -216,9 +216,7 @@ def create_report(
                 percent_after=entry.percent_complete,
             )
         )
-        if task.percent_complete != entry.percent_complete:
-            task.percent_complete = entry.percent_complete
-            task.progress_updated_at = clock.utcnow()
+        if schedule_service.apply_progress(db, task, entry.percent_complete, on=data.report_date):
             changed.append(task.code or task.name)
 
     try:

@@ -35,7 +35,7 @@ def analyze(api: TestClient, report_id: str, who: Person | Who) -> dict:  # type
     return body
 
 
-def confirm(api: TestClient, report_id: str, who: Person | Who, issues: list[dict], **actions: bool):  # type: ignore[no-untyped-def,type-arg]
+def confirm(api: TestClient, report_id: str, who: Person | Who, issues: list[dict], **actions: object):  # type: ignore[no-untyped-def,type-arg]
     return api.post(
         f"/api/v1/reports/{report_id}/issues/confirm",
         json={"issues": issues, "actions": actions},
@@ -283,7 +283,9 @@ def test_stop_work_is_cleared_only_by_the_project_manager(
     """BR-11 (the part in Phase 7): a stop-work flag stays open until the PM clears it."""
     report_id = file_report(api, report_project, engineer, "A helper fell from the scaffold")
     [issue] = analyze(api, report_id, engineer)["issues"]
-    [action] = confirm(api, report_id, engineer, [keep(issue)], stop_work=True).json()["actions"]
+    [action] = confirm(
+        api, report_id, engineer, [keep(issue)], stop_work=True, stop_work_scope="project"
+    ).json()["actions"]
     assert (action["kind"], action["status"], action["can_close"]) == ("stop_work", "open", False)
     assert len(notes_of(db, manager.user, "stop_work")) == 1
     close = f"/api/v1/report-actions/{action['id']}/close"
@@ -434,3 +436,38 @@ def test_get_issues_for_a_reader(
     assert body["can_confirm"] is False  # not the author
     assert body["issues"][0]["status"] == "suggested"
     assert body["low_confidence_below"] == LOW_CONFIDENCE
+
+
+def test_stop_work_names_its_tasks_or_the_whole_project(
+    api: TestClient, db: Session, report_project: Project, engineer: Person, manager: Person
+) -> None:
+    """BR-11 (Phase 9): the author picks the stopped tasks, or the whole project."""
+    from datetime import date as day
+
+    from app.models import Task
+
+    slab = Task(project_id=report_project.id, code="T-1", name="Slab", planned_start=day(2026, 1, 5),
+                planned_end=day(2026, 12, 31), weight=Decimal("50"), position=1)  # fmt: skip
+    db.add(slab)
+    db.commit()
+    report_id = file_report(api, report_project, engineer, "A helper fell from the scaffold")
+    [issue] = analyze(api, report_id, engineer)["issues"]
+
+    none_chosen = confirm(api, report_id, engineer, [keep(issue)], stop_work=True)
+    stranger = confirm(api, report_id, engineer, [keep(issue)], stop_work=True,
+                       stop_work_task_ids=[str(uuid.uuid4())])  # fmt: skip
+    chosen = confirm(
+        api, report_id, engineer, [keep(issue)], stop_work=True, stop_work_task_ids=[str(slab.id)]
+    )
+
+    assert none_chosen.status_code == 422
+    assert "Choose the tasks" in none_chosen.json()["error"]["message"]
+    assert stranger.status_code == 422
+    [action] = chosen.json()["actions"]
+    assert (action["stop_scope"], action["stop_task_ids"], action["can_edit_scope"]) == (
+        "tasks",
+        [str(slab.id)],
+        False,
+    )
+    listed = api.get(f"/api/v1/projects/{report_project.id}/report-actions", headers=manager.headers).json()
+    assert listed[0]["can_edit_scope"] is True

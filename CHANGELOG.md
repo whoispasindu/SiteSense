@@ -8,6 +8,26 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Phase 9, advanced schedule ([ADR 0012](docs/adr/0012-critical-path-calendar-weather-stop-work.md)):
+  - **Task links and the critical path:** the PM links tasks finish-to-start, with a lag in working
+    days. Loops are refused. The critical path is calculated with a two-pass CPM written from scratch.
+  - **Forecast handover and slip:** finished tasks keep their actual dates, work under way finishes
+    at its own rate, and work not started begins no earlier than today. Tasks now record their
+    actual start and finish.
+  - **Working calendar:** each project has a working week (Monday to Saturday by default). The
+    Company Admin keeps the company's holidays (2026's Poya days and public holidays seeded) and is
+    warned when next year's list is missing.
+  - **BR-06 (TC-12):** concrete pour tasks with 10 mm or more of rain forecast on a day of work are
+    flagged and the site's PMs alerted, daily at 05:45, when a pour is marked, and from
+    `app.cli check-pours`.
+  - **BR-11:** a stop-work flag stops the tasks its author picks, or the whole project. Only a PM
+    changes or clears it. Stopped tasks take no progress, and their forecast moves a working day
+    later for each stopped day.
+  - **Gantt** on the Schedule tab: planned and forecast bars, the critical path, links, a today
+    line, slip, STOP badges and rain marks, with a table for screen readers. The stop-work banner
+    shows there too.
+  - Demo data: linked programmes, concrete pours and actual dates.
+
 - Phase 8, cost control, claims and variations ([ADR 0011](docs/adr/0011-claims-variations-forecast.md)):
   - **Forecast final cost** per BOQ section: committed cost plus the remaining budget at the cost trend
     so far. The budget panel shows forecast, variance and trend; a section forecast more than 5% over
@@ -46,8 +66,18 @@ uses [Semantic Versioning](https://semver.org/).
     `GET /projects/{id}/report-actions`.
   - Training code, synthetic data generator and labelling guide in `ml/nlp/`.
 
+### Changed
+
+- BR-06's heavy-rain threshold is now 10 mm or more (it was "over 10 mm"), in the weather strip,
+  the risk model's input and the simulator alike.
+- A task's "critical" tick is gone: the critical path is calculated. Tasks can be marked as concrete
+  pours instead.
+
 ### Security
 
+- A network that would run past the calendar's 30-year horizon is shown without a critical path and
+  with a warning, instead of failing; working-day arithmetic no longer walks day by day.
+- Pour alerts' de-duplication key is a hash of the rain days, so a long wet spell cannot overflow it.
 - A project's contract value and planned end can no longer be edited directly once it is under way;
   they change only through approved variations.
 - onnxruntime's usage telemetry to Microsoft is switched off before it is imported.

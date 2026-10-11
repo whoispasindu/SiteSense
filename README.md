@@ -30,6 +30,9 @@ them, and clients see honest progress without internal costs.
 
 - Six roles with their own permissions: Admin, Project Manager, Quantity Surveyor, Site Engineer, Procurement Officer, Client
 - Projects, BOQ import and budget lines, with planned against actual progress
+- A programme with a critical path, forecast handover and slip, worked out in working days (Poya
+  days and public holidays off), plus heavy-rain warnings for concrete pours and stop-work flags
+  that hold back the tasks they stop
 - Daily site reports with photos and weather filled in automatically
 - Materials workflow from request to delivery, driven by 12 business rules
 - AI risk forecasts with drivers, ranges and a what-if recovery planner (v1 live: a daily delay and
@@ -103,11 +106,11 @@ Every account uses the password in `SITESENSE_DEMO_PASSWORD` in your `.env`
 
 | Role | Email | Try this |
 | --- | --- | --- |
-| Project Manager | `pm@sitesense.example` | Dashboard ranked by risk; Cost & claims: approve the waiting progress claim; open Havelock Residences for the forecast and its drivers; approve requests sent to the PM |
+| Project Manager | `pm@sitesense.example` | Dashboard ranked by risk; Cost & claims: approve the waiting progress claim; open Havelock Residences for the forecast and its drivers, and its Schedule tab for the critical path, forecast slip and rain on pour days; link tasks from a task's edit dialog; approve requests sent to the PM |
 | Quantity Surveyor | `qs@sitesense.example` | Enter the quoted price at the QS check and watch BR-01 and BR-13 decide who approves; price variation VO-0003; make a progress claim and see BR-08 calculate it; budget forecast |
-| Site Engineer | `engineer@sitesense.example` | File today's daily report for Havelock and write a problem or two: the AI check tags them for you to confirm; raise a material request |
+| Site Engineer | `engineer@sitesense.example` | File today's daily report for Havelock and write a problem or two: the AI check tags them for you to confirm (a safety issue can flag stop-work on chosen tasks); raise a material request |
 | Procurement Officer | `procurement@sitesense.example` | Order approved requests, record deliveries, manage suppliers |
-| Company Admin | `admin@sitesense.example` | Users, sites, each project's variation limit (BR-09) and the audit log |
+| Company Admin | `admin@sitesense.example` | Users, sites, holidays, each project's variation limit (BR-09) and the audit log |
 | Client | `client@sitesense.example` | Variations: approve or query VO-0002, a roof plant room with a 10-day time impact (TC-10). The full portal arrives in Phase 12 |
 
 <p>
@@ -120,15 +123,15 @@ Stop with `docker compose down`; `docker compose down -v` also deletes the local
 ### More about the demo data
 
 Havelock Residences comes with a full BOQ (`backend/app/seed_data/boq-havelock-residences.csv`,
-also a good file to try the import with), a programme, a few weeks of daily reports, five suppliers
-and material requests at every stage (QS check, PM approval, ready to order, ordered, delivered,
-change requested).
+also a good file to try the import with), a linked programme with its concrete pours marked, a few
+weeks of daily reports, five suppliers and material requests at every stage (QS check, PM approval,
+ready to order, ordered, delivered, change requested).
 
 Every open demo project is also given a risk score by the model, and the PM and QS dashboards rank
 the projects by it. Havelock runs short-handed with a few missed reports and late deliveries;
 Peradeniya is ahead of plan. Scores are recalculated every morning and after each daily report.
 
-Three operator commands run the scheduled jobs on demand:
+These operator commands run the scheduled jobs on demand:
 
 ```bash
 docker compose exec backend python -m app.cli send-reminders
@@ -146,8 +149,13 @@ docker compose exec backend python -m app.cli score-risk
 docker compose exec backend python -m app.cli check-variance
 ```
 
-Run `refresh-weather` once after seeding to fill in the 14-day forecast (weather in reports and
-the risk model's rain input); it is also refreshed every morning. For a real company, create the
+```bash
+docker compose exec backend python -m app.cli check-pours
+```
+
+Run `refresh-weather` once after seeding to fill in the 14-day forecast (weather in reports, rain
+on pour days and the risk model's rain input), then `check-pours` to alert the PM about pours on
+heavy-rain days; both also run every morning. For a real company, create the
 first admin instead of seeding; it prints a one-time password:
 
 ```bash
@@ -271,8 +279,8 @@ docs/           architecture, decision records, security reviews, model cards
 | 5 | Materials, approvals and rules engine | Done |
 | 6 | Demo data and risk model v1 → **v0.1 MVP** | Done |
 | 7 | Report NLP classifier | Done |
-| 8 | Cost control, claims and variations | In review |
-| 9 | Advanced schedule | Planned |
+| 8 | Cost control, claims and variations | Done |
+| 9 | Advanced schedule | In review |
 | 10 | Risk model v2, what-if planner and supplier model | Planned |
 | 11 | Dashboard, alerts and AI briefing | Planned |
 | 12 | Client portal | Planned |

@@ -38,7 +38,112 @@ here, newest first. The baseline design is in [ADR 0003](adr/0003-security-basel
 | Personal data in free text | Names of site people, the author, titled names and common Sri Lankan names (any case) become `[PERSON]` before classification and storage; only the weather client may call out of the server | `ai/nlp/text.py: redact`, `ai/nlp/names_lk.txt`, `services/issue_service.py` | `test_names_are_redacted_before_storage`, `test_report_nlp.py`, `test_outbound_calls.py`, ML `test_the_name_list_holds_no_word_from_the_report_data` |
 | Contract changes | The contract value and planned end change only through approved variations once a project is under way; claims are calculated (BR-08) and a database check keeps their figures consistent; one claim waits at a time (partial unique index and a project lock); variation approval locks the variation, project and budget line and applies everything in one transaction, audited before and after; each variation keeps the BR-09 limit it was routed with; only the Company Admin changes a limit (reason audited) | `rules/claims.py`, `rules/variations.py`, `services/claim_service.py`, `services/variation_service.py`, `services/project_service.py: contract_locked`, migration 0010 | `test_rules_cost.py`, `test_contract_api.py`, `test_the_contract_changes_only_through_variations_once_under_way` |
 | Client view | Separate schema with no internal cost or comment; only variations sent to the client, on their sites (404 otherwise); the client never reaches budgets, claims or the cost overview (TC-07) | `schemas/contract.py: ClientVariationOut`, `services/variation_service.py: client_out` | `test_the_client_queries_and_a_revision_goes_back_to_the_client`, `test_the_client_sees_only_their_sites`, role matrix |
+| Programme | Links only inside one project, never a loop (checked under a project row lock), lag 0–365, at most 2,000 per programme; one progress path refuses stopped tasks (BR-11) from the task list and daily reports; only a PM changes or clears a stop-work flag, audited; holidays only by the Company Admin, 2000 to 2100, audited; working-day arithmetic is bounded to 30 years and a network past it degrades with a warning; pour alerts read the forecast cache only and are de-duplicated by a fixed-length hash | `rules/calendar.py`, `rules/schedule.py`, `services/network_service.py`, `services/schedule_service.py: apply_progress`, `services/issue_service.py: set_stop_scope`, migration 0011 | `test_rules_schedule.py`, `test_network_api.py`, role matrix |
 | Supply chain | Pinned deps, Dependabot (pip, npm, actions, docker), pip-audit, npm audit, dependency review, CodeQL `security-extended`, actions pinned to SHAs, `permissions: contents: read`, `persist-credentials: false` | `.github/` | CI |
+
+## Phase 9 review: 2026-10-11
+
+Scope: task links and the critical path (`rules/schedule.py`), the working calendar and holidays
+(`rules/calendar.py`, `services/calendar_service.py`), the forecast, BR-06 pour checks and alerts,
+BR-11 stop-work scope and blocking, migration 0011, the Gantt, the stop-work picker and banner, the
+holidays page, the working week on projects, and the demo seed.
+
+### OWASP Top 10 (2021) walk-through
+
+- **A01 Broken access control.** The 7 new endpoints are in the role matrix for every role.
+  - The network: PM, QS and Site Engineer, on their own sites (404 otherwise).
+  - Links: only a PM adds or removes them. Both tasks must be in the project, and a link on another
+    site answers 404.
+  - Stop-work scope: only a PM, on open flags, through the report's site scope. The task IDs given
+    are checked against the project, whoever sends them, at confirmation and on change.
+  - Holidays: only the Company Admin (`holidays:manage`).
+  - Mutation-checked (below).
+- **A03 Injection.** Holiday and task names are stored as text and rendered by React. The working
+  week is checked by the schema (each ISO weekday once) and again by a database check.
+- **A04 Insecure design.**
+  - All progress goes through one function, so BR-11 cannot be bypassed by the daily report path;
+    both paths are tested.
+  - Loops are refused under a project row lock, so two links added at once cannot close one.
+  - The critical path and forecast are calculated on the server; the browser only draws them.
+  - Actual dates are kept by progress updates and guarded by database checks (started when there is
+    progress, finished at 100%, in order).
+- **A05 / DoS.**
+  - At most 500 tasks (Phase 3) and 2,000 links per programme; lag 0–365; stop-work lists at most
+    500 tasks; holiday names 80 characters.
+  - Working-day counting is arithmetic and shifting jumps whole weeks. A 500-task, 15-year
+    programme is calculated in about 15 ms (it took 1.2 s day by day); Havelock's network takes
+    about 10 ms. The calendar never searches more than 30 years.
+  - Stopped days are counted over merged date ranges, so many flags do not multiply the work.
+- **A06 Vulnerable components.** No new dependencies. pip-audit **0**, npm audit **0**.
+- **A08 Data integrity.** New audit entries: `dependency.added` and `.removed`, `holiday.added` and
+  `.removed`, and `report_action.stop_scope_changed` with the scope and tasks before and after.
+  Clearing a flag or changing its scope re-scores the project's risk.
+- **A09 Logging.** The daily pour check runs project by project. A failure is logged with the
+  project code, rolled back, and does not stop the others.
+- **SSRF / outbound calls.** None added. BR-06 reads the weather cache that the existing refresh
+  fills; `test_outbound_calls.py` still lists the weather client as the only caller.
+
+### Privacy
+
+- Pour alerts name the task, the project and the rain days; they go only to the site's project
+  managers, in the app.
+- The holiday seed is public data: the government's 2026 list, with the May Day holiday moved to
+  31 May as amended on 21 April 2026. The Company Admin can correct it.
+
+### Verification beyond unit tests
+
+- **Mutation checks: 12 of 12** deliberate faults fail a test:
+  - CPM: lag ignored in the forward pass, lag ignored in the backward pass, the forward pass off by
+    one, "critical" needing negative float;
+  - the forecast: the task's own rate trusted from day one, stopped days counted as work, cleared
+    flags counting forever;
+  - BR-06: 10 mm not counted as heavy, alerts ignoring a new rain day;
+  - links: the loop check removed;
+  - BR-11: progress on a stopped task accepted; anyone changing a flag's scope.
+
+  The first run caught 10. The two survivors (lag in the backward pass, cleared flags) had no test
+  that could see them; both now do.
+- **A randomised check** compares the fast calendar arithmetic with a day-by-day walk over 300
+  random working weeks, holiday sets and spans.
+- **In the browser** (demo data):
+  - the PM sees the Gantt with the critical chain, slip, links, today line and rain marks;
+  - the engineer files a report with a safety problem, confirms the AI tag and stop-work, and sees
+    the in-progress tasks pre-ticked. They narrow it to one task; the Gantt shows it STOPPED and
+    hatched, and the banner names it with "Only the project manager can clear it";
+  - the PM adds a task to the flag, then clears it;
+  - the Company Admin sees the 2026 holidays and the warning for 2027;
+  - the working week in the project dialog;
+  - no horizontal page scroll at 1440 px or 375 px, and on a phone the Gantt opens at today.
+
+### Findings fixed during the review
+
+1. **A long wet spell broke the pour alert.** The de-duplication key listed every rain day and
+   overflowed its 120-character column with 9 days (found against the live forecast in the browser
+   check). It is now a hash of the days, and the message names at most 5.
+2. **A runaway network returned 500.** Long chains of 365-day lags, or very slow work stretched
+   10×, could push dates past the calendar's 30-year limit. The network and the task list then
+   failed. Now the network falls back to each task's own dates, with no critical path and a warning
+   the PM can act on.
+3. **Day-by-day arithmetic was slow** at the limits: about 3 s per request for a 500-task, 15-year
+   programme, and the task list calls it too. It is now arithmetic, about 100 times faster, with the
+   same results.
+4. **No cap on links.** A programme now has at most 2,000.
+5. **The scope-change audit recorded the IDs as sent**, not the ones validated. It now records the
+   stored tasks.
+6. **Holiday dates were unbounded.** They are now 2000 to 2100, in the API and the form.
+7. **The Gantt's screen-reader table widened the page.** A visually hidden table ignores its 1 px
+   width, so the whole page scrolled sideways at desktop width. It is now wrapped in a hidden block.
+8. **The stop-work banner showed only on the Overview.** It now shows on the Schedule tab too, next
+   to the stopped tasks.
+
+### Open items
+
+- Only finish-to-start links. Start-to-start and finish-to-finish can come later without changing
+  stored links.
+- One holiday list per company: projects in another country would need their own.
+- A flag counts its first day as stopped even if it is raised late in the afternoon.
+- Rain barely moves the risk score: the simulator's rain effect is to be reviewed before the
+  Phase 10 retrain ([#27](https://github.com/whoispasindu/SiteSense/issues/27)).
 
 ## Phase 8 review: 2026-10-11
 

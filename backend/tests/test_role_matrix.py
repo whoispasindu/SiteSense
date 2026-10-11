@@ -102,6 +102,14 @@ ENDPOINTS = [
     Endpoint("PATCH", "/api/v1/tasks/{task_id}", PROGRESS_EDITORS, {"percent_complete": "10"}),
     Endpoint("DELETE", "/api/v1/tasks/{task_id}", PM_ONLY),
     Endpoint("GET", "/api/v1/projects/{project_id}/progress", SCHEDULE_READERS),
+    Endpoint("GET", "/api/v1/projects/{project_id}/network", SCHEDULE_READERS),
+    Endpoint("POST", "/api/v1/projects/{project_id}/dependencies", PM_ONLY,
+             {"predecessor_id": "{task_id}", "successor_id": "{task_id}"}),
+    Endpoint("DELETE", "/api/v1/dependencies/{dependency_id}", PM_ONLY),
+    Endpoint("GET", "/api/v1/admin/holidays", ADMIN_ONLY),
+    Endpoint("POST", "/api/v1/admin/holidays", ADMIN_ONLY,
+             {"holiday_date": "2031-01-01", "name": "Matrix day"}),
+    Endpoint("DELETE", "/api/v1/admin/holidays/{holiday_id}", ADMIN_ONLY),
     Endpoint("GET", "/api/v1/reports/today", REPORT_READERS),
     Endpoint("GET", "/api/v1/projects/{project_id}/reports", REPORT_READERS),
     Endpoint("POST", "/api/v1/projects/{project_id}/reports", SE_ONLY,
@@ -113,6 +121,7 @@ ENDPOINTS = [
     Endpoint("POST", "/api/v1/reports/{report_id}/analyze", REPORT_READERS),
     Endpoint("POST", "/api/v1/reports/{report_id}/issues/confirm", REPORT_READERS, {"issues": []}),
     Endpoint("POST", "/api/v1/report-actions/{action_id}/close", REPORT_READERS, {"resolution": "done"}),
+    Endpoint("PUT", "/api/v1/report-actions/{action_id}/stop-scope", REPORT_READERS, {"scope": "project"}),
     Endpoint("GET", "/api/v1/projects/{project_id}/report-actions", REPORT_READERS),
     Endpoint("GET", "/api/v1/photos/{photo_id}", REPORT_READERS),
     Endpoint("DELETE", "/api/v1/photos/{photo_id}", SE_ONLY),
@@ -276,6 +285,8 @@ def ids(make_user: Callable[..., User], make_site: Callable[..., Site], db: Sess
         "section_id": str(section.id),
         "claim_id": str(uuid.uuid4()),
         "variation_id": str(uuid.uuid4()),
+        "dependency_id": str(uuid.uuid4()),
+        "holiday_id": str(uuid.uuid4()),
     }
 
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { useProgress, useTasks, type Task } from "../../api/schedule";
+import { useNetwork, useProgress, useTasks, type Task } from "../../api/schedule";
 import { useAuth } from "../../auth/context";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -8,20 +8,35 @@ import { SectionHeading } from "../../components/ui/SectionHeading";
 import { Sheet } from "../../components/ui/Sheet";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { errorText } from "../../features/admin/adminUtils";
+import { StopWorkBanner } from "../../features/reports/StopWorkBanner";
 import { formatDate } from "../../features/projects/dates";
 import { KpiTile } from "../../features/projects/ProjectBits";
 import { SCurve } from "../../features/schedule/SCurve";
 import { TaskFormDialog } from "../../features/schedule/TaskFormDialog";
 import { TaskTable } from "../../features/schedule/TaskTable";
-import { TaskTimeline } from "../../features/schedule/TaskTimeline";
+import { Gantt } from "../../features/schedule/Gantt";
+import { slipText } from "../../features/schedule/network";
 import { varianceLabel } from "../../features/schedule/variance";
 import { useCurrentProject } from "./projectContext";
+
+const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** "123456" -> "Mon–Sat"; anything else is listed. */
+function weekText(week: string): string {
+  if (week === "123456") return "Mon–Sat";
+  if (week === "12345") return "Mon–Fri";
+  return week
+    .split("")
+    .map((d) => DAY_NAMES[Number(d) - 1] ?? d)
+    .join(", ");
+}
 
 export function ProjectSchedule() {
   const project = useCurrentProject();
   const { can } = useAuth();
   const tasks = useTasks(project.id);
   const progress = useProgress(project.id);
+  const network = useNetwork(project.id);
   const [editing, setEditing] = useState<Task | "new" | null>(null);
   const canManage = can("schedule:manage");
 
@@ -33,10 +48,11 @@ export function ProjectSchedule() {
   const list = tasks.data.tasks;
   const weightTotal = Number(tasks.data.weight_total);
   const variance = varianceLabel(p.variance);
-  const overruns = p.programme_end > p.contract_end;
+  const net = network.data;
 
   return (
     <div className="space-y-10">
+      {can("reports:read") ? <StopWorkBanner projectId={project.id} /> : null}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiTile icon="schedule" label="Planned today" value={`${p.planned_percent.toFixed(1)}%`} note={`As of ${formatDate(p.as_of)}`} />
         <KpiTile icon="reports" label="Actual" value={`${p.actual_percent.toFixed(1)}%`} note="Weighted by task share of the contract" />
@@ -52,9 +68,10 @@ export function ProjectSchedule() {
         </div>
         <KpiTile
           icon="schedule"
-          label="Programme end"
-          value={formatDate(p.programme_end)}
-          note={overruns ? `Past the contract end (${formatDate(p.contract_end)})` : `Contract end ${formatDate(p.contract_end)}`}
+          label="Forecast handover"
+          value={net?.forecast_end ? formatDate(net.forecast_end) : "—"}
+          tone={net && net.slip_days > 0 ? "down" : "idle"}
+          note={net ? `${slipText(net.slip_days)} against ${formatDate(net.planned_end)}` : `Contract end ${formatDate(p.contract_end)}`}
         />
       </div>
 
@@ -77,13 +94,23 @@ export function ProjectSchedule() {
         </Sheet>
       </section>
 
-      {list.length > 0 ? (
+      {net?.warnings.map((w) => (
+        <Alert key={w} tone="warn">
+          {w}
+        </Alert>
+      ))}
+      {network.isError ? <Alert tone="error">{errorText(network.error)}</Alert> : null}
+
+      {list.length > 0 && net ? (
         <section aria-labelledby="timeline-heading">
-          <SectionHeading id="timeline-heading" annotation={`${String(list.length)} tasks`}>
+          <SectionHeading
+            id="timeline-heading"
+            annotation={`critical path on the forecast; working days, ${weekText(net.working_week)}`}
+          >
             Programme
           </SectionHeading>
           <Sheet className="p-4 sm:p-6">
-            <TaskTimeline tasks={list} start={p.programme_start} end={p.programme_end} today={p.as_of} />
+            <Gantt network={net} />
           </Sheet>
         </section>
       ) : null}

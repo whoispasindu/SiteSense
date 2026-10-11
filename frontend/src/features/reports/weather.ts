@@ -20,5 +20,6 @@ export function summaryIcon(summary: string): IconName {
 }
 
 export function isHeavyRain(day: Pick<WeatherDay, "rain_mm">, threshold: string): boolean {
-  return day.rain_mm !== null && Number(day.rain_mm) > Number(threshold);
+  // BR-06: 10 mm or more.
+  return day.rain_mm !== null && Number(day.rain_mm) >= Number(threshold);
 }
