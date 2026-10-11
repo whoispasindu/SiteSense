@@ -11,8 +11,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-MODEL = Path(__file__).parent.parent / "backend" / "app" / "ai" / "risk" / "models" / "risk-v1.2.0.json"
-METRICS = Path(__file__).parent / "models" / "risk-v1.2.0" / "metrics.json"
+MODEL = Path(__file__).parent.parent / "backend" / "app" / "ai" / "risk" / "models" / "risk-v2.0.0.json"
+METRICS = Path(__file__).parent / "models" / "risk-v2.0.0" / "metrics.json"
 TOLERANCE = 0.01  # days / percentage points
 
 
@@ -28,10 +28,17 @@ def main() -> int:
     problems = []
     if fresh["training"]["data_sha256"] != committed["training"]["data_sha256"]:
         problems.append("the simulated training data differs from the data the shipped model was trained on")
+    for target in ("delay_days", "overrun_pct"):
+        if fresh["targets"][target]["kind"] != committed["targets"][target]["kind"]:
+            problems.append(
+                f"{target}: shipped a {committed['targets'][target]['kind']} model, retraining chose another"
+            )
     for old, new in zip(committed["golden"], fresh["golden"], strict=True):
         for target in ("delay_days", "overrun_pct"):
-            if abs(old[target] - new[target]) > TOLERANCE:
-                problems.append(f"{target}: shipped {old[target]:.3f}, retrained {new[target]:.3f}")
+            for which in ("point", "p10", "p90"):
+                a, b = old[target][which], new[target][which]
+                if abs(a - b) > TOLERANCE:
+                    problems.append(f"{target} {which}: shipped {a:.3f}, retrained {b:.3f}")
     if problems:
         print("The shipped risk model is not reproducible from this commit:", *problems[:10], sep="\n  ")
         print("Retrain (python train.py) and commit the new model file, or revert the change.")

@@ -6,7 +6,7 @@ import { SectionHeading } from "../../components/ui/SectionHeading";
 import { Sheet } from "../../components/ui/Sheet";
 import { errorText } from "../admin/adminUtils";
 import { RiskBadge, ScoreScale } from "./RiskBits";
-import { delayText, overrunText } from "./risk";
+import { delayRangeText, delayText, NO_RANGE_TEXT, overrunRangeText, overrunText, scoreRangeText } from "./risk";
 
 /** The dashboard's ranking: every open project on the user's sites, highest risk first. */
 export function RiskRankingPanel() {
@@ -36,7 +36,8 @@ export function RiskRankingPanel() {
                 </div>
                 {r.score !== null && r.delay_days !== null && r.overrun_pct !== null ? (
                   <p className="mt-0.5 text-sm text-ink-soft">
-                    Forecast {delayText(r.delay_days)}, {overrunText(r.overrun_pct)}
+                    Forecast {delayText(r.delay_days)} ({r.ranges ? delayRangeText(r.ranges.delay_days) : NO_RANGE_TEXT}),{" "}
+                    {overrunText(r.overrun_pct)} ({r.ranges ? overrunRangeText(r.ranges.overrun_pct) : NO_RANGE_TEXT})
                     {r.top_driver ? <span className="block text-xs text-ink-faint sm:inline sm:before:content-['_·_']">{r.top_driver}</span> : null}
                   </p>
                 ) : (
@@ -45,10 +46,17 @@ export function RiskRankingPanel() {
               </div>
               {r.score !== null && r.level !== null ? (
                 <div className="col-start-2 flex items-center gap-3 sm:col-start-3">
-                  <span className="tabular w-8 text-right text-lg font-semibold text-ink">{r.score}</span>
+                  <span className="w-10 text-right">
+                    <span className="tabular block text-lg leading-tight font-semibold text-ink">{r.score}</span>
+                    {r.ranges ? (
+                      <span className="tabular block text-[0.6875rem] leading-tight text-ink-faint" title={scoreRangeText(r.ranges.score)}>
+                        {r.ranges.score.low}–{r.ranges.score.high}
+                      </span>
+                    ) : null}
+                  </span>
                   <div className="flex-1 space-y-1.5">
                     <RiskBadge level={r.level} />
-                    <ScoreScale score={r.score} level={r.level} compact />
+                    <ScoreScale score={r.score} level={r.level} range={r.ranges?.score} compact />
                   </div>
                 </div>
               ) : null}

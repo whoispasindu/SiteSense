@@ -28,7 +28,15 @@ from app.core import clock
 from app.core.logging import get_logger
 from app.core.permissions import Role
 from app.models import Project, ProjectStatus, RiskScore, User
-from app.schemas.risk import DriverOut, ProjectRisk, RiskHistoryPoint, RiskOut, RiskRanking
+from app.schemas.risk import (
+    DriverOut,
+    ProjectRisk,
+    Ranges,
+    RiskHistoryPoint,
+    RiskOut,
+    RiskRanking,
+    ScoreRange,
+)
 from app.services import notification_service, project_service
 from app.services.notification_service import NewNotification
 
@@ -56,6 +64,14 @@ def score_project(
     planned_days = built.values["planned_duration_days"]
     score = scoring.risk_score(delay.value, overrun.value, planned_days)
     level = scoring.level(score)
+    ranges = {
+        "delay_days": {"low": round(delay.low, 1), "high": round(delay.high, 1)},
+        "overrun_pct": {"low": round(overrun.low, 2), "high": round(overrun.high, 2)},
+        "score": {
+            "low": scoring.risk_score(delay.low, overrun.low, planned_days),
+            "high": scoring.risk_score(delay.high, overrun.high, planned_days),
+        },
+    }
     drivers = scoring.drivers(
         model.features,
         built.values,
@@ -79,7 +95,7 @@ def score_project(
         "level": level,
         "delay_days": Decimal(str(round(delay.value, 1))),
         "overrun_pct": Decimal(str(round(overrun.value, 2))),
-        "ranges": None,
+        "ranges": ranges,
         "drivers": [d.as_dict() for d in drivers],
         "features": {"values": built.values, "notes": built.notes},
         "model_version": model.version,
@@ -94,15 +110,32 @@ def score_project(
     )
     alerted = level == "high" and (previous is None or previous.level != "high")
     if alerted:
-        _alert(db, project, score, drivers, on)
+        _alert(db, project, score, delay, overrun, drivers, on)
     db.commit()
     return Scored(project.id, score, level, alerted)
 
 
-def _alert(db: Session, project: Project, score: int, drivers: list[scoring.Driver], on: date) -> None:
+def forecast_text(delay: risk_model.Prediction, overrun: risk_model.Prediction) -> str:
+    """The forecast in words, always with its likely range."""
+    return (
+        f"about {delay.value:.0f} days late (likely {delay.low:.0f} to {delay.high:.0f}) and "
+        f"{overrun.value:.1f}% over budget (likely {overrun.low:.1f} to {overrun.high:.1f}%)"
+    )
+
+
+def _alert(
+    db: Session,
+    project: Project,
+    score: int,
+    delay: risk_model.Prediction,
+    overrun: risk_model.Prediction,
+    drivers: list[scoring.Driver],
+    on: date,
+) -> None:
     """BR-10: tell the site's project managers that the project has become high risk."""
     signals = [d.label.lower() for d in drivers if d.kind == "signal"][:2]
     reason = f" Main factors: {' and '.join(signals)}." if signals else ""
+    reason = f" Forecast: {forecast_text(delay, overrun)}.{reason}"
     notification_service.send(
         db,
         [
@@ -152,6 +185,10 @@ def rescore_after_report(db: Session, project: Project) -> None:
 # --- Reading --------------------------------------------------------------------------------------
 
 
+def _ranges(row: RiskScore) -> Ranges | None:
+    return Ranges.model_validate(row.ranges) if row.ranges else None
+
+
 def _out(row: RiskScore) -> RiskOut:
     return RiskOut(
         score_date=row.score_date,
@@ -159,6 +196,7 @@ def _out(row: RiskScore) -> RiskOut:
         level=row.level,
         delay_days=row.delay_days,
         overrun_pct=row.overrun_pct,
+        ranges=_ranges(row),
         drivers=[DriverOut.model_validate(d) for d in row.drivers],
         notes=list(row.features.get("notes", [])),
         model_version=row.model_version,
@@ -183,7 +221,15 @@ def project_risk(db: Session, user: User, project_id: uuid.UUID) -> ProjectRisk:
     return ProjectRisk(
         project_id=project.id,
         latest=_out(latest) if latest else None,
-        history=[RiskHistoryPoint(date=r.score_date, score=r.score, level=r.level) for r in rows],
+        history=[
+            RiskHistoryPoint(
+                date=r.score_date,
+                score=r.score,
+                level=r.level,
+                score_range=ScoreRange.model_validate(r.ranges["score"]) if r.ranges else None,
+            )
+            for r in rows
+        ],
     )
 
 
@@ -231,6 +277,7 @@ def ranking(db: Session, user: User) -> list[RiskRanking]:
                 level=row.level if row else None,
                 delay_days=row.delay_days if row else None,
                 overrun_pct=row.overrun_pct if row else None,
+                ranges=_ranges(row) if row else None,
                 top_driver=f"{top['label']}: {top['value']}" if top else None,
                 score_date=row.score_date if row else None,
             )

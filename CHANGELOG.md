@@ -17,6 +17,14 @@ uses [Semantic Versioning](https://semver.org/).
     expected from the site's climate (nearest of seven towns, shipped with the backend) until the
     planned end. Rain's share of the delay model goes from 0.0% to 12.7% (8.3% if programmes allow
     three quarters; `ml/rain_sensitivity.py`). The risk panel shows it as "Wet season ahead".
+  - **Risk model 2.0.0: likely ranges and SHAP drivers** ([model card](docs/model-card-risk.md)).
+    Every forecast comes with its likely range (10th to 90th percentile, about 8 in 10 outcomes
+    inside it at every stage): the risk panel, the dashboard ranking, the score's bar and the
+    High-risk alert all show it. Drivers are exact SHAP values (TreeSHAP in pure Python, checked
+    against LightGBM). For each target a sign-constrained straight line competes with the trees, and
+    the trees ship only if clearly better: they do for delay; the line ships for overrun.
+  - **Forecast handover, two ways:** the Schedule tab shows the programme's date "At current rates"
+    and the risk model's likely range, with a note when they disagree. Engineers see the first only.
 
 - Phase 9, advanced schedule ([ADR 0012](docs/adr/0012-critical-path-calendar-weather-stop-work.md)):
   - **Task links and the critical path:** the PM links tasks finish-to-start, with a lag in working

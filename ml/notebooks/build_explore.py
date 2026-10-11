@@ -91,12 +91,24 @@ cells = [
     ),
     md("## Evaluation (from `train.py`, held-out projects)"),
     code(
-        "metrics = json.loads((ROOT / 'models' / 'risk-v1.2.0' / 'metrics.json').read_text())\n"
+        "metrics = json.loads((ROOT / 'models' / 'risk-v2.0.0' / 'metrics.json').read_text())\n"
         "rows = []\n"
         "for target, m in metrics['targets'].items():\n"
-        "    rows.append({'target': target, 'model': 'LightGBM', **m['test']})\n"
-        "    rows.append({'target': target, 'model': 'linear baseline', **m['baseline_test']})\n"
+        "    for family, key in (('trees (LightGBM)', 'trees_test'), ('straight line', 'baseline_test')):\n"
+        "        shipped = (m['shipped'] == 'trees') == family.startswith('trees')\n"
+        "        rows.append({'target': target, 'model': family, 'ships': shipped, **m[key]})\n"
         "pd.DataFrame(rows).set_index(['target', 'model'])"
+    ),
+    md(
+        "The straight line ships unless the trees are **clearly** better: a 95% interval over projects for "
+        "the difference in cross-validated error must lie entirely in the trees' favour."
+    ),
+    code("pd.DataFrame({t: m['cv_mae']['trees_minus_linear_mae'] for t, m in metrics['targets'].items()}).T"),
+    md(
+        "**Likely ranges** (10th to 90th percentile): how often the outcome fell inside, by stage. The aim is 0.8."
+    ),
+    code(
+        "pd.DataFrame({t: {'overall': m['range']['coverage'], **m['range']['coverage_by_elapsed'], 'mean width': m['range']['mean_width']} for t, m in metrics['targets'].items()}).T"
     ),
     code(
         "rc = metrics['risk_class']\n"
@@ -112,16 +124,17 @@ cells = [
         "pd.Series(metrics['delay_mae_by_elapsed'], name='delay MAE (days) by stage')"
     ),
     code(
-        "gain = pd.Series(metrics['targets']['delay_days']['importance_gain_pct']).head(10)[::-1]\n"
-        "gain.plot.barh(color='#3b6e8f', title='Delay model: share of gain by feature (%)'); plt.tight_layout()"
+        "shap = pd.Series(metrics['targets']['delay_days']['shap_share_pct']).head(10)[::-1]\n"
+        "shap.plot.barh(color='#3b6e8f', title='Delay model: share of mean |SHAP value| (%)'); plt.tight_layout()"
     ),
     md(
         "## Conclusions\n\n"
         "- The simulated projects behave as the assumptions intend; no feature has a backwards relationship.\n"
-        "- The delay model clearly beats the linear baseline, and the season still ahead "
-        "(`wet_days_ahead`) is among its main inputs. The overrun model is weak, and in this run the "
-        "linear baseline is slightly better: most overrun comes from overheads and variations the app "
-        "does not record yet.\n"
+        "- For delay the trees clearly beat the straight line and ship; the season still ahead "
+        "(`wet_days_ahead`) is among their main inputs. For overrun the trees are not clearly better, so "
+        "the straight line ships. Overrun stays hard to forecast: most of it comes from overheads and "
+        "variations the app does not record yet.\n"
+        "- The likely ranges hold about 8 in 10 outcomes at every stage of a project.\n"
         "- These are results on simulated data. They show the pipeline works; they do not prove the model "
         "is right about real projects. Validating the assumptions with a contractor comes first."
     ),

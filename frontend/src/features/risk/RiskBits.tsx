@@ -1,4 +1,4 @@
-import type { Driver, RiskLevel } from "../../api/risk";
+import type { Driver, Range, RiskLevel } from "../../api/risk";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { driverEffect, LEVEL_LABELS, LEVEL_TONES, raisesRisk } from "./risk";
 
@@ -8,9 +8,20 @@ export function RiskBadge({ level }: { level: RiskLevel }) {
 
 /**
  * The 0 to 100 score on a drawn scale: Low, Medium and High bands with hairline ticks at the BR-10
- * thresholds (40 and 70), and a marker at the score. The number and band are also given in text.
+ * thresholds (40 and 70), the likely range as a bracket, and a marker at the score. The number, range
+ * and band are also given in text.
  */
-export function ScoreScale({ score, level, compact = false }: { score: number; level: RiskLevel; compact?: boolean }) {
+export function ScoreScale({
+  score,
+  level,
+  range,
+  compact = false,
+}: {
+  score: number;
+  level: RiskLevel;
+  range?: Range | null;
+  compact?: boolean;
+}) {
   const marker = level === "high" ? "bg-signal-high" : level === "medium" ? "bg-signal-medium" : "bg-signal-low";
   return (
     <div
@@ -18,7 +29,9 @@ export function ScoreScale({ score, level, compact = false }: { score: number; l
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={score}
-      aria-valuetext={`${String(score)} out of 100, ${LEVEL_LABELS[level]} risk`}
+      aria-valuetext={`${String(score)} out of 100, ${LEVEL_LABELS[level]} risk${
+        range ? `, likely ${String(range.low)} to ${String(range.high)}` : ""
+      }`}
       aria-label="Risk score"
       className={compact ? "w-full" : "w-full pt-1"}
     >
@@ -28,6 +41,14 @@ export function ScoreScale({ score, level, compact = false }: { score: number; l
         <div className="absolute inset-y-0 left-[70%] w-[30%] rounded-r-full bg-signal-high-tint" />
         <span aria-hidden="true" className="absolute -inset-y-1 left-[40%] w-px bg-rule-strong" />
         <span aria-hidden="true" className="absolute -inset-y-1 left-[70%] w-px bg-rule-strong" />
+        {range ? (
+          <span
+            aria-hidden="true"
+            data-testid="score-range"
+            className="absolute -inset-y-0.5 rounded-full border border-ink/40 bg-ink/10"
+            style={{ left: `${String(range.low)}%`, width: `${String(Math.max(range.high - range.low, 1))}%` }}
+          />
+        ) : null}
         <span
           aria-hidden="true"
           className={`absolute top-1/2 ${compact ? "size-2.5" : "size-3.5"} -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-paper-raised ${marker} shadow-sm`}

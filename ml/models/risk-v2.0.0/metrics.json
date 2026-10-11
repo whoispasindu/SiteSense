@@ -1,0 +1,216 @@
+{
+  "targets": {
+    "delay_days": {
+      "shipped": "trees",
+      "cv_mae": {
+        "trees_mae": 18.971,
+        "linear_mae": 22.667,
+        "trees_minus_linear_mae": {
+          "mean": -3.6954,
+          "low": -4.683,
+          "high": -2.7052
+        }
+      },
+      "params": {
+        "num_leaves": 7,
+        "min_child_samples": 40,
+        "learning_rate": 0.05
+      },
+      "rounds": 167,
+      "test": {
+        "mae": 19.13,
+        "rmse": 25.49,
+        "r2": 0.645
+      },
+      "trees_test": {
+        "mae": 19.13,
+        "rmse": 25.49,
+        "r2": 0.645
+      },
+      "baseline_test": {
+        "mae": 22.92,
+        "rmse": 29.46,
+        "r2": 0.526
+      },
+      "range": {
+        "coverage": 0.784,
+        "mean_width": 59.93,
+        "coverage_by_elapsed": {
+          "0-25%": 0.758,
+          "25-50%": 0.788,
+          "50-75%": 0.795,
+          "75-100%": 0.803,
+          "late": 0.763
+        }
+      },
+      "importance_gain_pct": {
+        "progress_gap_pct": 35.5,
+        "elapsed_pct": 19.2,
+        "planned_duration_days": 13.3,
+        "contract_value_m": 13.1,
+        "wet_days_ahead": 12.2,
+        "avg_lateness_days": 2.9,
+        "crew_vs_plan_pct": 1.2,
+        "late_deliveries_count": 0.7,
+        "missing_reports_14": 0.5,
+        "rain_days_next_14": 0.5,
+        "type_mixed_use": 0.2,
+        "budget_variance_pct": 0.2,
+        "type_institutional": 0.1,
+        "type_commercial": 0.1,
+        "type_residential": 0.0,
+        "issues_design_14": 0.0,
+        "issues_material_14": 0.0
+      },
+      "shap_share_pct": {
+        "progress_gap_pct": 37.0,
+        "elapsed_pct": 17.9,
+        "wet_days_ahead": 14.0,
+        "contract_value_m": 7.3,
+        "planned_duration_days": 6.8,
+        "avg_lateness_days": 5.9,
+        "crew_vs_plan_pct": 3.7,
+        "missing_reports_14": 2.3,
+        "rain_days_next_14": 2.0,
+        "budget_variance_pct": 1.4,
+        "late_deliveries_count": 1.4,
+        "project_type": 0.3,
+        "issues_design_14": 0.1,
+        "issues_material_14": 0.1
+      }
+    },
+    "overrun_pct": {
+      "shipped": "linear",
+      "cv_mae": {
+        "trees_mae": 4.692,
+        "linear_mae": 4.749,
+        "trees_minus_linear_mae": {
+          "mean": -0.0565,
+          "low": -0.2072,
+          "high": 0.0974
+        }
+      },
+      "params": {
+        "num_leaves": 7,
+        "min_child_samples": 100,
+        "learning_rate": 0.05
+      },
+      "rounds": 54,
+      "test": {
+        "mae": 4.72,
+        "rmse": 6.06,
+        "r2": 0.266
+      },
+      "trees_test": {
+        "mae": 4.74,
+        "rmse": 6.16,
+        "r2": 0.24
+      },
+      "baseline_test": {
+        "mae": 4.72,
+        "rmse": 6.06,
+        "r2": 0.266
+      },
+      "range": {
+        "coverage": 0.8,
+        "mean_width": 14.58,
+        "coverage_by_elapsed": {
+          "0-25%": 0.798,
+          "25-50%": 0.8,
+          "50-75%": 0.795,
+          "75-100%": 0.826,
+          "late": 0.76
+        }
+      },
+      "importance_gain_pct": {
+        "budget_variance_pct": 27.9,
+        "progress_gap_pct": 19.0,
+        "elapsed_pct": 16.4,
+        "contract_value_m": 16.4,
+        "planned_duration_days": 14.0,
+        "issues_design_14": 2.7,
+        "wet_days_ahead": 1.4,
+        "type_residential": 0.6,
+        "type_institutional": 0.6,
+        "type_commercial": 0.4,
+        "type_mixed_use": 0.3,
+        "type_industrial": 0.2,
+        "avg_lateness_days": 0.2,
+        "late_deliveries_count": 0.1
+      },
+      "shap_share_pct": {
+        "budget_variance_pct": 28.3,
+        "progress_gap_pct": 21.4,
+        "issues_design_14": 9.4,
+        "wet_days_ahead": 8.8,
+        "late_deliveries_count": 6.4,
+        "progress_rate_trend": 5.1,
+        "project_type": 4.9,
+        "planned_duration_days": 4.9,
+        "contract_value_m": 4.5,
+        "elapsed_pct": 3.4,
+        "crew_vs_plan_pct": 1.6,
+        "issues_material_14": 1.0,
+        "issues_safety_14": 0.4,
+        "missing_reports_14": 0.0,
+        "avg_lateness_days": 0.0,
+        "rain_days_next_14": 0.0
+      }
+    }
+  },
+  "risk_class": {
+    "f1_high": 0.595,
+    "f1_high_baseline": 0.577,
+    "f1_macro": 0.587,
+    "confusion_matrix": {
+      "labels": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "rows_true_cols_predicted": [
+        [
+          754,
+          387,
+          5
+        ],
+        [
+          136,
+          610,
+          124
+        ],
+        [
+          120,
+          741,
+          727
+        ]
+      ]
+    }
+  },
+  "backtest": {
+    "high_projects": 23,
+    "flagged": 23,
+    "median_flagged_at_elapsed_pct": 41.1,
+    "median_weeks_before_planned_end": 36.0,
+    "low_projects": 22,
+    "low_projects_ever_flagged_high": 2
+  },
+  "delay_mae_by_elapsed": {
+    "0-25%": 26.8,
+    "25-50%": 21.9,
+    "50-75%": 16.7,
+    "75-100%": 13.4,
+    "late": 15.4
+  },
+  "version": "2.0.0",
+  "trained_at": "2026-10-11T19:18:15+00:00",
+  "data_sha256": "dd263e4f41fcdbc2b24a1ab3c792e9d9e7b25f6b8d4f18b0ad66863c48b7c7f2",
+  "split": {
+    "train_projects": 240,
+    "test_projects": 60,
+    "train_rows": 14549,
+    "test_rows": 3604
+  },
+  "model_file": "backend/app/ai/risk/models/risk-v2.0.0.json",
+  "model_sha256": "a5cf579db11471452401cb18794dba698abc9b587e63ae722f88b70cc362eb57"
+}

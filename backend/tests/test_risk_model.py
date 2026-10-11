@@ -1,6 +1,8 @@
-"""Risk model v1: the JSON scorer, its validation, and the score, band and driver rules (no database)."""
+"""Risk model v2: the JSON scorer (trees, lines, likely ranges, SHAP), its validation, and the score,
+band and driver rules (no database)."""
 
 import copy
+import itertools
 import json
 import math
 from pathlib import Path
@@ -12,17 +14,38 @@ from app.ai.risk import model, scoring
 from app.ai.risk.features import FEATURE_NAMES
 
 GAP = FEATURE_NAMES.index("progress_gap_pct")
+ELAPSED = FEATURE_NAMES.index("elapsed_pct")
+PLANNED = FEATURE_NAMES.index("planned_duration_days")
+N = len(FEATURE_NAMES)
+NO_RANGE = {
+    "features": list(model.RANGE_FEATURES),
+    "p10": {"intercept": 0, "coef": [0, 0]},
+    "p90": {"intercept": 0, "coef": [0, 0]},
+}
 
 
-def doc(delay_trees: list[Any] | None = None, overrun_trees: list[Any] | None = None) -> dict[str, Any]:
-    """A tiny valid model document: by default a constant 10 days and 2%."""
+def leaf(value: float, count: float = 10) -> list[float]:
+    return [-1, 0, -1, -1, value, count]
+
+
+def trees_target(*trees: list[list[float]], span: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {"kind": "trees", "point": {"trees": list(trees)}, "range": span or copy.deepcopy(NO_RANGE)}
+
+
+def line_target(intercept: float, coef: list[float], mean: list[float] | None = None) -> dict[str, Any]:
+    point = {"intercept": intercept, "coef": coef, "mean": mean or [0.0] * N}
+    return {"kind": "linear", "point": point, "range": copy.deepcopy(NO_RANGE)}
+
+
+def doc(delay: dict[str, Any] | None = None, overrun: dict[str, Any] | None = None) -> dict[str, Any]:
+    """A tiny valid model document: by default a constant 10 days and 2%, with no range width."""
     return {
-        "format": "sitesense-gbdt-v1",
+        "format": "sitesense-risk-v2",
         "version": "0.0.1",
         "features": list(FEATURE_NAMES),
         "targets": {
-            "delay_days": {"trees": delay_trees or [[[-1, 0, -1, -1, 10.0]]]},
-            "overrun_pct": {"trees": overrun_trees or [[[-1, 0, -1, -1, 2.0]]]},
+            "delay_days": delay or trees_target([leaf(10.0)]),
+            "overrun_pct": overrun or trees_target([leaf(2.0)]),
         },
     }
 
@@ -35,24 +58,35 @@ def vector(**values: float) -> tuple[float, ...]:
 
 
 def test_shipped_model_reproduces_lightgbm_exactly() -> None:
-    """The golden rows hold LightGBM's own predictions from training: the JSON scorer must agree."""
+    """Golden rows hold the training code's own outputs: forecasts, ranges, SHAP values and base."""
     shipped = model.current()
 
     assert len(shipped.golden) >= 20
     for row in shipped.golden:
-        delay, overrun = shipped.predict(tuple(row["x"]))
-        assert delay.value == pytest.approx(row["delay_days"], abs=1e-9)
-        assert overrun.value == pytest.approx(row["overrun_pct"], abs=1e-9)
+        for prediction, name in zip(
+            shipped.predict(tuple(row["x"])), ("delay_days", "overrun_pct"), strict=True
+        ):
+            expected = row[name]
+            assert prediction.value == pytest.approx(expected["point"], abs=1e-9)
+            assert prediction.low == pytest.approx(
+                min(expected["p10"], expected["point"], expected["p90"]), abs=1e-9
+            )
+            assert prediction.high == pytest.approx(
+                max(expected["p10"], expected["point"], expected["p90"]), abs=1e-9
+            )
+            assert prediction.base == pytest.approx(expected["base"], abs=1e-9)
+            assert prediction.contributions == pytest.approx(expected["contributions"], abs=1e-9)
 
 
-def test_contributions_add_up_to_the_prediction() -> None:
+def test_contributions_add_up_and_the_range_holds_the_forecast() -> None:
     shipped = model.current()
     for row in shipped.golden:
         for prediction in shipped.predict(tuple(row["x"])):
-            assert len(prediction.contributions) == len(FEATURE_NAMES)
+            assert len(prediction.contributions) == N
             assert prediction.base + sum(prediction.contributions) == pytest.approx(
                 prediction.value, abs=1e-9
             )
+            assert prediction.low <= prediction.value <= prediction.high
 
 
 def test_shipped_model_uses_the_feature_builders_features_in_order() -> None:
@@ -63,30 +97,131 @@ def test_shipped_model_uses_the_feature_builders_features_in_order() -> None:
     assert "synthetic" in shipped.training["data"]
 
 
-def test_falling_behind_never_lowers_the_delay_forecast() -> None:
-    """Trained with a monotone constraint: more behind plan can only mean more delay."""
+def test_falling_behind_never_lowers_the_forecast_or_its_range() -> None:
+    """Monotone constraints, and range offsets that do not depend on the gap."""
     shipped = model.current()
     base = list(shipped.golden[0]["x"])
-    previous = math.inf
+    previous = (math.inf, math.inf, math.inf)
     for gap in (-30, -20, -10, -5, 0, 5, 10):
         base[GAP] = gap
         delay, _ = shipped.predict(tuple(base))
-        assert delay.value <= previous + 1e-9
-        previous = delay.value
+        assert (delay.value, delay.low, delay.high) <= tuple(p + 1e-9 for p in previous)
+        previous = (delay.value, delay.low, delay.high)
+
+
+def test_ranges_are_wider_with_more_of_the_programme_to_run() -> None:
+    shipped = model.current()
+    early = list(shipped.golden[0]["x"])
+    late = list(early)
+    early[ELAPSED], late[ELAPSED] = 10.0, 90.0
+
+    (d_early, _), (d_late, _) = shipped.predict(tuple(early)), shipped.predict(tuple(late))
+
+    assert d_early.high - d_early.low > d_late.high - d_late.low
 
 
 # --- Scoring a document -----------------------------------------------------------------------------
 
 
 def test_trees_go_left_at_or_below_the_threshold() -> None:
-    split = [[GAP, -5.0, 1, 2, 20.0], [-1, 0, -1, -1, 40.0], [-1, 0, -1, -1, 5.0]]
-    m = model.parse(doc(delay_trees=[split]))
+    split = [[GAP, -5.0, 1, 2, 20.0, 20], leaf(40.0, 10), leaf(0.0, 10)]
+    m = model.parse(doc(delay=trees_target(split)))
 
     assert m.predict(vector(progress_gap_pct=-5.0))[0].value == 40.0  # exactly the threshold: left
-    assert m.predict(vector(progress_gap_pct=-4.99))[0].value == 5.0
+    assert m.predict(vector(progress_gap_pct=-4.99))[0].value == 0.0
     delay, _ = m.predict(vector(progress_gap_pct=-12))
-    assert delay.base == 20.0
-    assert delay.contributions[GAP] == 20.0  # the split moved the forecast from 20 to 40
+    assert delay.base == 20.0  # half the training rows go each way
+    assert delay.contributions[GAP] == 20.0
+
+
+def test_tree_shap_equals_shapley_values_by_brute_force() -> None:
+    """On a small tree with a repeated feature and uneven counts, TreeSHAP must equal the exact
+    Shapley values of the path-dependent expectation, computed over every subset of features."""
+    a, b, c = 0, 1, 2  # three features of a 3-feature model
+    tree = [
+        [a, 0.5, 1, 6, 0.0, 100],
+        [b, 0.5, 2, 5, 0.0, 60],
+        [a, 0.2, 3, 4, 0.0, 45],
+        [-1, 0, -1, -1, 3.0, 20],
+        [-1, 0, -1, -1, 7.0, 25],
+        [-1, 0, -1, -1, -2.0, 15],
+        [c, 0.3, 7, 8, 0.0, 40],
+        [-1, 0, -1, -1, 11.0, 10],
+        [-1, 0, -1, -1, 5.0, 30],
+    ]
+    parsed = model._tree(tree, 3)
+    x = (0.1, 0.7, 0.9)
+
+    def expectation(known: set[int], node: int = 0) -> float:
+        f = parsed.feature[node]
+        if f < 0:
+            return parsed.value[node]
+        left, right = parsed.left[node], parsed.right[node]
+        if f in known:
+            return expectation(known, left if x[f] <= parsed.threshold[node] else right)
+        weight = parsed.count[node]
+        return (
+            parsed.count[left] * expectation(known, left) + parsed.count[right] * expectation(known, right)
+        ) / weight
+
+    exact = []
+    for i in range(3):
+        others = [j for j in range(3) if j != i]
+        total = 0.0
+        for size in range(3):
+            for subset in itertools.combinations(others, size):
+                weight = math.factorial(size) * math.factorial(3 - size - 1) / math.factorial(3)
+                total += weight * (expectation({*subset, i}) - expectation(set(subset)))
+        exact.append(total)
+
+    phi = [0.0, 0.0, 0.0]
+    parsed.shap(x, phi)
+
+    assert phi == pytest.approx(exact, abs=1e-12)
+    assert parsed.expected() == pytest.approx(expectation(set()))
+    assert parsed.expected() + sum(phi) == pytest.approx(parsed.leaf(x))
+
+
+def test_a_line_and_its_shap_values() -> None:
+    coef = [0.0] * N
+    coef[GAP] = -0.5
+    mean = [0.0] * N
+    mean[GAP] = -4.0
+    m = model.parse(doc(overrun=line_target(3.0, coef, mean)))
+
+    _, overrun = m.predict(vector(progress_gap_pct=-10))
+
+    assert overrun.value == 8.0
+    assert overrun.base == 5.0  # the line at the average snapshot
+    assert overrun.contributions[GAP] == 3.0  # 6 points further behind than average, 0.5 each
+
+
+def test_the_range_grows_with_the_programme_still_to_run() -> None:
+    span = {
+        "features": list(model.RANGE_FEATURES),
+        "p10": {"intercept": -2.0, "coef": [0.0, -0.1]},
+        "p90": {"intercept": 5.0, "coef": [0.0, 0.2]},
+    }
+    m = model.parse(doc(delay=trees_target([leaf(10.0)], span=span)))
+
+    delay, _ = m.predict(vector(planned_duration_days=400, elapsed_pct=75))  # 100 planned days left
+
+    assert (delay.low, delay.value, delay.high) == pytest.approx((-2.0, 10.0, 35.0))
+    past_end, _ = m.predict(vector(planned_duration_days=400, elapsed_pct=130))
+    assert (past_end.low, past_end.high) == pytest.approx((8.0, 15.0))
+
+
+def test_crossed_offsets_still_give_a_range_around_the_forecast() -> None:
+    span = {
+        "features": list(model.RANGE_FEATURES),
+        "p10": {"intercept": 3.0, "coef": [0.0, 0.0]},  # above the forecast
+        "p90": {"intercept": -1.0, "coef": [0.0, 0.0]},  # below it
+    }
+    m = model.parse(doc(delay=trees_target([leaf(10.0)], span=span)))
+
+    delay, _ = m.predict(vector())
+
+    assert (delay.low, delay.value, delay.high) == (9.0, 10.0, 13.0)
 
 
 def test_predict_refuses_bad_vectors() -> None:
@@ -102,44 +237,66 @@ def test_predict_refuses_bad_vectors() -> None:
 
 def _broken(change: str) -> dict[str, Any]:
     d = doc()
-    split = [[GAP, 0.0, 1, 2, 1.0], [-1, 0, -1, -1, 2.0], [-1, 0, -1, -1, 0.0]]
-    d["targets"]["delay_days"]["trees"] = [copy.deepcopy(split)]
-    tree = d["targets"]["delay_days"]["trees"][0]
+    split = [[GAP, 0.0, 1, 2, 1.0, 20], leaf(2.0), leaf(0.0)]
+    d["targets"]["delay_days"]["point"]["trees"] = [copy.deepcopy(split)]
+    tree = d["targets"]["delay_days"]["point"]["trees"][0]
+    target = d["targets"]["delay_days"]
     if change == "format":
-        d["format"] = "pickle"
+        d["format"] = "sitesense-gbdt-v1"
     elif change == "no features":
         d["features"] = []
+    elif change == "no planned duration":
+        d["features"] = [f for f in FEATURE_NAMES if f != "planned_duration_days"]
     elif change == "missing target":
         del d["targets"]["overrun_pct"]
     elif change == "extra target":
-        d["targets"]["anything"] = d["targets"]["delay_days"]
+        d["targets"]["anything"] = target
+    elif change == "unknown kind":
+        target["kind"] = "pickle"
     elif change == "empty trees":
-        d["targets"]["delay_days"]["trees"] = []
+        target["point"]["trees"] = []
     elif change == "unknown feature":
-        tree[0][0] = len(FEATURE_NAMES)
+        tree[0][0] = N
     elif change == "child before parent":  # would let a walk loop forever
-        tree[1] = [GAP, 0.0, 0, 2, 1.0]
+        tree[1] = [GAP, 0.0, 0, 2, 1.0, 10]
     elif change == "child out of range":
         tree[0][3] = 9
     elif change == "short node":
-        tree[1] = [-1, 0, 2.0]
+        tree[1] = [-1, 0, -1, -1, 2.0]
     elif change == "text in node":
-        tree[1] = [-1, 0, -1, -1, "2.0"]
+        tree[1] = [-1, 0, -1, -1, "2.0", 10]
     elif change == "boolean in node":
-        tree[1] = [-1, 0, -1, -1, True]
+        tree[1] = [-1, 0, -1, -1, True, 10]
     elif change == "infinite value":
-        tree[1] = [-1, 0, -1, -1, math.inf]
+        tree[1] = [-1, 0, -1, -1, math.inf, 10]
+    elif change == "zero count":
+        tree[1] = [-1, 0, -1, -1, 2.0, 0]
     elif change == "too many trees":
-        d["targets"]["delay_days"]["trees"] = [[[-1, 0, -1, -1, 0.0]]] * (model.MAX_TREES + 1)
+        target["point"]["trees"] = [[leaf(0.0)]] * (model.MAX_TREES + 1)
+    elif change == "no range":
+        del target["range"]
+    elif change == "range over other inputs":
+        target["range"]["features"] = ["progress_gap_pct", "elapsed_pct"]
+    elif change == "short range line":
+        target["range"]["p90"]["coef"] = [0.1]
+    elif change == "line without means":
+        d["targets"]["overrun_pct"] = line_target(1.0, [0.0] * N)
+        del d["targets"]["overrun_pct"]["point"]["mean"]
+    elif change == "line too short":
+        d["targets"]["overrun_pct"] = line_target(1.0, [0.0] * (N - 1))
+    elif change == "line not finite":
+        d["targets"]["overrun_pct"] = line_target(math.nan, [0.0] * N)
     return d
 
 
 @pytest.mark.parametrize(
     "change",
     [
-        "format", "no features", "missing target", "extra target", "empty trees", "unknown feature",
-        "child before parent", "child out of range", "short node", "text in node", "boolean in node",
-        "infinite value", "too many trees",
+        "format", "no features", "no planned duration", "missing target", "extra target", "unknown kind",
+        "empty trees", "unknown feature", "child before parent", "child out of range", "short node",
+        "text in node", "boolean in node", "infinite value", "zero count", "too many trees", "no range",
+        "range over other inputs", "short range line", "line without means", "line too short",
+        "line not finite",
     ],
 )  # fmt: skip
 def test_malformed_model_files_are_refused(change: str) -> None:

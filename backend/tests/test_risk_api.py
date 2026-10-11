@@ -110,14 +110,37 @@ def add_report(db: Session, project: Project, author: User, day: date, crew: int
 
 
 def fake_model(delay_when_behind: float = 200.0, delay_otherwise: float = 10.0) -> risk_model.RiskModel:
-    """Delay depends on progress only: 10 or more points behind plan -> ``delay_when_behind`` days."""
-    split = [[GAP, -10.0, 1, 2, 50.0], [-1, 0, -1, -1, delay_when_behind], [-1, 0, -1, -1, delay_otherwise]]
+    """Delay depends on progress only: 10 or more points behind plan -> ``delay_when_behind`` days.
+
+    The training counts (4 behind, 15 not) make the average 50 days at the defaults. The likely range
+    runs from 20 days below the forecast to 30 above, and overrun from 1 point below to 2 above.
+    """
+    split = [
+        [GAP, -10.0, 1, 2, 50.0, 19],
+        [-1, 0, -1, -1, delay_when_behind, 4],
+        [-1, 0, -1, -1, delay_otherwise, 15],
+    ]
+
+    def span(low: float, high: float) -> dict[str, object]:
+        return {
+            "features": list(risk_model.RANGE_FEATURES),
+            "p10": {"intercept": low, "coef": [0, 0]},
+            "p90": {"intercept": high, "coef": [0, 0]},
+        }
+
     return risk_model.parse(
         {
-            "format": "sitesense-gbdt-v1",
+            "format": "sitesense-risk-v2",
             "version": "9.9.9",
             "features": list(FEATURE_NAMES),
-            "targets": {"delay_days": {"trees": [split]}, "overrun_pct": {"trees": [[[-1, 0, -1, -1, 1.0]]]}},
+            "targets": {
+                "delay_days": {"kind": "trees", "point": {"trees": [split]}, "range": span(-20, 30)},
+                "overrun_pct": {
+                    "kind": "trees",
+                    "point": {"trees": [[[-1, 0, -1, -1, 1.0, 19]]]},
+                    "range": span(-1, 2),
+                },
+            },
         }
     )
 
@@ -269,7 +292,13 @@ def test_scoring_stores_the_forecast_with_drivers_and_inputs(db: Session, boq: B
     assert row.delay_days == Decimal("200.0")
     assert row.model_version == "9.9.9"
     assert row.drivers[0]["feature"] == "progress_gap_pct"
-    assert row.drivers[0]["delay_days"] == 150.0  # from the base of 50 to 200 days
+    assert row.drivers[0]["delay_days"] == 150.0  # from the average of 50 to 200 days
+    # Every forecast is stored with its likely range, and the score with the scores at its ends.
+    assert row.ranges == {
+        "delay_days": {"low": 180.0, "high": 230.0},
+        "overrun_pct": {"low": 0.0, "high": 3.0},
+        "score": {"low": 99, "high": 100},  # 180 days late on this two-year job scores 99
+    }
     assert "behind" in row.drivers[0]["value"]
     assert set(row.features["values"]) == set(FEATURE_NAMES)
     assert row.score_date == ON
@@ -297,6 +326,8 @@ def test_br10_alerts_the_project_managers_when_a_project_enters_high(
     assert result.alerted is True
     [note] = notes_of(db, pm.user)
     assert note.title == "HR-1 is now high risk (100)"
+    assert "about 200 days late (likely 180 to 230)" in note.body  # the forecast, always with its range
+    assert "1.0% over budget (likely 0.0 to 3.0%)" in note.body
     assert "progress against plan" in note.body
     assert note.link == f"/projects/{boq.project.id}"
     assert notes_of(db, qs.user) == []  # BR-10 alerts the PM
@@ -383,6 +414,9 @@ def test_the_shipped_model_scores_a_live_project(db: Session, boq: Boq) -> None:
     assert 0 <= row.score <= 100
     assert row.model_version == risk_model.CURRENT_VERSION
     assert result.score == row.score
+    assert row.ranges is not None
+    assert row.ranges["delay_days"]["low"] <= float(row.delay_days) <= row.ranges["delay_days"]["high"]
+    assert row.ranges["score"]["low"] <= row.score <= row.ranges["score"]["high"]
 
 
 # --- Endpoints --------------------------------------------------------------------------------------------
@@ -403,6 +437,9 @@ def test_pm_reads_the_latest_forecast_and_two_weeks_of_history(
     assert body["latest"]["score"] == 100
     assert body["latest"]["level"] == "high"
     assert body["latest"]["model_version"] == "9.9.9"
+    assert body["latest"]["ranges"]["delay_days"] == {"low": 180.0, "high": 230.0}
+    assert body["latest"]["ranges"]["score"] == {"low": 99, "high": 100}
+    assert body["history"][-1]["score_range"] == {"low": 99, "high": 100}
     assert body["latest"]["drivers"][0]["label"] == "Progress against plan"
     assert "No planned crew size set: crew counts as on plan." in body["latest"]["notes"]
     assert [p["date"] for p in body["history"]] == [(ON - timedelta(days=3)).isoformat(), ON.isoformat()]
@@ -458,6 +495,8 @@ def test_ranking_puts_the_riskiest_first_and_unscored_last(
 
     assert [r["code"] for r in body] == ["HR-1", "CALM-1", "NEW-1"]  # closed projects are not ranked
     assert (body[0]["level"], body[0]["score"], body[0]["site_code"]) == ("high", 100, "COL-07")
+    assert body[0]["ranges"]["delay_days"] == {"low": 180.0, "high": 230.0}
+    assert body[2]["ranges"] is None  # never scored
     assert body[0]["top_driver"].startswith("Progress against plan: ")
     assert body[1]["score_date"] == ON.isoformat()  # the latest score, not an older one
     assert body[1]["top_driver"] is None  # nothing pushes the calm project's forecast up
