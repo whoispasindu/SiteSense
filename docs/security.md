@@ -37,12 +37,122 @@ here, newest first. The baseline design is in [ADR 0003](adr/0003-security-basel
 | Outbound calls (ML runtime) | onnxruntime's telemetry to Microsoft is switched off before it is imported, in code and in the image | `ai/nlp/transformer.py`, `backend/Dockerfile` | `test_onnxruntime_telemetry_is_off_before_onnxruntime_is_imported`; checked in the container: no connection |
 | Personal data in free text | Names of site people, the author, titled names and common Sri Lankan names (any case) become `[PERSON]` before classification and storage; only the weather client may call out of the server | `ai/nlp/text.py: redact`, `ai/nlp/names_lk.txt`, `services/issue_service.py` | `test_names_are_redacted_before_storage`, `test_report_nlp.py`, `test_outbound_calls.py`, ML `test_the_name_list_holds_no_word_from_the_report_data` |
 | Contract changes | The contract value and planned end change only through approved variations once a project is under way; claims are calculated (BR-08) and a database check keeps their figures consistent; one claim waits at a time (partial unique index and a project lock); variation approval locks the variation, project and budget line and applies everything in one transaction, audited before and after; each variation keeps the BR-09 limit it was routed with; only the Company Admin changes a limit (reason audited) | `rules/claims.py`, `rules/variations.py`, `services/claim_service.py`, `services/variation_service.py`, `services/project_service.py: contract_locked`, migration 0010 | `test_rules_cost.py`, `test_contract_api.py`, `test_the_contract_changes_only_through_variations_once_under_way` |
-| Client view | Separate schema with no internal cost or comment; only variations sent to the client, on their sites (404 otherwise); the client never reaches budgets, claims or the cost overview (TC-07) | `schemas/contract.py: ClientVariationOut`, `services/variation_service.py: client_out` | `test_the_client_queries_and_a_revision_goes_back_to_the_client`, `test_the_client_sees_only_their_sites`, role matrix |
+| Client view | Clients reach only the projects the Company Admin links them to, never through a site; another client's project answers exactly like a missing one; client-only schemas built field by field (no budget, cost, rate, risk score or internal comment); approved and paid claims only; photos private until the PM shares them, and shared copies carry no metadata; only linked clients are notified (TC-07) | `services/client_access.py`, `services/portal_service.py`, `schemas/portal.py`, `services/variation_service.py: client_out`, migrations 0014-0015 | `test_client_portal.py` (two clients on one site, schema walk), `test_contract_api.py`, role matrix |
 | Programme | Links only inside one project, never a loop (checked under a project row lock), lag 0–365, at most 2,000 per programme; one progress path refuses stopped tasks (BR-11) from the task list and daily reports; only a PM changes or clears a stop-work flag, audited; holidays only by the Company Admin, 2000 to 2100, audited; working-day arithmetic is bounded to 30 years and a network past it degrades with a warning; pour alerts read the forecast cache only and are de-duplicated by a fixed-length hash | `rules/calendar.py`, `rules/schedule.py`, `services/network_service.py`, `services/schedule_service.py: apply_progress`, `services/issue_service.py: set_stop_scope`, migration 0011 | `test_rules_schedule.py`, `test_network_api.py`, role matrix |
 | Risk and supplier models | Plain JSON only (`sitesense-risk-v2`, `sitesense-supplier-v1`, the rain climate), each validated on load (kinds, sizes, finite numbers, node counts, range inputs, constants); golden rows prove the pure-Python scorers match training, including SHAP values; CI retrains both models and the climate table and checks they reproduce; the what-if planner stores and changes nothing and only the PM uses it; sign constraints mean no recovery action can worsen a forecast; the BR-12 override is PM-only, strict-boolean and audited | `ai/risk/model.py`, `ai/risk/climate.py`, `ai/supplier/model.py`, `services/risk_service.py: what_if`, `services/supplier_service.py`, `ml/check_model.py` | `test_risk_model.py`, `test_risk_whatif.py`, `test_supplier_api.py`, `ml/tests`, role matrix |
 | AI briefing (LLM) | The model receives only allow-listed facts (`extra="forbid"` models of numbers, enumerated words, project codes and names, rule IDs), built per reader with their own visibility; a fixed instruction; JSON-schema output with codes limited to the reader's projects; answers validated and source counts made by the server; optional key held as `SecretStr` and never logged; one retry, 20 s timeout, rule-based fallback; at most one new answer per reader every 15 minutes | `ai/briefing`, `integrations/llm.py`, `services/briefing_service.py` | `test_briefing_leaks.py` (real SDK request captured for every role), `test_briefing.py`, `test_outbound_calls.py` |
 | Email | Bodies built from the alert's title, a fixed sentence and links only, never its text; subject stripped of line breaks; TLS required in production and an https app link; transactional outbox, five attempts, errors recorded by type only; per-user choices audited; stop-work always sent; the weekly PDF only to cost roles; without SMTP, logged not sent | `services/alerts.py`, `services/channels.py`, `integrations/email.py`, `services/weekly_report.py` | `test_alerts_email.py`, `test_config.py` |
 | Supply chain | Pinned deps, Dependabot (pip, npm, actions, docker), pip-audit, npm audit, dependency review, CodeQL `security-extended`, actions pinned to SHAs, `permissions: contents: read`, `persist-credentials: false` | `.github/` | CI |
+
+## Phase 12 review: 2026-10-13
+
+Scope:
+
+- the client portal (`/client/projects`, `/client/projects/{id}`, `/claims`, `/client/photos/{id}`);
+- client access per project (`project_clients`, migration 0015) and its use in the Phase 8 variation pages;
+- the published handover date and its reminder (`handover_publications`, migration 0014);
+- photo sharing and milestones;
+- the Company Admin's project links;
+- the client's top navigation and the PM's Client view tab.
+
+### OWASP Top 10 (2021) walk-through
+
+- **A01 Broken access control.** The 11 new endpoints are in the role matrix for every role.
+  - **Clients reach projects only through the links the Company Admin sets, never through a site.**
+    The review found the demo had two clients' projects on one site. Site scoping would have shown
+    each client the other's progress and payments, so the project owner chose links per project
+    (below).
+  - Every client path goes through `client_access`:
+    - the portal pages and photos;
+    - variation lists, views and decisions;
+    - the notifications for a variation or a new handover date, and the emails built from them.
+  - A project the client is not linked to, or a record on one, answers exactly like a record that
+    does not exist: the same status, code and message. This is tested for every client endpoint with
+    two clients on one site, so a client cannot even learn that another project exists.
+  - Publishing or confirming the handover date, sharing photos and flagging milestones are for the PM
+    only. Programme and report readers see the state.
+  - Links are set only by the Company Admin, only on client accounts, and are cleared on a role
+    change.
+  - Mutation-checked (below).
+- **A03 Injection.**
+  - Reasons are 3 to 300 characters and milestone names 2 to 80 characters, stripped. All are
+    rendered as text by React.
+  - Share calls take at most 100 UUIDs and strict booleans.
+  - Unknown fields are refused throughout.
+- **A04 Insecure design.**
+  - Client responses use their own schemas, never subclasses of internal ones, built field by field.
+    A test walks every client response, fully populated, for 30 internal field names at any depth (the
+    guide's schema test, TC-07). Others check that no client schema declares one, and that none extends
+    an internal class.
+  - Submitted and returned claims stay internal.
+  - Reviews that confirm a date unchanged are internal.
+  - Who shared or uploaded a photo is never sent to the client.
+  - Photos are private by default. The bulk share is all-or-nothing and limited to the project's own
+    photos.
+- **A05 / DoS.** On demo data the client project view takes about 22 ms, claims 14 ms, the list 6 ms. Photos are capped at 60 per
+  view and 100 per share call. A publication takes a row lock on the project, so two quick saves
+  cannot interleave.
+- **A08 Data integrity.**
+  - Publications are append-only rows.
+  - Every publish, confirm, share change and link change is audited, with before and after.
+- **Privacy.**
+  - Shared copies leave the server without EXIF, GPS, device, timestamps, XMP, ICC or comments. Each
+    file is re-checked on the way out, as well as at upload.
+  - The PM is reminded to check for faces and unsafe moments before sharing.
+- **Outbound calls.** None added.
+
+### Verification beyond unit tests
+
+- **Mutation checks: 23 of 23** deliberate faults fail a test:
+  - cancelled projects shown;
+  - any project, variation or photo opened by ID;
+  - every variation listed;
+  - every client, or the site's clients, told about a project;
+  - another project's photo shared through this one;
+  - the client copy keeping its metadata;
+  - uploads keeping the comment;
+  - submitted claims shown;
+  - retention summed instead of cumulative;
+  - either reminder threshold disabled;
+  - an unchanged date announced again;
+  - milestones expected after the published date;
+  - a milestone name without a milestone;
+  - staff linked to projects;
+  - links kept after a role change;
+  - an internal field added to a client schema;
+  - publishing or sharing opened to readers;
+  - share changes not audited.
+
+  The first run caught 22. The survivor (sharing another project's photo) showed that the test only
+  tried a random ID; it now tries a real photo of another project on the same site.
+- **In the browser** (demo data):
+  - the client opens straight into Havelock (their only project) under the top navigation, with
+    progress, the published date and its reason, earlier dates, milestones, three shared photos (the
+    newest stays private) and payments with the retention held;
+  - the PM's Client view tab shows the date, suggestions and history;
+  - sharing and unsharing a photo through the UI moves the count from 3 to 4 and back.
+
+### Findings fixed during the review
+
+1. **Clients saw every project on their site** (Phase 1 and 8 design). Fixed by linking clients to
+   projects (migration 0015), applied to every client path, with the two-clients test.
+2. **Uploads kept JPEG comments** (since Phase 4). Pillow writes `info["comment"]` back when saving,
+   even with no arguments, so a comment such as a name or a place survived the "fresh" re-encode. The
+   Phase 4 review had listed comments as dropped. The re-encode now clears the info dictionary, and a
+   test uploads a commented JPEG and checks both sizes. Photos stored before the fix are cleaned on
+   the way to clients; staff copies keep any comment until re-uploaded.
+3. **Sharing could flush a half-updated photo.** Reading the user's ID mid-loop, after an earlier
+   commit, triggered a query that flushed a row with `shared_with_client` set but no date. That broke
+   the check constraint. The loop now reads its values first and runs with autoflush off. This was
+   found by the demo seed.
+4. **Old migrations were reformatted by a formatter run.** They were restored; past migrations are
+   never edited.
+
+### Open items
+
+- Existing client accounts must be linked to their projects after upgrading (no automatic backfill:
+  it would recreate the site leak).
+- The defects-period end is not stored, so the retention note states the rule without a date.
 
 ## Phase 11 review: 2026-10-12
 

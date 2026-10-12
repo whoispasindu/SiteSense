@@ -8,6 +8,32 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Phase 12, the client portal ([ADR 0015](docs/adr/0015-client-portal.md)):
+  - **The portal**, under a simpler top navigation:
+    - progress and the S-curve;
+    - the handover date the PM published, with the reason and earlier dates (the contract date until
+      one is published);
+    - milestones with their status in words;
+    - the photos the PM shared;
+    - payments: approved and paid claims with the full breakdown, the contract value with approved
+      variations, and the retention held so far (released at the end of the defects period);
+    - variations waiting for a decision.
+
+    No budgets, costs, rates, risk scores or internal comments: client responses use their own
+    schemas, and a test walks every one of them for internal fields at any depth (TC-07).
+  - **Client access per project.** The Company Admin links client accounts to projects (audited).
+    Clients reach nothing else: portal pages, variation decisions, notifications and emails, photos.
+    Another client's project, even on the same site, answers exactly like one that does not exist
+    (tested with two clients on one site).
+  - **A "Client view" tab** on each project:
+    - the PM publishes the client's handover date with a reason, helped by the programme forecast and
+      the risk model's range, or confirms it unchanged (both audited, and the client is notified of a
+      new date);
+    - flags milestones (suggested ones mapped to tasks by keyword);
+    - shares or unshares photos, one at a time or in bulk.
+
+    The PM's dashboard flags a published date as outdated when the programme forecast is more than 7
+    working days later than it, or when it has not been reviewed for 30 days.
 - Phase 11, the dashboard, alerts and the AI daily briefing ([ADR 0014](docs/adr/0014-dashboard-alerts-briefing.md)):
   - **Today's briefing** at the top of the dashboard: 3 to 5 points on what needs attention, each
     with the records it rests on (counted by the server). Written by Claude (Haiku by default,
@@ -122,6 +148,11 @@ uses [Semantic Versioning](https://semver.org/).
     `POST /reports/{id}/issues/confirm`, `POST /report-actions/{id}/close`,
     `GET /projects/{id}/report-actions`.
   - Training code, synthetic data generator and labelling guide in `ml/nlp/`.
+
+### Fixed
+
+- Photo uploads kept a JPEG comment from the original file. The re-encode now drops it with every
+  other piece of metadata, and copies shown to clients are checked again on the way out.
 
 ### Changed
 

@@ -47,7 +47,9 @@ them, and clients see honest progress without internal costs.
   model's likely range, issue trends, the 5-day weather for each site, alerts and an approval queue
 - Alerts by email: urgent ones at once, the rest in an evening digest, and a weekly PDF report for
   project managers and quantity surveyors
-- Client portal with progress and variation approval
+- A client portal with honest progress and no internal costs: the handover date the project manager
+  publishes (with the reason), milestones, the photos they choose to share, approved claims and the
+  retention held, and variation approval. Clients see only the projects they are linked to
 
 ## Run it locally
 
@@ -117,8 +119,8 @@ Every account uses the password in `SITESENSE_DEMO_PASSWORD` in your `.env`
 | Quantity Surveyor | `qs@sitesense.example` | Enter the quoted price at the QS check and watch BR-01 and BR-13 decide who approves; price variation VO-0003; make a progress claim and see BR-08 calculate it; budget forecast |
 | Site Engineer | `engineer@sitesense.example` | File today's daily report for Havelock and write a problem or two: the AI check tags them for you to confirm (a safety issue can flag stop-work on chosen tasks); raise a material request |
 | Procurement Officer | `procurement@sitesense.example` | Order approved requests (choose Ceylon Formwork Hire for MR-0003 and BR-12 suggests a more reliable supplier), record deliveries, manage suppliers |
-| Company Admin | `admin@sitesense.example` | Users, sites, holidays, each project's variation limit (BR-09) and the audit log |
-| Client | `client@sitesense.example` | Variations: approve or query VO-0002, a roof plant room with a 10-day time impact (TC-10). The full portal arrives in Phase 12 |
+| Company Admin | `admin@sitesense.example` | Users (link client accounts to their projects), sites, holidays, each project's variation limit (BR-09) and the audit log |
+| Client | `client@sitesense.example` | The portal for Havelock Residences (the only project linked to this account): progress, the published handover date and why it moved, milestones, shared photos and payments; approve or query VO-0002, a roof plant room with a 10-day time impact (TC-10) |
 
 <p>
   <img src="docs/media/engineer-daily-report.gif" alt="A site engineer files today's report: weather filled in from the forecast, work done, problems and task progress" width="49%">
@@ -341,8 +343,8 @@ docs/           architecture, decision records, security reviews, model cards
 | 8 | Cost control, claims and variations | Done |
 | 9 | Advanced schedule | Done |
 | 10 | Risk model v2, what-if planner and supplier model | Done |
-| 11 | Dashboard, alerts and AI briefing | In review |
-| 12 | Client portal | Planned |
+| 11 | Dashboard, alerts and AI briefing | Done |
+| 12 | Client portal | In review |
 | 13 | Hardening and deployment | Planned |
 | 14 | Testing, UAT and evaluation → **v1.0** | Planned |
 | Later | Public demo: a hosted instance with seeded data | Planned |
