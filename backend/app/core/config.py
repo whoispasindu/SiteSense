@@ -83,6 +83,23 @@ class Settings(BaseSettings):
     scheduler_enabled: bool = True
     # BR-07: every active site submits its daily report by this hour (site time).
     report_deadline_hour: int = Field(default=18, ge=0, le=23)
+    # Daily briefing (Phase 11). Optional: with no key, everyone gets the rule-based briefing. Only
+    # structured facts are sent (app/ai/briefing), never report text or people's names.
+    anthropic_api_key: SecretStr | None = None
+    briefing_model: str = Field(default="claude-haiku-5-5", pattern=r"^[a-z0-9][a-z0-9.\-]{2,63}$")
+    briefing_timeout_seconds: float = Field(default=20.0, gt=0, le=120)
+    # Email (Phase 11). With no SMTP host, emails are written to the log instead of sent.
+    smtp_host: str | None = None
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_security: Literal["starttls", "ssl", "none"] = "starttls"
+    email_from: str = "SiteSense <no-reply@sitesense.example>"
+    # Links in emails open the web app here.
+    app_base_url: str = "http://localhost:5173"
+    # The evening digest of non-urgent alerts (site time).
+    digest_hour: int = Field(default=18, ge=0, le=23)
+    digest_minute: int = Field(default=30, ge=0, le=59)
 
     @field_validator("cors_origins", "allowed_hosts", mode="before")
     @classmethod
@@ -125,6 +142,10 @@ class Settings(BaseSettings):
             problems.append("jwt_secret is the development default")
         if not self.cookie_secure:
             problems.append("cookie_secure must be on")
+        if not self.app_base_url.startswith("https://"):
+            problems.append("app_base_url must use https (links in emails)")
+        if self.smtp_host and self.smtp_security == "none":
+            problems.append("SMTP must use TLS (starttls or ssl)")
         if problems:
             raise ValueError("Unsafe production configuration: " + "; ".join(problems))
         return self

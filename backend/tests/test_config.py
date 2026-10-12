@@ -11,6 +11,7 @@ SAFE_PROD = {
     "cors_origins": ["https://app.sitesense.example"],
     "allowed_hosts": ["api.sitesense.example"],
     "database_url": "postgresql+psycopg://app:s3cure-pw@db:5432/sitesense",
+    "app_base_url": "https://app.sitesense.example",
 }
 
 
@@ -33,6 +34,8 @@ def test_safe_production_settings_are_accepted() -> None:
             {"migration_database_url": "postgresql+psycopg://owner:change-me-owner@db/sitesense"},
             "migration_database_url still",
         ),
+        ({"app_base_url": "http://app.sitesense.example"}, "app_base_url must use https"),
+        ({"smtp_host": "mail.example", "smtp_security": "none"}, "SMTP must use TLS"),
     ],
 )
 def test_unsafe_production_settings_are_rejected(override: dict[str, object], problem: str) -> None:

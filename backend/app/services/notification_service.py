@@ -13,6 +13,7 @@ from app.core.permissions import Role
 from app.models import Notification, User
 from app.models.user import user_site_assignments
 from app.schemas.report import NotificationList, NotificationOut
+from app.services import alerts
 
 LIST_LIMIT = 30
 
@@ -82,6 +83,8 @@ def send(db: Session, items: list[NewNotification]) -> int:
         )
         if db.execute(stmt).first() is not None:
             created += 1
+            # Phase 11: urgent kinds also go by email, queued in this same transaction.
+            alerts.queue_urgent(db, item.user_id, item.kind, item.title[:160], _safe_link(item.link))
     return created
 
 

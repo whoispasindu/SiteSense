@@ -155,12 +155,42 @@ def test_scheduler_has_the_reminder_at_the_deadline(settings: Settings) -> None:
         "pour_check",
         "risk_scoring",
         "variance_check",
+        "email_outbox",
+        "email_digest",
+        "weekly_report",
     }
     assert str(jobs["report_reminders"].trigger) == "cron[hour='18', minute='0']"
     assert str(jobs["weather_refresh"].trigger) == "cron[hour='5', minute='30']"
     assert str(jobs["risk_scoring"].trigger) == "cron[hour='6', minute='0']"  # after the weather
     assert str(jobs["variance_check"].trigger) == "cron[hour='6', minute='10']"
     assert str(jobs["pour_check"].trigger) == "cron[hour='5', minute='45']"  # after the 05:30 weather
+    assert str(jobs["email_outbox"].trigger) == "interval[0:01:00]"
+    assert str(jobs["email_digest"].trigger) == "cron[hour='18', minute='30']"
+    assert str(jobs["weekly_report"].trigger) == "cron[day_of_week='mon', hour='7', minute='0']"
+    assert str(jobs["weekly_report"].trigger.timezone) == "Asia/Colombo"
+    database.dispose()
+
+
+def test_phase_11_jobs_run_their_services(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services import alerts, channels, weekly_report
+
+    database = Database(settings)
+    scheduler = build_scheduler(settings, database, FakeWeather())
+    ran: list[str] = []
+
+    def recorder(name: str) -> Callable[..., int]:
+        def run(*args: object) -> int:
+            ran.append(name)
+            return 0
+
+        return run
+
+    monkeypatch.setattr(channels, "send_pending", recorder("outbox"))
+    monkeypatch.setattr(alerts, "queue_digests", recorder("digest"))
+    monkeypatch.setattr(weekly_report, "queue_weekly", recorder("weekly"))
+    for job_id in ("email_outbox", "email_digest", "weekly_report"):
+        scheduler.get_job(job_id).func()
+    assert ran == ["outbox", "digest", "weekly"]
     database.dispose()
 
 

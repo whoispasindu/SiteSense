@@ -185,6 +185,12 @@ ENDPOINTS = [
     Endpoint("GET", "/api/v1/notifications", ALL_ROLES),
     Endpoint("POST", "/api/v1/notifications/{notification_id}/read", ALL_ROLES),
     Endpoint("POST", "/api/v1/notifications/read-all", ALL_ROLES),
+    Endpoint("GET", "/api/v1/analytics/portfolio", PROJECT_READERS),
+    Endpoint("GET", "/api/v1/briefing/today", PROJECT_READERS),
+    Endpoint("GET", "/api/v1/reports/weekly.pdf", COST_READERS),
+    Endpoint("GET", "/api/v1/me/notification-preferences", ALL_ROLES),
+    Endpoint("PUT", "/api/v1/me/notification-preferences", ALL_ROLES,
+             {"email_urgent": True, "email_digest": False}),
 ]  # fmt: skip
 
 

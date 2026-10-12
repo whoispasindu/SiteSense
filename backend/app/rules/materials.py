@@ -276,3 +276,8 @@ _STAGES: dict[str, Stage] = {"requested": "qs", "pm_approval": "pm", "change_req
 def stage_for(status: str) -> Stage | None:
     """Who acts next on a request in this status (None: nobody, it is with procurement or closed)."""
     return _STAGES.get(status)
+
+
+def statuses_at(stages: set[Stage]) -> list[str]:
+    """The request statuses waiting on any of ``stages`` (the dashboard's approval queue)."""
+    return [status for status, stage in _STAGES.items() if stage in stages]
