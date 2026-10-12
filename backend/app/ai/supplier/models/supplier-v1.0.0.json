@@ -2,7 +2,7 @@
  "format": "sitesense-supplier-v1",
  "name": "supplier",
  "version": "1.0.0",
- "trained_at": "2026-10-11T20:23:33+00:00",
+ "trained_at": "2026-10-12T06:03:56+00:00",
  "kind": "smoothed",
  "features": [
   "supplier_logit",

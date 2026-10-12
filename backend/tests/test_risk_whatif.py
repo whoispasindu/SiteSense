@@ -156,15 +156,25 @@ def test_the_planner_shows_each_action_as_a_range_and_the_plan_with_its_costs(
     assert crew["selected"] is True
     assert 0 <= crew["delay_saved_days"]["low"] <= crew["delay_saved_days"]["high"]
     assert crew["cost"] == "440000.00"
+    # Half the planned change saves less than all of it: an effect is a real range.
+    weather = next(a for a in body["actions"] if a["id"] == "weather_protection")
+    assert 0 < weather["delay_saved_days"]["low"] < weather["delay_saved_days"]["high"]
     assert crew["cost_pct"] == pytest.approx(10.0)
     assert "crew" in crew["change"]
     assert body["costs_not_entered"] == ["Weather protection"]  # blank is "cost not entered", never free
     after = body["plan"]
     assert after["delay_days"] <= base["delay_days"]
     assert after["delay_range"]["low"] <= after["delay_days"] <= after["delay_range"]["high"]
-    # The entered cost (10% of the budget) is added to the cost forecast; the model's saving is less.
-    model_saving = body["plan_overrun_saved_pct"]["high"] + 10.0
-    assert after["overrun_pct"] == pytest.approx(base["overrun_pct"] - model_saving + 10.0, abs=0.02)
+    # The entered cost (10% of the budget) is added to the cost forecast, range and all: compare the
+    # same plan without it.
+    free = plan(api, behind, pm, [{"id": "add_crew"}, {"id": "weather_protection"}]).json()
+    assert after["overrun_pct"] == pytest.approx(free["plan"]["overrun_pct"] + 10.0, abs=0.02)
+    assert after["overrun_range"]["high"] == pytest.approx(
+        free["plan"]["overrun_range"]["high"] + 10.0, abs=0.02
+    )
+    assert body["plan_overrun_saved_pct"]["high"] == pytest.approx(
+        free["plan_overrun_saved_pct"]["high"] - 10.0
+    )
     assert body["model_version"] == risk_model.CURRENT_VERSION
 
 

@@ -8,7 +8,7 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Phase 10, risk model v2 (in progress):
+- Phase 10, risk model v2, what-if planner and supplier model ([ADR 0013](docs/adr/0013-risk-v2-what-if-supplier-model.md)):
   - **Risk model 1.2.0: rain now counts** ([#27](https://github.com/whoispasindu/SiteSense/issues/27),
     [model card](docs/model-card-risk.md#rain-an-assumption-not-measured-data)). The simulator
     assumes programmes allow for half of a town's usual rain (`RAIN_ALLOWANCE`, an assumption, not

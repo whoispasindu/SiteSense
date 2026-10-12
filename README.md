@@ -285,7 +285,7 @@ docs/           architecture, decision records, security reviews, model cards
 | 7 | Report NLP classifier | Done |
 | 8 | Cost control, claims and variations | Done |
 | 9 | Advanced schedule | Done |
-| 10 | Risk model v2, what-if planner and supplier model | In progress |
+| 10 | Risk model v2, what-if planner and supplier model | In review |
 | 11 | Dashboard, alerts and AI briefing | Planned |
 | 12 | Client portal | Planned |
 | 13 | Hardening and deployment | Planned |

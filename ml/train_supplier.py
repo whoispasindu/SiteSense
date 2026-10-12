@@ -180,12 +180,12 @@ def main() -> int:
     }
     BACKEND_MODELS.mkdir(parents=True, exist_ok=True)
     model_path = BACKEND_MODELS / f"supplier-v{VERSION}.json"
-    model_path.write_text(json.dumps(model, indent=1) + "\n", encoding="utf-8")
+    model_path.write_bytes((json.dumps(model, indent=1) + "\n").encode("utf-8"))  # LF on every platform
     report_dir = ML / "models" / f"supplier-v{VERSION}"
     report_dir.mkdir(parents=True, exist_ok=True)
     report["trained_at"] = trained_at
     report["model_sha256"] = hashlib.sha256(model_path.read_bytes()).hexdigest()
-    (report_dir / "metrics.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    (report_dir / "metrics.json").write_bytes((json.dumps(report, indent=2) + "\n").encode("utf-8"))
     print(
         json.dumps(
             {

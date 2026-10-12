@@ -358,3 +358,24 @@ def test_supplier_estimates_are_site_scoped(
     on_project = f"/api/v1/suppliers/{kelani.id}/on-time?project_id={boq.project.id}"
     assert api.get(on_project, headers=outsider.headers).status_code == 404
     assert api.get(f"/api/v1/suppliers/{uuid.uuid4()}/on-time", headers=outsider.headers).status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("on_time", "count", "below", "low_data"),
+    [
+        (8, 20, True, False),  # (8 + 5 x 0.8) / 25 = 48%: under the BR-12 line
+        (9, 20, False, False),  # 52%
+        (3, 4, False, True),  # 4 deliveries: still low data
+        (4, 5, False, False),  # 5: enough
+    ],
+)
+def test_the_br12_line_and_the_low_data_mark(on_time: int, count: int, below: bool, low_data: bool) -> None:
+    out = supplier_service.estimate(
+        Supplier(id=uuid.uuid4(), name="Any"),
+        supplier_service.Record(on_time, count),
+        supplier_service.Record(0, 0),  # no company record: the 80% starting rate
+        lead_time_days=14,
+        wet_share=0.2,
+    )
+
+    assert (out.below_br12, out.low_data) == (below, low_data)

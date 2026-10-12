@@ -78,6 +78,6 @@
   },
   "on_time_share": 0.724,
   "data_sha256": "da05084468e9d5145db8aab8ebb7592d4cd4f66c137eb9e02273685d1a46d7ec",
-  "trained_at": "2026-10-11T20:23:33+00:00",
-  "model_sha256": "2aa8adbcc5d16f1cc2ad29249e7b0c3486ecc794276f36718234ffb1dc201b74"
+  "trained_at": "2026-10-12T06:03:56+00:00",
+  "model_sha256": "feb7a42337cc2e768b5ec812cf4ae6a272cb4b501f6bb680781d485f8281510c"
 }
