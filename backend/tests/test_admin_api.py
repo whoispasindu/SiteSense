@@ -1,4 +1,7 @@
+import uuid
 from collections.abc import Callable
+from datetime import date
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -6,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.permissions import Role
-from app.models import AuditLog, Site, User
+from app.models import AuditLog, Project, Site, User
 from tests.conftest import PASSWORD, bearer, login
 
 USERS = "/api/v1/admin/users"
@@ -288,3 +291,92 @@ def test_audit_log_lists_recent_events_with_actor_names(
     injection = api.get("/api/v1/admin/audit-logs", params={"action": "x'; drop table users;--"},
                         headers=admin_headers)  # fmt: skip
     assert injection.status_code == 422
+
+
+# --- Phase 12: clients are linked to projects -------------------------------------------------------------
+
+
+def make_project(db: Session, site: Site, code: str, client: str = "Client Co") -> Project:
+    project = Project(
+        code=code, name=f"Project {code}", site_id=site.id, client_name=client, project_type="residential",
+        status="active", contract_value=Decimal("1000000.00"), start_date=date(2026, 1, 1),
+        planned_end=date(2027, 1, 1),
+    )  # fmt: skip
+    db.add(project)
+    db.commit()
+    return project
+
+
+def test_the_admin_links_a_client_to_projects_and_it_is_audited(
+    api: TestClient, db: Session, admin_headers: dict[str, str], make_user: Callable[..., User],
+    make_site: Callable[..., Site],
+) -> None:  # fmt: skip
+    site = make_site("COL-21")
+    first, second = make_project(db, site, "AA-1"), make_project(db, site, "BB-2", "Other client")
+    client = make_user(Role.CLIENT, sites=[site])
+
+    response = api.post(
+        f"/api/v1/admin/users/{client.id}/projects",
+        json={"project_ids": [str(second.id), str(first.id), str(first.id)]},
+        headers=admin_headers,
+    )
+    assert response.status_code == 200, response.text
+    assert [p["code"] for p in response.json()["projects"]] == ["AA-1", "BB-2"]
+    entry = last_audit(db)
+    assert entry.action == "user.projects_assigned"
+    assert entry.details == {"from": [], "to": ["AA-1", "BB-2"]}
+
+    narrowed = api.post(
+        f"/api/v1/admin/users/{client.id}/projects",
+        json={"project_ids": [str(first.id)]},
+        headers=admin_headers,
+    ).json()
+    assert [p["code"] for p in narrowed["projects"]] == ["AA-1"]
+
+    listing = api.get("/api/v1/admin/projects", headers=admin_headers).json()
+    row = next(p for p in listing if p["code"] == "AA-1")
+    assert row["clients"] == 1
+    assert set(row) == {"id", "code", "name", "site_code", "status", "client_name", "clients"}  # no figures
+
+
+def test_only_clients_are_linked_to_projects_and_ids_are_checked(
+    api: TestClient, db: Session, admin_headers: dict[str, str], make_user: Callable[..., User],
+    make_site: Callable[..., Site],
+) -> None:  # fmt: skip
+    site = make_site("COL-22")
+    project = make_project(db, site, "CC-3")
+    engineer = make_user(Role.SITE_ENGINEER, sites=[site])
+    client = make_user(Role.CLIENT, sites=[site])
+    url = "/api/v1/admin/users/{}/projects"
+
+    refused = api.post(
+        url.format(engineer.id), json={"project_ids": [str(project.id)]}, headers=admin_headers
+    )
+    assert refused.status_code == 422
+    unknown = api.post(
+        url.format(client.id), json={"project_ids": [str(uuid.uuid4())]}, headers=admin_headers
+    )
+    assert unknown.status_code == 422
+    extra = api.post(url.format(client.id), json={"project_ids": [], "sites": []}, headers=admin_headers)
+    assert extra.status_code == 422
+
+
+def test_a_client_who_changes_role_loses_their_project_links(
+    api: TestClient, db: Session, admin_headers: dict[str, str], make_user: Callable[..., User],
+    make_site: Callable[..., Site],
+) -> None:  # fmt: skip
+    site = make_site("COL-23")
+    project = make_project(db, site, "DD-4")
+    client = make_user(Role.CLIENT, sites=[site])
+    api.post(
+        f"/api/v1/admin/users/{client.id}/projects",
+        json={"project_ids": [str(project.id)]},
+        headers=admin_headers,
+    )
+
+    changed = api.patch(
+        f"/api/v1/admin/users/{client.id}", json={"role": "site_engineer"}, headers=admin_headers
+    ).json()
+    assert changed["projects"] == []
+    db.refresh(client)
+    assert client.client_projects == []

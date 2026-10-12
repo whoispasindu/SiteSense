@@ -8,9 +8,11 @@ from app.api.deps import DbSession, Meta, require_permission
 from app.core.permissions import Permission, Role
 from app.models import AuditLog, User
 from app.schemas.admin import (
+    AdminProjectOut,
     AuditLogOut,
     Page,
     PasswordReset,
+    ProjectAssignment,
     SiteAssignment,
     SiteCreate,
     SiteOut,
@@ -72,6 +74,23 @@ def assign_sites(
     return user_service.to_user_out(
         user_service.assign_sites(db, user, body.site_ids, actor=admin, meta=meta)
     )
+
+
+@router.post("/users/{user_id}/projects", response_model=UserOut)
+def assign_projects(
+    user_id: uuid.UUID, body: ProjectAssignment, admin: UserAdmin, db: DbSession, meta: Meta
+) -> UserOut:
+    """Phase 12: link a client account to the projects it may see (replaces the set). Audited."""
+    user = user_service.get_user(db, user_id)
+    return user_service.to_user_out(
+        user_service.assign_projects(db, user, body.project_ids, actor=admin, meta=meta)
+    )
+
+
+@router.get("/projects", response_model=list[AdminProjectOut])
+def projects(_admin: UserAdmin, db: DbSession) -> list[AdminProjectOut]:
+    """Every project, to link client accounts to: codes, names, sites and statuses, no figures."""
+    return user_service.list_projects(db)
 
 
 @router.post("/users/{user_id}/reset-password", response_model=PasswordReset)

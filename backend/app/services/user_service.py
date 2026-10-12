@@ -11,8 +11,17 @@ from app.core import clock
 from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.core.permissions import ROLE_LABELS, SITE_SCOPED_ROLES, Role
 from app.core.security import generate_temporary_password, hash_password
-from app.models import Site, User
-from app.schemas.admin import SiteCreate, SiteOut, SiteUpdate, UserCreate, UserOut, UserUpdate
+from app.models import Project, Site, User, project_clients
+from app.schemas.admin import (
+    AdminProjectOut,
+    ProjectRef,
+    SiteCreate,
+    SiteOut,
+    SiteUpdate,
+    UserCreate,
+    UserOut,
+    UserUpdate,
+)
 from app.schemas.auth import SiteSummary
 from app.services import audit
 from app.services.audit import AuditAction, RequestMeta
@@ -33,6 +42,7 @@ def to_user_out(user: User) -> UserOut:
         last_login_at=user.last_login_at,
         created_at=user.created_at,
         sites=[SiteSummary.model_validate(site) for site in user.sites],
+        projects=[ProjectRef(id=p.id, code=p.code, name=p.name) for p in user.client_projects],
     )
 
 
@@ -124,6 +134,8 @@ def update_user(db: Session, user: User, data: UserUpdate, *, actor: User, meta:
             raise BusinessRuleError("The company must keep at least one active admin.")
         if data.role not in SITE_SCOPED_ROLES:
             user.sites = []
+        if data.role != Role.CLIENT:
+            user.client_projects = []  # only clients are linked to projects (Phase 12)
         changes["role"] = {"from": user.role, "to": data.role.value}
         user.role = data.role.value
         user.session_version += 1
@@ -176,6 +188,57 @@ def assign_sites(
     )
     db.commit()
     return user
+
+
+def assign_projects(
+    db: Session, user: User, project_ids: Sequence[uuid.UUID], *, actor: User, meta: RequestMeta
+) -> User:
+    """Phase 12: the projects a client may see. Only client accounts; every project must exist."""
+    if user.role != Role.CLIENT.value:
+        raise BusinessRuleError(
+            "Only client accounts are linked to projects; staff reach projects through sites."
+        )
+    unique_ids = list(dict.fromkeys(project_ids))
+    projects = list(db.scalars(select(Project).where(Project.id.in_(unique_ids)).order_by(Project.code)))
+    missing = sorted(str(i) for i in set(unique_ids) - {p.id for p in projects})
+    if missing:
+        raise BusinessRuleError("Some projects do not exist.", details=[{"project_ids": missing}])
+    before = sorted(p.code for p in user.client_projects)
+    user.client_projects = projects
+    audit.record(
+        db,
+        AuditAction.USER_PROJECTS_ASSIGNED,
+        meta=meta,
+        actor_id=actor.id,
+        target_type="user",
+        target_id=user.id,
+        details={"from": before, "to": [p.code for p in projects]},
+    )
+    db.commit()
+    return user
+
+
+def list_projects(db: Session) -> list[AdminProjectOut]:
+    """Every project, for linking clients. Codes, names, sites and statuses only: no figures."""
+    counts: dict[uuid.UUID, int] = dict(
+        db.execute(
+            select(project_clients.c.project_id, func.count(project_clients.c.user_id)).group_by(
+                project_clients.c.project_id
+            )
+        ).all()
+    )
+    return [
+        AdminProjectOut(
+            id=p.id,
+            code=p.code,
+            name=p.name,
+            site_code=p.site.code,
+            status=p.status,
+            client_name=p.client_name,
+            clients=int(counts.get(p.id, 0)),
+        )
+        for p in db.scalars(select(Project).order_by(Project.code))
+    ]
 
 
 def reset_password(db: Session, user: User, *, actor: User, meta: RequestMeta) -> str:

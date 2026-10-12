@@ -3,7 +3,15 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StringConstraints,
+    model_validator,
+)
 
 from app.schemas.project import ProjectCard, ProjectSummary
 
@@ -16,6 +24,8 @@ TaskCode = Annotated[str, BeforeValidator(_upper), StringConstraints(pattern=r"^
 TaskName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=160)]
 Weight = Annotated[Decimal, Field(gt=0, le=100, max_digits=5, decimal_places=2)]
 Percent = Annotated[Decimal, Field(ge=0, le=100, max_digits=5, decimal_places=2)]
+# Phase 12: what the client calls a milestone, e.g. "Structure complete".
+MilestoneName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=80)]
 
 
 class TaskCreate(BaseModel):
@@ -30,11 +40,16 @@ class TaskCreate(BaseModel):
     percent_complete: Percent = Decimal(0)
     # BR-06: flagged when heavy rain is forecast on a working day of its window.
     is_concrete_pour: bool = False
+    # Phase 12: shown to the client as a milestone (project managers only).
+    client_milestone: StrictBool = False
+    milestone_name: MilestoneName | None = None
 
     @model_validator(mode="after")
     def _dates_in_order(self) -> "TaskCreate":
         if self.planned_end < self.planned_start:
             raise ValueError("The planned end must be on or after the planned start.")
+        if self.milestone_name and not self.client_milestone:
+            raise ValueError("A milestone name needs the task to be a client milestone.")
         return self
 
 
@@ -49,6 +64,8 @@ class TaskUpdate(BaseModel):
     weight: Weight | None = None
     percent_complete: Percent | None = None
     is_concrete_pour: bool | None = None
+    client_milestone: StrictBool | None = None
+    milestone_name: MilestoneName | None = None
 
 
 TaskState = Literal["not_started", "on_track", "behind", "done"]
@@ -67,6 +84,8 @@ class TaskOut(BaseModel):
     percent_complete: Decimal
     is_critical: bool  # on the forecast critical path (Phase 9: calculated, never set by hand)
     is_concrete_pour: bool
+    client_milestone: bool  # Phase 12: shown to the client
+    milestone_name: str | None  # the client-friendly name, if the PM gave one
     stopped: bool  # BR-11: a stop-work flag stops it
     actual_start: date | None
     actual_finish: date | None

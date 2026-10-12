@@ -9,6 +9,7 @@ from app.api.v1 import (
     issues,
     materials,
     notifications,
+    portal,
     projects,
     reports,
     risk,
@@ -30,4 +31,5 @@ api_router.include_router(materials.router)
 api_router.include_router(contract.router)
 api_router.include_router(risk.router)
 api_router.include_router(notifications.router)
+api_router.include_router(portal.router)
 api_router.include_router(admin.router)

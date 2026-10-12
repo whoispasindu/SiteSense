@@ -91,6 +91,7 @@ def to_detail(report: DailyReport, project: Project, user: User, photo_limit: in
                 height=p.height,
                 size_bytes=p.size_bytes,
                 created_at=p.created_at,
+                shared_with_client=p.shared_with_client,
             )
             for p in report.photos
         ],

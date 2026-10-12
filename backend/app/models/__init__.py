@@ -31,11 +31,12 @@ from app.models.materials import (
     RequestStatus,
     Supplier,
 )
+from app.models.portal import HandoverPublication
 from app.models.project import BoqItem, BoqSection, BudgetLine, Project, ProjectStatus, ProjectType
 from app.models.report import DailyReport, Notification, ReportPhoto, ReportProgress, WeatherForecast
 from app.models.risk import RiskScore
 from app.models.schedule import Holiday, ProgressSnapshot, Task, TaskDependency
-from app.models.user import RefreshToken, RoleRecord, Site, User, user_site_assignments
+from app.models.user import RefreshToken, RoleRecord, Site, User, project_clients, user_site_assignments
 
 __all__ = [
     "ActionKind",
@@ -52,6 +53,7 @@ __all__ = [
     "Delivery",
     "DocumentCounter",
     "EmailOutbox",
+    "HandoverPublication",
     "Holiday",
     "IssueCategory",
     "IssueSeverity",
@@ -85,5 +87,6 @@ __all__ = [
     "VariationEvent",
     "VariationOrder",
     "WeatherForecast",
+    "project_clients",
     "user_site_assignments",
 ]

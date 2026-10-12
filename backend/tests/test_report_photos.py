@@ -68,6 +68,18 @@ def jpeg_with_gps() -> bytes:
 
 
 # --- Accepted uploads ------------------------------------------------------------------------
+def test_jpeg_comments_do_not_survive_the_re_encode(
+    api: TestClient, report: dict[str, str], engineer: Person, manager: Person
+) -> None:
+    """Found in the Phase 12 review: Pillow writes a JPEG comment it read, even with no arguments."""
+    data = image_bytes("JPEG", (64, 48), comment=b"Taken by Kamal Perera at 6.87, 79.86")
+    photo = upload(api, report["id"], engineer, data).json()
+
+    for size in ("full", "thumb"):
+        stored = api.get(f"/api/v1/photos/{photo['id']}", params={"size": size}, headers=manager.headers)
+        image = Image.open(io.BytesIO(stored.content))
+        assert "comment" not in image.info
+        assert b"Kamal" not in stored.content
 
 
 def test_engineer_uploads_a_photo_that_the_pm_can_view(

@@ -30,7 +30,6 @@ from sqlalchemy.orm import Session
 from app.core import clock
 from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from app.core.permissions import Permission, Role, has_permission
-from app.core.scoping import accessible_site_ids, scope_to_user_sites
 from app.models import BoqItem, BoqSection, BudgetLine, Project, Task, User, VariationEvent, VariationOrder
 from app.rules import variations as rules
 from app.rules.materials import ZERO, money
@@ -49,7 +48,14 @@ from app.schemas.contract import (
     VariationPriceIn,
     WithdrawIn,
 )
-from app.services import audit, cost_service, notification_service, project_service, risk_service
+from app.services import (
+    audit,
+    client_access,
+    cost_service,
+    notification_service,
+    project_service,
+    risk_service,
+)
 from app.services.audit import AuditAction, RequestMeta
 from app.services.materials_service import next_number
 from app.services.notification_service import NewNotification
@@ -84,14 +90,13 @@ def get_variation(db: Session, user: User, variation_id: uuid.UUID, *, lock: boo
 def _client_variation(
     db: Session, user: User, variation_id: uuid.UUID, *, lock: bool = False
 ) -> VariationOrder:
-    """For the client: on their sites, and only once it has been sent to them (else 404)."""
+    """For the client: on a project they are linked to, once sent to them; else the same 404 as missing."""
     stmt = select(VariationOrder).where(VariationOrder.id == variation_id)
     variation = db.scalars(stmt.with_for_update(of=VariationOrder) if lock else stmt).first()
-    allowed = accessible_site_ids(user)
     if (
         variation is None
         or variation.sent_to_client_at is None
-        or (allowed is not None and _project(db, variation).site_id not in allowed)
+        or not client_access.can_see(user, variation.project_id)
     ):
         raise NotFoundError("Variation not found.")
     return variation
@@ -239,7 +244,7 @@ def client_list(db: Session, user: User) -> list[ClientVariationOut]:
         .where(VariationOrder.sent_to_client_at.is_not(None))
         .order_by(VariationOrder.sent_to_client_at.desc())
     )
-    rows = db.scalars(scope_to_user_sites(stmt, Project.site_id, user)).all()
+    rows = db.scalars(stmt.where(VariationOrder.project_id.in_(client_access.project_ids(user)))).all()
     return [client_out(db, v, user) for v in rows]
 
 
@@ -320,10 +325,13 @@ def _route(
     if to_client and variation.sent_to_client_at is None:
         variation.sent_to_client_at = clock.utcnow()
     _event(variation, actor, "priced", before, comment, client_visible=to_client)
-    roles = {Role.CLIENT} if to_client else {Role.PROJECT_MANAGER}
-    people = [
-        p for p in notification_service.site_people(db, project.site_id, roles) if p.id != variation.raised_by
-    ]
+    # Clients are told only about their own projects (Phase 12), never through the site.
+    candidates = (
+        client_access.clients_of(db, project.id)
+        if to_client
+        else notification_service.site_people(db, project.site_id, {Role.PROJECT_MANAGER})
+    )
+    people = [p for p in candidates if p.id != variation.raised_by]
     notification_service.send(
         db,
         [
