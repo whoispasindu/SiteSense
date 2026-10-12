@@ -172,3 +172,13 @@
     var(--c-asphalt) 8px 16px
   );
 }
+
+/* Phase 11: the risk model's likely range on the cost ruler, hatched so it reads without colour. */
+.cost-range {
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-survey) 38%, transparent) 0 2px,
+    transparent 2px 6px
+  );
+  background-color: color-mix(in srgb, var(--color-survey) 8%, transparent);
+}

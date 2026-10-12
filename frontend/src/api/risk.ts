@@ -51,7 +51,7 @@ const projectRiskSchema = z.object({
 });
 export type ProjectRisk = z.infer<typeof projectRiskSchema>;
 
-const rankingSchema = z.array(
+export const rankingSchema = z.array(
   z.object({
     project_id: z.uuid(),
     code: z.string(),

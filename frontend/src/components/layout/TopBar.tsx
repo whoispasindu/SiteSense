@@ -50,7 +50,9 @@ export function TopBar({ onOpenMenu }: TopBarProps) {
         <Icon name="menu" className="size-5" />
       </button>
 
-      <p className="min-w-0 truncate text-sm font-medium text-ink">{current?.label ?? "SiteSense"}</p>
+      <p className="min-w-0 truncate text-sm font-medium text-ink">
+        {current?.label ?? (pathname.startsWith("/settings/") ? "Settings" : "SiteSense")}
+      </p>
 
       <div className="ml-auto flex items-center gap-2 sm:gap-4">
         <SiteClock />
