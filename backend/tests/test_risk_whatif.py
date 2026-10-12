@@ -241,3 +241,22 @@ def test_the_planner_changes_nothing(api: TestClient, behind: Boq, pm: Who, db) 
 
     assert (db.scalar(select(func.count(RiskScore.id))), db.scalar(select(func.count(AuditLog.id)))) == before
     assert behind.project.planned_crew == 50
+
+
+def test_tc11_what_if_with_all_actions_selected(api: TestClient, behind: Boq, pm: Who) -> None:
+    """TC-11: forecast delay, cost and score recalculated and shown, each with its likely range."""
+    every: list[dict[str, object]] = [{"id": a.id, "cost": "10000.00"} for a in whatif.CATALOGUE]
+
+    body = plan(api, behind, pm, every).json()
+
+    base, after = body["baseline"], body["plan"]
+    assert all(a["selected"] for a in body["actions"])
+    assert body["costs_not_entered"] == []
+    for key in ("delay_days", "overrun_pct", "score"):
+        assert after[key] is not None
+    assert after["delay_days"] <= base["delay_days"]
+    assert after["score"] <= base["score"] or after["overrun_pct"] > base["overrun_pct"]  # costs can outweigh
+    assert after["delay_range"]["low"] <= after["delay_days"] <= after["delay_range"]["high"]
+    assert after["overrun_range"]["low"] <= after["overrun_pct"] <= after["overrun_range"]["high"]
+    assert after["score_range"]["low"] <= after["score"] <= after["score_range"]["high"]
+    assert body["plan_delay_saved_days"]["low"] <= body["plan_delay_saved_days"]["high"]

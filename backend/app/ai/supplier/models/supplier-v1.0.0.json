@@ -1,0 +1,289 @@
+{
+ "format": "sitesense-supplier-v1",
+ "name": "supplier",
+ "version": "1.0.0",
+ "trained_at": "2026-10-11T20:23:33+00:00",
+ "kind": "smoothed",
+ "features": [
+  "supplier_logit",
+  "log_deliveries",
+  "lead_time_days",
+  "wet_share",
+  "short_lead",
+  "supplier_logit_x_log_deliveries"
+ ],
+ "intercept": 0.3099986992354802,
+ "coef": [
+  1.0828216502726946,
+  0.002577078588586257,
+  0.0013999413959192794,
+  -1.2385578489076525,
+  -0.8767276224015507,
+  -0.027588130888634904
+ ],
+ "constants": {
+  "prior_strength": 5.0,
+  "default_rate": 0.8,
+  "company_prior_strength": 20.0,
+  "short_lead_days": 7,
+  "low_data_deliveries": 5
+ },
+ "training": {
+  "data": "synthetic: ml/data_generator/deliveries.py (see ml/data_generator/ASSUMPTIONS.md)",
+  "data_sha256": "da05084468e9d5145db8aab8ebb7592d4cd4f66c137eb9e02273685d1a46d7ec",
+  "suppliers": 150,
+  "orders": 4706
+ },
+ "golden": [
+  {
+   "inputs": {
+    "supplier_logit": -0.617546,
+    "log_deliveries": 3.951244,
+    "lead_time_days": 30.0,
+    "wet_share": 0.0184,
+    "short_lead": 0.0
+   },
+   "p": 0.35033978095384893
+  },
+  {
+   "inputs": {
+    "supplier_logit": 1.386882,
+    "log_deliveries": 4.219508,
+    "lead_time_days": 2.0,
+    "wet_share": 0.0214,
+    "short_lead": 0.714286
+   },
+   "p": 0.8000940056457007
+  },
+  {
+   "inputs": {
+    "supplier_logit": 0.17586,
+    "log_deliveries": 4.025352,
+    "lead_time_days": 3.0,
+    "wet_share": 0.1705,
+    "short_lead": 0.571429
+   },
+   "p": 0.5438520414887792
+  },
+  {
+   "inputs": {
+    "supplier_logit": 1.55046,
+    "log_deliveries": 4.615121,
+    "lead_time_days": 7.0,
+    "wet_share": 0.1762,
+    "short_lead": 0.0
+   },
+   "p": 0.8249801601971426
+  },
+  {
+   "inputs": {
+    "supplier_logit": -0.523994,
+    "log_deliveries": 3.637586,
+    "lead_time_days": 14.0,
+    "wet_share": 0.3733,
+    "short_lead": 0.0
+   },
+   "p": 0.3719187781812765
+  },
+  {
+   "inputs": {
+    "supplier_logit": 0.989014,
+    "log_deliveries": 3.295837,
+    "lead_time_days": 7.0,
+    "wet_share": 0.4194,
+    "short_lead": 0.0
+   },
+   "p": 0.7288931249024062
+  },
+  {
+   "inputs": {
+    "supplier_logit": 0.850287,
+    "log_deliveries": 3.178054,
+    "lead_time_days": 10.0,
+    "wet_share": 0.3134,
+    "short_lead": 0.0
+   },
+   "p": 0.7006273438079345
+  },
+  {
+   "inputs": {
+    "supplier_logit": 1.944495,
+    "log_deliveries": 1.94591,
+    "lead_time_days": 7.0,
+    "wet_share": 0.0286,
+    "short_lead": 0.0
+   },
+   "p": 0.8748451359145083
+  },
+  {
+   "inputs": {
+    "supplier_logit": 3.74698,
+    "log_deliveries": 4.59512,
+    "lead_time_days": 5.0,
+    "wet_share": 0.1521,
+    "short_lead": 0.285714
+   },
+   "p": 0.9769547351121516
+  },
+  {
+   "inputs": {
+    "supplier_logit": 2.623939,
+    "log_deliveries": 3.401197,
+    "lead_time_days": 7.0,
+    "wet_share": 0.05,
+    "short_lead": 0.0
+   },
+   "p": 0.9323864520225913
+  },
+  {
+   "inputs": {
+    "supplier_logit": 0.143963,
+    "log_deliveries": 4.007333,
+    "lead_time_days": 5.0,
+    "wet_share": 0.0657,
+    "short_lead": 0.285714
+   },
+   "p": 0.5359287184989371
+  },
+  {
+   "inputs": {
+    "supplier_logit": 1.386294,
+    "log_deliveries": 0.0,
+    "lead_time_days": 14.0,
+    "wet_share": 0.1567,
+    "short_lead": 0.0
+   },
+   "p": 0.7999999422208112
+  },
+  {
+   "inputs": {
+    "supplier_logit": 1.549092,
+    "log_deliveries": 1.386294,
+    "lead_time_days": 3.0,
+    "wet_share": 0.3643,
+    "short_lead": 0.571429
+   },
+   "p": 0.8247825497346978
+  },
+  {
+   "inputs": {
+    "supplier_logit": -0.63056,
+    "log_deliveries": 3.713572,
+    "lead_time_days": 21.0,
+    "wet_share": 0.0595,
+    "short_lead": 0.0
+   },
+   "p": 0.3473835703530497
+  },
+  {
+   "inputs": {
+    "supplier_logit": -0.050825,
+    "log_deliveries": 2.890372,
+    "lead_time_days": 7.0,
+    "wet_share": 0.4631,
+    "short_lead": 0.0
+   },
+   "p": 0.4872964845051982
+  },
+  {
+   "inputs": {
+    "supplier_logit": 1.293204,
+    "log_deliveries": 1.94591,
+    "lead_time_days": 7.0,
+    "wet_share": 0.431,
+    "short_lead": 0.0
+   },
+   "p": 0.7846890056812428
+  },
+  {
+   "inputs": {
+    "supplier_logit": 0.985353,
+    "log_deliveries": 0.0,
+    "lead_time_days": 21.0,
+    "wet_share": 0.05,
+    "short_lead": 0.0
+   },
+   "p": 0.7281690763157916
+  },
+  {
+   "inputs": {
+    "supplier_logit": 1.159004,
+    "log_deliveries": 3.951244,
+    "lead_time_days": 7.0,
+    "wet_share": 0.0184,
+    "short_lead": 0.0
+   },
+   "p": 0.7611516893479187
+  },
+  {
+   "inputs": {
+    "supplier_logit": 1.521922,
+    "log_deliveries": 3.258097,
+    "lead_time_days": 3.0,
+    "wet_share": 0.3894,
+    "short_lead": 0.571429
+   },
+   "p": 0.8208213305173315
+  },
+  {
+   "inputs": {
+    "supplier_logit": 1.998489,
+    "log_deliveries": 3.713572,
+    "lead_time_days": 2.0,
+    "wet_share": 0.3134,
+    "short_lead": 0.714286
+   },
+   "p": 0.8806383413659711
+  },
+  {
+   "inputs": {
+    "supplier_logit": 1.060177,
+    "log_deliveries": 2.564949,
+    "lead_time_days": 5.0,
+    "wet_share": 0.1405,
+    "short_lead": 0.285714
+   },
+   "p": 0.7427243687796307
+  },
+  {
+   "inputs": {
+    "supplier_logit": 1.659657,
+    "log_deliveries": 4.454347,
+    "lead_time_days": 5.0,
+    "wet_share": 0.3833,
+    "short_lead": 0.285714
+   },
+   "p": 0.8401919540140461
+  },
+  {
+   "inputs": {
+    "supplier_logit": -0.679222,
+    "log_deliveries": 4.49981,
+    "lead_time_days": 14.0,
+    "wet_share": 0.1267,
+    "short_lead": 0.0
+   },
+   "p": 0.3364349662487963
+  },
+  {
+   "inputs": {
+    "supplier_logit": 0.072705,
+    "log_deliveries": 2.397895,
+    "lead_time_days": 3.0,
+    "wet_share": 0.3905,
+    "short_lead": 0.571429
+   },
+   "p": 0.518168247566161
+  },
+  {
+   "inputs": {
+    "supplier_logit": -0.644935,
+    "log_deliveries": 3.970292,
+    "lead_time_days": 5.0,
+    "wet_share": 0.3157,
+    "short_lead": 0.285714
+   },
+   "p": 0.34413182947591825
+  }
+ ]
+}

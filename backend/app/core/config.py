@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     # Migrations run as the schema owner. Falls back to database_url when unset.
     migration_database_url: SecretStr | None = None
     db_pool_size: int = Field(default=5, ge=1, le=50)
+    # BR-12: a task with this many working days of float or fewer counts as near-critical (Phase 10).
+    br12_float_days: int = Field(default=5, ge=0, le=60)
     db_statement_timeout_ms: int = Field(default=15_000, ge=100, le=300_000)
 
     # NoDecode: read comma-separated strings from env instead of requiring JSON.

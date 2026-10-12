@@ -12,6 +12,7 @@ import {
   type PoStatus,
   type RequestSummary,
 } from "../../api/materials";
+import { useSupplierOutlook } from "../../api/suppliers";
 import { useAuth } from "../../auth/context";
 import { Alert } from "../../components/ui/Alert";
 import { Button, primaryLinkClass } from "../../components/ui/Button";
@@ -22,6 +23,7 @@ import { SectionHeading } from "../../components/ui/SectionHeading";
 import { Sheet } from "../../components/ui/Sheet";
 import { StatusBadge, type Tone } from "../../components/ui/StatusBadge";
 import { errorText } from "../../features/admin/adminUtils";
+import { Br12Notice, SupplierChance } from "../../features/materials/Br12";
 import { formatDate } from "../../features/projects/dates";
 import { formatAmount, formatCompactLKR, formatQuantity } from "../../lib/money";
 import { addDaysIso, siteTodayIso } from "../../lib/time";
@@ -96,6 +98,10 @@ function OrderDialog({ requests, onClose }: { requests: RequestSummary[]; onClos
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OrderResult | null>(null);
   const total = requests.reduce((sum, r) => sum + Number(r.quantity) * Number(prices[r.id] ?? r.unit_price ?? 0), 0);
+  // BR-12: every supplier's chance for this project and date, and which of these requests are critical.
+  const outlook = useSupplierOutlook(requests[0]?.project.id, expected);
+  const chosen = outlook.data?.suppliers.find((s) => s.supplier_id === supplierId);
+  const critical = requests.filter((r) => outlook.data?.critical_request_ids.includes(r.id)).map((r) => r.number);
 
   function onSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -140,6 +146,12 @@ function OrderDialog({ requests, onClose }: { requests: RequestSummary[]; onClos
             </option>
           ))}
         </SelectField>
+        {chosen ? (
+          <p className="-mt-2 text-sm text-ink-soft">
+            <SupplierChance estimate={chosen} />
+          </p>
+        ) : null}
+        {outlook.data && supplierId ? <Br12Notice outlook={outlook.data} supplierId={supplierId} criticalNumbers={critical} /> : null}
         <ul aria-label="Order lines" className="divide-y divide-rule rounded-lg border border-rule">
           {requests.map((r) => (
             <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">

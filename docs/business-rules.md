@@ -18,7 +18,7 @@ boundaries can be tested directly; services gather the facts and apply the resul
 | BR-09 | Variations above the project's limit (1% of the contract value by default; Company Admin only, audited), or with any time impact, need client approval before work starts | Phase 8 | `rules/variations.py: needs_client, route`, `services/variation_service.py` | `test_rules_cost.py` (`test_br09_*`), `test_br09_limit_boundary`, TC-10 `test_tc10_client_approves_a_variation_with_time_impact` |
 | BR-10 | Risk score 70+ is High (automatic PM alert), 40–69 Medium, under 40 Low | Phase 6 | `ai/risk/scoring.py: level`, `services/risk_service.py` | `test_br10_bands`, `test_br10_alerts_the_project_managers_when_a_project_enters_high`, `test_br10_does_not_repeat_while_the_project_stays_high` |
 | BR-11 | A safety issue marked stop-work blocks related tasks until the PM clears it | Phase 7 (the flag, the PM alert, the banner, PM-only clearing) and Phase 9 (the stopped tasks refuse progress; the author picks them, or the whole project; the PM can change them) | `services/issue_service.py: _can_close, close_action, set_stop_scope`, `services/schedule_service.py: apply_progress`, `services/network_service.py: stopped, stopped_days` | `test_stop_work_is_cleared_only_by_the_project_manager`, `test_br11_a_stopped_task_takes_no_progress_until_the_pm_clears_it`, `test_br11_the_whole_project_stops_daily_report_progress_too`, `test_br11_the_author_chooses_the_scope_and_the_pm_can_change_it` |
-| BR-12 | If a supplier's predicted on-time chance is under 50% for a critical-path item, suggest an alternative | Phase 10 | | |
+| BR-12 | If a supplier's predicted on-time chance is under 50% for a critical-path item, suggest an alternative | Phase 10. Critical-path item: its BOQ section is linked to a critical task or one with 5 working days of float or fewer (`SITESENSE_BR12_FLOAT_DAYS`), or the PM marks it so; the PM can also mark it not critical | `services/supplier_service.py: estimate, outlook, critical_path`, `ai/supplier/model.py`, `features/materials/Br12.tsx` | `test_supplier_api.py` (`test_br12_marks_a_supplier_under_half`, `test_the_outlook_ranks_suppliers_and_names_critical_requests`, `test_the_pm_overrides_what_counts_as_critical`, `test_near_critical_tasks_count_too`), `materials.test.tsx` (BR-12) |
 | BR-13 | If the section's committed cost plus this request exceeds its budget line, the project manager approves. Checked at approval and again at purchase-order issue | Phase 5 (added at the project owner's request: the section check that was part of BR-01) | `rules/materials.py: check_section_budget`, `services/procurement_service.py: create_order` | `test_rules_materials.py` (`test_br13_*`), `test_qs_approval_rechecks_routing_with_current_figures`, `test_two_requests_that_fit_alone_exceed_the_line_together_at_approval`, `test_two_lines_that_fit_alone_exceed_the_line_together_at_po_issue` |
 | BR-14 | A purchase-order unit price more than 5% above the approved price sends the request back for project manager approval | Phase 5 (added at the project owner's request) | `rules/materials.py: check_order_price`, `services/procurement_service.py: create_order` | `test_rules_materials.py` (`test_br14_*`), `test_order_price_more_than_five_percent_above_approval_goes_back_to_the_pm` |
 
@@ -204,6 +204,36 @@ path and the risk model see the delay.
 | Each stopped working day | Forecast one working day later; cleared days stop counting; two flags on a day count it once | `test_br11_each_stopped_working_day_moves_the_forecast_one_working_day`, `test_br11_a_cleared_flag_stops_counting_from_the_day_it_is_cleared`, `test_br11_two_flags_on_the_same_days_count_them_once` |
 | Stop-work with no task chosen / a task from elsewhere | 422 | `test_stop_work_names_its_tasks_or_the_whole_project` |
 | The engineer, or the PM, changes what a flag stops | 403 / changed, audited, risk re-scored | `test_br11_the_author_chooses_the_scope_and_the_pm_can_change_it` |
+
+## BR-12 and the what-if planner (Phase 10)
+
+**BR-12.** Each supplier's on-time chance comes from its record across the company: order lines
+already due, on time if the whole quantity had arrived by the expected date. The record is smoothed
+towards the company's rate ([model card](model-card-supplier.md)). Every estimate shows its likely
+range and "based on N deliveries"; under 5 deliveries it is marked low data.
+
+A request is a **critical-path item** when its BOQ item's section is linked to a programme task that
+is critical, or has 5 working days of float or fewer. The project manager can mark a request
+critical or not critical; the override is shown on the request and audited. When an order for a
+critical-path item is about to go to a supplier under 50%, the purchase-order form suggests the best
+alternative. The suggestion is marked tentative when it rests on few deliveries, and worded "if they
+supply it". It never blocks the order.
+
+**What-if (TC-11).** The project manager ticks recovery actions on a project's Risk tab and sees the
+forecast delay, cost and score recalculated, each with its likely range
+([ADR 0013](adr/0013-risk-v2-what-if-supplier-model.md)).
+
+| Case | Expected | Test |
+| --- | --- | --- |
+| A supplier with 20 overdue orders | Under 50%, marked for BR-12 | `test_br12_marks_a_supplier_under_half` |
+| A new supplier | The company's rate, low data, a wider range | `test_an_estimate_shows_its_range_and_the_deliveries_behind_it` |
+| Early, on the day, late, overdue, not yet due | 2 of 4 on time (the last two not counted) | `test_a_suppliers_record_counts_lines_already_due` |
+| A request whose section is linked to a critical task / a task with 3 days of float / with more | Critical / critical / not | `test_the_outlook_ranks_suppliers_and_names_critical_requests`, `test_near_critical_tasks_count_too` |
+| The PM marks it not critical, then hands it back | Not critical despite the programme, then critical again; audited | `test_the_pm_overrides_what_counts_as_critical` |
+| A critical order to a supplier under 50% | Suggestion with the alternative's chance and deliveries; tentative with little history | `materials.test.tsx` (BR-12) |
+| TC-11: every action ticked | Delay, cost and score recalculated with ranges | `test_tc11_what_if_with_all_actions_selected`, `planner.test.tsx` (TC-11) |
+| Any action or combination, half or full strength | Never a worse forecast or range end | `test_no_action_or_combination_ever_makes_a_forecast_worse` |
+| A blank action cost | "Cost not entered", never free | `test_the_planner_shows_each_action_as_a_range_and_the_plan_with_its_costs` |
 
 ## BR-08: progress claims
 

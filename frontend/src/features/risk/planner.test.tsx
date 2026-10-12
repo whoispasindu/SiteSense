@@ -127,6 +127,25 @@ describe("Project Risk tab (Phase 10)", () => {
     expect(within(trend).getAllByRole("row")[3]).toHaveTextContent("4618 to 89Medium");
   });
 
+  it("TC-11: with every action ticked, delay, cost and score are recalculated and shown with ranges", async () => {
+    const user = userEvent.setup();
+    riskApi("project_manager");
+    renderRoute(`/projects/${PID}/risk`);
+
+    for (const name of ["Add a crew", "Work Sundays", "Expedite late materials", "Weather protection"]) {
+      await user.click(await screen.findByRole("checkbox", { name }));
+    }
+
+    const panel = (await screen.findByText("With 4 actions")).closest("[aria-live]") as HTMLElement;
+    expect(panel).toHaveTextContent("27");
+    expect(panel).toHaveTextContent("likely 0 to 69");
+    expect(panel).toHaveTextContent("about 36 days late (likely 6 days early to 97 days late)");
+    expect(panel).toHaveTextContent("over budget (likely");
+    expect(panel).toHaveTextContent(
+      "Add a crew, Work Sundays, Expedite late materials, Weather protection: the cost forecast leaves them out",
+    );
+  });
+
   it("refuses a malformed cost and keeps it out of the plan", async () => {
     const user = userEvent.setup();
     const fetchMock = riskApi("project_manager");

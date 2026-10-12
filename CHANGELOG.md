@@ -30,6 +30,14 @@ uses [Semantic Versioning](https://semver.org/).
     following up issues appear as advice only. A test checks no action or combination ever makes a
     forecast, or either end of its range, worse. The tab also shows the score's last 14 days with its
     range, and **Risk & what-if** in the menu lists every project by risk.
+  - **Supplier on-time model and BR-12** ([model card](docs/model-card-supplier.md)): each supplier's
+    chance of delivering on time, with its likely range and "based on N deliveries" (low data under
+    5). Trained on simulated histories; logistic regression was not clearly better than the smoothed
+    on-time rate, so the rate ships. The purchase-order form suggests a better supplier when a
+    critical-path item would go to one under 50%; each request shows its critical-path status (from
+    the programme: critical, or 5 working days of float or fewer) and the suppliers for its date, and
+    the PM can mark it critical or not (audited). Demo data adds a finished job with a year of
+    deliveries.
   - **Forecast handover, two ways:** the Schedule tab shows the programme's date "At current rates"
     and the risk model's likely range, with a note when they disagree. Engineers see the first only.
 

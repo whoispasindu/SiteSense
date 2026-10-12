@@ -72,6 +72,20 @@ The town's "usual loss" for each month is the average of the same rule over 2012
 | Missing reports | Each working day's report is missing with chance 0.02 + 0.30 × (1 − quality)² |
 | Confirmed report issues (v1.1) | Per week, Poisson counts scaled by the share of reports filed: material delays 0.1 + 0.5 per overdue delivery; safety 0.05 + 0.6 × (1 − quality)²; design 0.08 plus 1.5 after each variation, fading by 40% a week. The model sees the last two weeks. Drawn from their own random stream, so adding them left every other number unchanged |
 
+## Suppliers (BR-12)
+
+A separate simulation (`deliveries.py`) for the supplier on-time model. Nothing here comes from real
+delivery records yet.
+
+| What | Assumption | To validate |
+| --- | --- | --- |
+| Suppliers | 150, each with a hidden base on-time chance from Beta(6, 2) × 1.05 (most fairly reliable, a tail not), between 20% and 98% | Real suppliers' on-time shares |
+| Orders | Per supplier, log-normal around 18 (1 to 300), placed on random days from 2016 to mid-2025, at a random one of the seven towns | |
+| Lead time | 2, 3, 5, 7, 10, 14, 21 or 30 days (mostly 7 to 14) | Typical lead times by material |
+| Wet season | Each supplier has a hidden sensitivity (0.5 to 1.5); the log-odds of being on time fall by 1.5 × sensitivity × the town's share of heavy-rain days in the delivery month | Whether deliveries really slip more in the monsoon |
+| Short lead time | Up to 0.6 log-odds lost at a lead time of zero, none from a week | Whether rushed orders really arrive later |
+| What the app knows | At each order: the supplier's and the company's orders already due by then, on time or late; never the hidden values. The company's rate starts at 80% (an assumption) and the supplier's is smoothed towards it as if by 5 deliveries | |
+
 ## Outcomes
 
 The project runs until all the work is done (or three times the planned duration, which never

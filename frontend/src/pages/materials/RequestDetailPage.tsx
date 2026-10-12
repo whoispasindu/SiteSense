@@ -15,6 +15,7 @@ import { PriceText, RequestStatusBadge, RuleChecks } from "../../features/materi
 import { formatAmount, formatQuantity } from "../../lib/money";
 import { formatSiteTime, siteTodayIso } from "../../lib/time";
 import { NotFoundPage } from "../NotFoundPage";
+import { SupplierPanel } from "../../features/materials/SupplierPanel";
 
 const ACTION_TEXT: Record<string, string> = {
   submit: "Submitted",
@@ -371,10 +372,13 @@ export function RequestDetailPage() {
           </Sheet>
         </div>
 
-        <Sheet className="h-fit p-5">
-          <SectionHeading annotation="live figures">Rules check</SectionHeading>
-          <RuleChecks check={r.rules} />
-        </Sheet>
+        <div className="space-y-6">
+          <Sheet className="h-fit p-5">
+            <SectionHeading annotation="live figures">Rules check</SectionHeading>
+            <RuleChecks check={r.rules} />
+          </Sheet>
+          <SupplierPanel request={r} />
+        </div>
       </div>
 
       {pending ? (

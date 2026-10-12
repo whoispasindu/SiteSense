@@ -118,6 +118,10 @@ Scores are written only by the scheduler, after daily reports and by the CLI; no
 | --- | --- | --- |
 | `GET /api/v1/projects/{id}/risk`, `GET /api/v1/risk/projects` | PM, QS | Now with the likely range of every forecast (`ranges`), and the score's range in the 14-day history |
 | `POST /api/v1/projects/{id}/risk/what-if` | **Project manager only** (`risk:what_if`) | Up to four recovery actions, each once, with an optional cost (LKR, 2 decimals). Calculates only: nothing is stored or changed. Site-scoped (404 otherwise) |
+| `GET /api/v1/suppliers/{id}/on-time` | PM, QS, Site Engineer, Procurement | The supplier's chance with its range and deliveries; for a project and date if given (site-scoped) |
+| `GET /api/v1/projects/{id}/supplier-outlook` | PM, QS, Site Engineer, Procurement | Active suppliers for an order on the project, best first, and its approved critical-path requests. Site-scoped |
+| `GET /api/v1/material-requests/{id}/critical-path` | PM, QS, Site Engineer, Procurement | Whether it counts for BR-12, and why. Site-scoped |
+| `PUT /api/v1/material-requests/{id}/critical-path` | **Project manager only** | `true`, `false` or `null` (back to the programme); strict booleans only; audited |
 
 ## Phase 9 endpoints
 
