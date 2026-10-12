@@ -42,6 +42,11 @@ them, and clients see honest progress without internal costs.
   (BR-12; [model card](docs/model-card-supplier.md))
 - AI report reading that tags issues, always confirmed by a person
 - Cost control, progress claims with retention, and variation orders
+- A dashboard that says what needs attention today: a daily briefing (AI-written when a Claude API
+  key is set, rule-based otherwise, and always labelled), KPIs, cost against plan with the risk
+  model's likely range, issue trends, the 5-day weather for each site, alerts and an approval queue
+- Alerts by email: urgent ones at once, the rest in an evening digest, and a weekly PDF report for
+  project managers and quantity surveyors
 - Client portal with progress and variation approval
 
 ## Run it locally
@@ -244,9 +249,59 @@ Backend settings are environment variables prefixed with `SITESENSE_`
 | `SITESENSE_WEATHER_ENABLED` | Live forecast from Open-Meteo (off: cached forecasts only) | `true` |
 | `SITESENSE_SCHEDULER_ENABLED` | Run the 18:00 reminder and 05:30 weather jobs in the API process | `true` |
 | `SITESENSE_REPORT_DEADLINE_HOUR` | BR-07 daily report deadline, site time | `18` |
+| `SITESENSE_ANTHROPIC_API_KEY` | Claude API key for the AI briefing (optional; without it the briefing is rule-based) | unset |
+| `SITESENSE_BRIEFING_MODEL` | Claude model that writes the briefing | `claude-haiku-5-5` |
+| `SITESENSE_BRIEFING_TIMEOUT_SECONDS` | How long to wait for the model before using the rule-based briefing | `20` |
+| `SITESENSE_SMTP_HOST` | Mail server (optional; without it emails are written to the log) | unset |
+| `SITESENSE_SMTP_PORT` / `SITESENSE_SMTP_SECURITY` | Port and `starttls`, `ssl` or `none` (refused in production) | `587` / `starttls` |
+| `SITESENSE_SMTP_USERNAME` / `SITESENSE_SMTP_PASSWORD` | Mail server sign-in | unset |
+| `SITESENSE_EMAIL_FROM` | Sender of alert emails | `SiteSense <no-reply@sitesense.example>` |
+| `SITESENSE_APP_BASE_URL` | Where links in emails point (https in production) | `http://localhost:5173` |
+| `SITESENSE_DIGEST_HOUR` / `SITESENSE_DIGEST_MINUTE` | Evening digest time, site time | `18` / `30` |
 
-In production the API refuses to start with debug on, wildcard or plain-HTTP origins, or the
-example database password.
+In production the API refuses to start with debug on, wildcard or plain-HTTP origins, the
+example database password, a plain-HTTP `SITESENSE_APP_BASE_URL`, or a mail server without TLS.
+
+### The AI briefing
+
+The dashboard opens with today's briefing: 3 to 5 points on what needs attention, each with the
+number of records it rests on. It works with no setup: without a key, everyone gets a rule-based
+briefing written from fixed templates. To have Claude write it:
+
+1. Create an API key in the [Claude Console](https://platform.claude.com/) and give it a monthly
+   spending limit there.
+2. Add it to `backend/.env` (read by both Docker and a local run):
+
+   ```bash
+   SITESENSE_ANTHROPIC_API_KEY=sk-ant-...
+   # optional, to use another model:
+   SITESENSE_BRIEFING_MODEL=claude-haiku-5-5
+   ```
+
+3. Restart the backend (`docker compose restart backend`).
+
+Each briefing is labelled **AI-written** or **Rule-based**, so readers always know which they are
+seeing. If the model is slow, refuses, runs out of credit or answers outside the expected shape,
+the rule-based briefing is shown with a short note. The model receives only structured facts
+(scores and their ranges, counts, project codes and names, rule IDs), never report text, comments
+or people's names; a test captures the real request and fails if any of those reach it. One
+answer is reused while the facts are unchanged, and a new one is asked for at most every 15
+minutes per person.
+
+### Email alerts
+
+Every alert appears in the app. By email:
+
+- **At once:** high risk (BR-10), stop-work (BR-11), heavy rain on a pour (BR-06), high-severity
+  issues, and anything waiting for your approval. Stop-work emails cannot be turned off.
+- **Evening digest** at 18:30 site time for everything else, skipped when there is nothing new.
+- **Weekly report (PDF)** on Mondays at 07:00 site time: on by default for project managers,
+  opt-in for quantity surveyors. It holds cost figures, so no other role can get it.
+
+Each person chooses under **Email settings** in their account menu. Emails are short: the alert's
+title, one fixed sentence and a link into SiteSense; comments, report text and amounts stay in the
+app. Without `SITESENSE_SMTP_HOST`, emails are written to the backend log instead of sent, which is
+how local development and the demo run.
 
 ## Tech stack
 
@@ -285,15 +340,16 @@ docs/           architecture, decision records, security reviews, model cards
 | 7 | Report NLP classifier | Done |
 | 8 | Cost control, claims and variations | Done |
 | 9 | Advanced schedule | Done |
-| 10 | Risk model v2, what-if planner and supplier model | In review |
-| 11 | Dashboard, alerts and AI briefing | Planned |
+| 10 | Risk model v2, what-if planner and supplier model | Done |
+| 11 | Dashboard, alerts and AI briefing | In review |
 | 12 | Client portal | Planned |
 | 13 | Hardening and deployment | Planned |
 | 14 | Testing, UAT and evaluation → **v1.0** | Planned |
 | Later | Public demo: a hosted instance with seeded data | Planned |
 
-After v1.0: an offline-first mobile app for site engineers and voice input in Sinhala, Tamil
-and English.
+After v1.0: an offline-first mobile app for site engineers, voice input in Sinhala, Tamil
+and English, and SMS alerts for stop-work and high risk (alerts already go through one channel
+interface, so an SMS sender plugs in without changing the alert rules).
 
 ## Contributing
 

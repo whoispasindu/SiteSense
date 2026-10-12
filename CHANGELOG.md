@@ -8,6 +8,30 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Phase 11, the dashboard, alerts and the AI daily briefing ([ADR 0014](docs/adr/0014-dashboard-alerts-briefing.md)):
+  - **Today's briefing** at the top of the dashboard: 3 to 5 points on what needs attention, each
+    with the records it rests on (counted by the server). Written by Claude (Haiku by default,
+    `SITESENSE_BRIEFING_MODEL`) when `SITESENSE_ANTHROPIC_API_KEY` is set, by fixed rules otherwise,
+    and always labelled **AI-written** or **Rule-based**. The model receives only structured facts:
+    scores and their ranges, counts, project codes and names, rule IDs. It never receives report
+    text, comments or people's names; a test captures the real request for every role and fails if
+    any reach it. Any failure falls back to the rules with a note.
+  - **Portfolio analytics** (`GET /analytics/portfolio`): KPIs, cost against plan with the risk
+    model's likely final cost, the risk ranking, confirmed issues per week, each site's saved 5-day
+    forecast, and an approval queue of what waits for you. Cost and risk only for the roles that see
+    them.
+  - **The full dashboard**: briefing card, KPI tiles, a cost ruler per project (committed, budget,
+    the forecast at current rates and the model's hatched likely range), issues per week, the
+    weather strip for every site, the latest alerts with urgent ones marked, and the approval queue.
+  - **Email alerts**: urgent kinds at once (high risk, stop-work, rain on a pour, high-severity
+    issues, items waiting for your approval), everything else in an 18:30 digest that is skipped
+    when there is nothing new. Each person chooses under **Email settings**; stop-work emails cannot
+    be turned off. Emails carry a title, a fixed sentence and a link, never the alert's text. They
+    go through a transactional outbox with retries. Without an SMTP host they are written to the
+    log.
+  - **Weekly PDF report** (`GET /reports/weekly.pdf`, PM and QS only, audited): a download on the
+    dashboard and a Monday 07:00 email. On by default for project managers, opt-in for quantity
+    surveyors.
 - Phase 10, risk model v2, what-if planner and supplier model ([ADR 0013](docs/adr/0013-risk-v2-what-if-supplier-model.md)):
   - **Risk model 1.2.0: rain now counts** ([#27](https://github.com/whoispasindu/SiteSense/issues/27),
     [model card](docs/model-card-risk.md#rain-an-assumption-not-measured-data)). The simulator

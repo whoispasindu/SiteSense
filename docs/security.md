@@ -29,7 +29,7 @@ here, newest first. The baseline design is in [ADR 0003](adr/0003-security-basel
 | File uploads | BOQ import: .xlsx/CSV checked by content; 5 MB, 5,000 rows, 30 columns; zip-bomb and macro checks before opening; XML via defusedxml; formulas never evaluated; larger body limit on the upload route only; file never written to disk | `services/boq_import.py`, `BodySizeLimitMiddleware` overrides | `test_boq_import.py`, `test_projects_api.py` |
 | Money | NUMERIC columns with check constraints; Decimal end to end; decimal strings in JSON | `models/project.py`, `schemas/project.py` | `test_projects_api.py` |
 | Photo uploads | Magic-byte check (JPEG/PNG/WebP), full decode under a 50 MP budget, re-encode to a fresh JPEG with no metadata (GPS removed); random server-generated storage keys checked against a pattern; 10 MB, 12 per report, per-IP rate limit; files outside any served folder; served only through an authenticated, site-scoped endpoint | `services/photos.py`, `integrations/storage.py`, `api/v1/reports.py` | `test_report_photos.py` |
-| Outbound calls (SSRF) | Weather: fixed https host, query built from stored coordinates only, redirects refused, 64 KB cap, response schema-validated, 5 s timeout; failures fall back to the cache | `integrations/weather.py`, `services/weather.py` | `test_weather.py` |
+| Outbound calls (SSRF) | Weather: fixed https host, query built from stored coordinates only, redirects refused, 64 KB cap, response schema-validated, 5 s timeout; failures fall back to the cache. Claude: the SDK's fixed API host, no user-supplied URL. SMTP: host from configuration only. Only these three modules may import a network client | `integrations/weather.py`, `services/weather.py` | `test_weather.py` |
 | Approvals | Stage-and-role checks, segregation of duties (BR-04), state machine (invalid transitions 409), order prices more than 5% over approval go back to the PM (BR-14), row locks against double approval and quantity races | `rules/materials.py`, `services/materials_service.py`, `services/procurement_service.py` | `test_rules_materials.py`, `test_materials_api.py` |
 | Notifications | Per-user only (others answer 404); links restricted to in-app paths by service and database constraint; de-duplicated reminders | `services/notification_service.py`, migration 0005 | `test_reminders_notifications.py`, `reports.test.tsx` |
 | AI models | Model files are JSON data validated before use (structure, feature indexes, finite numbers, children after parents, size limits); no pickle/joblib loading; golden predictions prove the scorer matches training; CI retrains and checks the shipped model is reproducible | `ai/risk/model.py`, `ml/check_model.py` | `test_risk_model.py`, CI ML job |
@@ -40,7 +40,136 @@ here, newest first. The baseline design is in [ADR 0003](adr/0003-security-basel
 | Client view | Separate schema with no internal cost or comment; only variations sent to the client, on their sites (404 otherwise); the client never reaches budgets, claims or the cost overview (TC-07) | `schemas/contract.py: ClientVariationOut`, `services/variation_service.py: client_out` | `test_the_client_queries_and_a_revision_goes_back_to_the_client`, `test_the_client_sees_only_their_sites`, role matrix |
 | Programme | Links only inside one project, never a loop (checked under a project row lock), lag 0–365, at most 2,000 per programme; one progress path refuses stopped tasks (BR-11) from the task list and daily reports; only a PM changes or clears a stop-work flag, audited; holidays only by the Company Admin, 2000 to 2100, audited; working-day arithmetic is bounded to 30 years and a network past it degrades with a warning; pour alerts read the forecast cache only and are de-duplicated by a fixed-length hash | `rules/calendar.py`, `rules/schedule.py`, `services/network_service.py`, `services/schedule_service.py: apply_progress`, `services/issue_service.py: set_stop_scope`, migration 0011 | `test_rules_schedule.py`, `test_network_api.py`, role matrix |
 | Risk and supplier models | Plain JSON only (`sitesense-risk-v2`, `sitesense-supplier-v1`, the rain climate), each validated on load (kinds, sizes, finite numbers, node counts, range inputs, constants); golden rows prove the pure-Python scorers match training, including SHAP values; CI retrains both models and the climate table and checks they reproduce; the what-if planner stores and changes nothing and only the PM uses it; sign constraints mean no recovery action can worsen a forecast; the BR-12 override is PM-only, strict-boolean and audited | `ai/risk/model.py`, `ai/risk/climate.py`, `ai/supplier/model.py`, `services/risk_service.py: what_if`, `services/supplier_service.py`, `ml/check_model.py` | `test_risk_model.py`, `test_risk_whatif.py`, `test_supplier_api.py`, `ml/tests`, role matrix |
+| AI briefing (LLM) | The model receives only allow-listed facts (`extra="forbid"` models of numbers, enumerated words, project codes and names, rule IDs), built per reader with their own visibility; a fixed instruction; JSON-schema output with codes limited to the reader's projects; answers validated and source counts made by the server; optional key held as `SecretStr` and never logged; one retry, 20 s timeout, rule-based fallback; at most one new answer per reader every 15 minutes | `ai/briefing`, `integrations/llm.py`, `services/briefing_service.py` | `test_briefing_leaks.py` (real SDK request captured for every role), `test_briefing.py`, `test_outbound_calls.py` |
+| Email | Bodies built from the alert's title, a fixed sentence and links only, never its text; subject stripped of line breaks; TLS required in production and an https app link; transactional outbox, five attempts, errors recorded by type only; per-user choices audited; stop-work always sent; the weekly PDF only to cost roles; without SMTP, logged not sent | `services/alerts.py`, `services/channels.py`, `integrations/email.py`, `services/weekly_report.py` | `test_alerts_email.py`, `test_config.py` |
 | Supply chain | Pinned deps, Dependabot (pip, npm, actions, docker), pip-audit, npm audit, dependency review, CodeQL `security-extended`, actions pinned to SHAs, `permissions: contents: read`, `persist-credentials: false` | `.github/` | CI |
+
+## Phase 11 review: 2026-10-12
+
+Scope:
+
+- portfolio analytics (`GET /analytics/portfolio`);
+- the daily briefing (`GET /briefing/today`): the facts, the rule writer, the Claude client and
+  the fallback;
+- email: the alert rules, the channel interface, the outbox, SMTP, the digest and the Monday job;
+- the weekly PDF (`GET /reports/weekly.pdf`);
+- email preferences (`GET`/`PUT /me/notification-preferences`, migration 0013);
+- the new dashboard and the Email settings page.
+
+### OWASP Top 10 (2021) walk-through
+
+- **A01 Broken access control.** The 5 new endpoints are in the role matrix for every role.
+  - The portfolio and briefing go to project readers, scoped to their sites. `cost` and `risk`
+    are `null` without `cost:read` or `risk:read`.
+  - The approval queue holds only what the reader acts on, never their own request or variation.
+  - The PDF needs `cost:read`. It is mounted before the reports router, so the path is never read
+    as a report ID (tested).
+  - Preferences are the caller's own. The weekly PDF can't be taken by a role without cost access
+    (422), and the Monday job checks again before queuing.
+  - Mutation-checked (below).
+- **A02 Cryptographic failures.** In production, SMTP must use STARTTLS or implicit TLS (with
+  certificate checks from `ssl.create_default_context`) and email links must be https. The API
+  refuses to start otherwise (tested). The Claude SDK talks https to its fixed host.
+- **A03 Injection.**
+  - Email subjects are stripped of line breaks (header injection, tested). Bodies are plain text.
+  - Everything printed in the PDF is escaped before ReportLab's paragraph markup (tested with a
+    project named `<b>& </para>`).
+  - Preference fields are strict booleans and unknown fields are refused.
+  - The model's answer is validated against a schema; codes it did not receive are rejected.
+    React renders the bullets as text.
+- **A04 Insecure design.**
+  - The model receives only `Facts`: allow-listed, `extra="forbid"` models of numbers, enumerated
+    words, project codes and names, and rule IDs. The leak test runs the real SDK client over a
+    fake transport for every reading role and fails if any seeded secret appears in the HTTP body:
+    report text, issue snippets, action summaries, notes, comments, variation descriptions, the
+    client's name, site, task and supplier names, people's names and emails.
+  - The model never states counts; the server computes them.
+  - Emails carry a title, a fixed sentence and links, never an alert's body (comments, names,
+    amounts, report text). Stop-work emails can't be switched off.
+- **A05 / DoS.**
+  - The model is called at most once per reader every 15 minutes, and after a failure not again
+    for 10. One SDK retry, a 20 s timeout. The database connection is released while the model
+    writes. Without a key nothing is called or stored.
+  - On demo data: portfolio 12 to 98 ms, briefing 16 to 76 ms, PDF about 110 ms (4 KB). Each
+    reader's site scope bounds the work.
+  - The outbox sends 50 rows a minute with `SKIP LOCKED`, so two API workers never send the same
+    email. It gives up after five attempts. Attachments are capped at 5 MB by a database check.
+    The digest lists at most 25 titles.
+- **A06 Vulnerable components.** New: `anthropic` 1.13.0 (official SDK), `reportlab` 5.0.1, and
+  `types-reportlab` for development. pip-audit **0**, npm audit **0**.
+- **A08 Data integrity.** The briefing cache is keyed by the facts' SHA-256 and the model name.
+  Preference changes are audited (`user.notification_preferences_changed`, before and after), and
+  so is each PDF download (`report.weekly_downloaded`). Outbox errors record the exception type
+  only, never server text.
+- **A09 Logging.** The key is a `SecretStr`. Logs say which source wrote a briefing and how many
+  bullets, never the facts or the text. Without SMTP, emails are logged; their bodies hold no
+  sensitive text by design.
+- **Outbound calls.** `test_outbound_calls.py` now also watches `anthropic` and `httpx2`. It
+  allows two new modules, with what each sends: `integrations/llm.py` (the facts) and
+  `integrations/email.py` (alert emails).
+
+### Privacy
+
+- Project names go to Anthropic when a key is set (the project owner's decision). A project named
+  after a person would carry that name. Name projects by place or code, as the demo does.
+- An email's title can name the person who decided a variation ("VO-0003 approved by …"). These go
+  to colleagues on the same project (PM, QS, the raiser), never to the client, whose only email is
+  "VO-… needs your decision".
+- Digests and the PDF cover only the reader's own sites.
+
+### Verification beyond unit tests
+
+- **Mutation checks: 27 of 27** deliberate faults fail a test:
+  - the email carrying the alert's body;
+  - stop-work switchable;
+  - an empty digest sent;
+  - urgent alerts repeated in the digest;
+  - the PDF by default for QSs, for every role, or twice a week;
+  - failures retried for ever;
+  - subject header injection;
+  - an engineer opting into the PDF;
+  - the client's name, cost or risk reaching the model;
+  - facts accepting undeclared fields;
+  - the model's unknown codes or own counts accepted;
+  - a refusal taken as an answer;
+  - either call limit removed;
+  - approving your own request;
+  - cost shown to every role;
+  - other sites counted;
+  - removed issue suggestions counted;
+  - two points behind counted as behind;
+  - the model range not moved from the budget;
+  - the PDF route shadowed;
+  - the download not audited.
+- **In the browser** (demo data, no key, no SMTP):
+  - the PM's dashboard shows the rule-based briefing with its label and source counts;
+  - the KPIs, approval queue, alerts, weather for both sites, the risk ranking, the cost ruler with
+    the model's range, and issues per week all render;
+  - the PDF downloads with the session (401 without it);
+  - a site engineer sees no cost, risk, PDF or approval queue;
+  - the settings page saves, and stop-work stays locked on;
+  - no horizontal scroll at 375 px.
+- **The PDF** was opened and read: KPIs, the rule-based points, the project table with likely
+  ranges, and issues per week.
+
+### Findings fixed during the review
+
+1. **The rule-based briefing went stale.** It was cached by its facts, so a change to the
+   templates did not show until the facts changed. Without a key it is now written fresh on every
+   request and not stored. The cache stays only to limit calls to the model.
+2. **A tie read as a trend.** "Most often weather (1)" was written when three kinds had one issue
+   each. Ties now read "spread across 3 kinds" (tested).
+3. **Production could have sent mail in clear text, or links over http.** The production check
+   refuses both now (tested).
+4. **Old tests built production settings without an https app link.** They were updated, and the
+   check stays strict.
+5. **Download errors spoke of "the photo".** The blob helper now names what it loads.
+
+### Open items
+
+- SMS alerts for stop-work and high risk: roadmap. The `Channel` interface is ready.
+- If the model provider's terms or region change, revisit sending project names. The facts can
+  drop them for codes alone without other changes.
 
 ## Phase 10 review: 2026-10-12
 
