@@ -1,4 +1,4 @@
-import type { Driver, RiskLevel } from "../../api/risk";
+import type { Driver, Effect, Range, RiskLevel } from "../../api/risk";
 import type { Tone } from "../../components/ui/StatusBadge";
 
 /** BR-10 bands in words: colour is never the only signal. */
@@ -11,6 +11,45 @@ export function delayText(days: string | number): string {
   if (Math.abs(d) < 3) return "on time";
   return d > 0 ? `about ${String(d)} days late` : `about ${String(-d)} days early`;
 }
+
+/** The end of a delay range in words: "40 days late", "5 days early", "on time". */
+function daysEnd(days: number): string {
+  const d = Math.round(days);
+  if (d === 0) return "on time";
+  return d > 0 ? `${String(d)} days late` : `${String(-d)} days early`;
+}
+
+/**
+ * The likely range of a delay forecast: "likely 40 to 100 days late", "likely 5 days early to 30 days
+ * late". Shown with every forecast: the number alone would look more certain than it is.
+ */
+export function delayRangeText(range: Range): string {
+  const low = Math.round(range.low);
+  const high = Math.round(range.high);
+  if (low > 0) return `likely ${String(low)} to ${String(high)} days late`;
+  if (high < 0) return `likely ${String(-high)} to ${String(-low)} days early`;
+  return `likely ${daysEnd(low)} to ${daysEnd(high)}`;
+}
+
+function pctEnd(pct: number): string {
+  if (Math.abs(pct) < 0.05) return "on budget";
+  return pct > 0 ? `${pct.toFixed(1)}% over budget` : `${(-pct).toFixed(1)}% under budget`;
+}
+
+/** "likely 1.0% to 10.2% over budget", "likely 2.0% under budget to 4.5% over budget". */
+export function overrunRangeText(range: Range): string {
+  if (range.low >= 0.05) return `likely ${range.low.toFixed(1)}% to ${range.high.toFixed(1)}% over budget`;
+  if (range.high <= -0.05) return `likely ${(-range.high).toFixed(1)}% to ${(-range.low).toFixed(1)}% under budget`;
+  return `likely ${pctEnd(range.low)} to ${pctEnd(range.high)}`;
+}
+
+/** "likely 55 to 88" (or "likely 100" when both ends round to the same score). */
+export function scoreRangeText(range: Range): string {
+  return range.low === range.high ? `likely ${String(range.low)}` : `likely ${String(range.low)} to ${String(range.high)}`;
+}
+
+/** Said where a score made before risk model v2 has no range. */
+export const NO_RANGE_TEXT = "range from the next scoring";
 
 export function overrunText(pct: string | number): string {
   const p = Number(pct);
@@ -33,4 +72,25 @@ export function driverEffect(driver: Driver): string {
 /** Does this driver push the forecast up (worse) overall? */
 export function raisesRisk(driver: Driver): boolean {
   return driver.delay_days + driver.overrun_pct * 5 > 0;
+}
+
+/** What an action saves on handover, as a range: "saves 4 to 9 days", "little effect on handover". */
+export function savedDaysText(effect: Effect): string {
+  const low = Math.round(effect.low);
+  const high = Math.round(effect.high);
+  if (high < 1) return "little effect on handover";
+  if (low === high) return `saves about ${String(high)} days`;
+  return `saves ${String(Math.max(low, 0))} to ${String(high)} days`;
+}
+
+/**
+ * What it does to cost, as a range. Positive is a saving. With entered action costs the plan can cost
+ * more than it saves: "adds 0.5% to 1.1% to cost", or "between saving 0.4% and adding 0.6% of cost".
+ */
+export function savedCostText(effect: Effect): string {
+  const { low, high } = effect;
+  if (Math.abs(low) < 0.05 && Math.abs(high) < 0.05) return "little effect on cost";
+  if (low >= 0) return `saves ${low.toFixed(1)}% to ${high.toFixed(1)}% of cost`;
+  if (high <= 0) return `adds ${(-high).toFixed(1)}% to ${(-low).toFixed(1)}% to cost`;
+  return `between adding ${(-low).toFixed(1)}% and saving ${high.toFixed(1)}% of cost`;
 }

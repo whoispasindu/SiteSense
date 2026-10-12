@@ -2,8 +2,10 @@
 
 Training code for SiteSense's AI features:
 
-- **Risk model** (Phase 6, v1.1.0 in Phase 7): final delay and cost overrun from weekly project
+- **Risk model** (Phase 6; v1.1.0 in Phase 7; v1.2.0 and v2.0.0 in Phase 10: rain, likely ranges, SHAP): final delay and cost overrun from weekly project
   snapshots. [Model card](../docs/model-card-risk.md), [ADR 0009](../docs/adr/0009-risk-model-v1.md).
+- **Supplier on-time model** (Phase 10, BR-12): the chance a supplier's next order arrives on time,
+  from simulated delivery histories. [Model card](../docs/model-card-supplier.md).
 - **Report issue classifier** (Phase 7): category and severity for each sentence of a daily report's
   problems. [Model card](../docs/model-card-report-issues.md),
   [ADR 0010](../docs/adr/0010-report-issue-classifier.md).
@@ -17,10 +19,14 @@ Training code for SiteSense's AI features:
 | Path | What |
 | --- | --- |
 | `data_generator/rainfall.py`, `rainfall.csv` | Real daily rainfall for seven towns (Open-Meteo archive, 2012 to 2025) |
-| `data_generator/simulate.py` | The project simulator; writes `data/snapshots.csv` (not committed) |
-| `train.py` | Grouped split, linear baseline, LightGBM, metrics, JSON export to the backend |
+| `data_generator/simulate.py` | The project simulator; writes `data/snapshots.csv` (not committed). `--calibrate` finds the pace that keeps the median project 10% late |
+| `data_generator/climate.py` | Writes the monthly rain climate the backend uses (`backend/app/ai/risk/rain_climate.json`) |
+| `risk_models.py` | Sign-constrained straight lines, quantile regression for the likely ranges, the "clearly better" choice between trees and line, JSON export with node counts for TreeSHAP |
+| `train.py` | Grouped split, both families per target, ranges, metrics, golden rows, JSON export to the backend |
 | `check_model.py` | CI check: retraining from this commit reproduces the shipped model |
-| `models/risk-v1.1.0/metrics.json` | Metrics and settings of the shipped risk model (v1.0.0 kept for comparison) |
+| `models/risk-v2.0.0/metrics.json` | Metrics and settings of the shipped risk model (earlier versions kept for comparison) |
+| `rain_sensitivity.py`, `models/risk-v2.0.0/rain-sensitivity.json` | The same pipeline with programmes allowing 75% of usual rain instead of 50%: how much rain's weight depends on that assumption |
+| `data_generator/deliveries.py`, `train_supplier.py` | Simulated supplier delivery histories, and the supplier model: the smoothed on-time rate against logistic regression; `models/supplier-v1.0.0/metrics.json` |
 | `nlp/` | Report issue classifier: labelling guide, data generator, hand-written test set, training and export |
 | `models/report-nlp/` | Classifier metrics, the adoption decision and the metrics of what ships |
 | `notebooks/01_explore.ipynb` | Distributions, sanity checks and evaluation (built by `notebooks/build_explore.py`) |
@@ -34,11 +40,13 @@ python -m venv .venv
 .venv/Scripts/python -m pip install -r requirements.txt   # macOS/Linux: .venv/bin/python
 .venv/Scripts/python -m data_generator.simulate             # 300 projects, seed 2026
 .venv/Scripts/python train.py                               # trains, evaluates, exports
+.venv/Scripts/python -m data_generator.deliveries          # supplier histories
+.venv/Scripts/python train_supplier.py                      # supplier on-time model
 .venv/Scripts/python -m pytest
 ```
 
-`train.py` writes the model to `backend/app/ai/risk/models/risk-v1.1.0.json` and its metrics to
-`models/risk-v1.1.0/metrics.json`. The same seed and code give the same model, byte for byte apart
+`train.py` writes the model to `backend/app/ai/risk/models/risk-v2.0.0.json` and its metrics to
+`models/risk-v2.0.0/metrics.json`. The same seed and code give the same model, byte for byte apart
 from the timestamp; `check_model.py` enforces that in CI.
 
 ## Changing the model
@@ -46,9 +54,13 @@ from the timestamp; `check_model.py` enforces that in CI.
 1. Change the simulator or training code, and the assumptions file if a rule changed.
 2. If a feature is added, renamed or redefined, change it in `simulate.py` **and**
    `backend/app/ai/risk/features.py` (tests in both projects compare the lists), and bump the version.
-3. Retrain, read `metrics.json` against the previous version, update the model card, commit both files.
+3. If a rule changed how late projects are, re-run `python -m data_generator.simulate --calibrate`
+   and set `BASE_PACE` to the value it prints. If the rain climate rule changed, re-run
+   `python -m data_generator.climate`.
+4. Retrain, read `metrics.json` against the previous version, update the model card, commit both files.
 
-The backend never loads pickles; it scores the exported JSON trees in pure Python (ADR 0009).
+The backend never loads pickles; it scores the exported JSON (trees or a line, the range offsets and
+exact SHAP values) in pure Python (ADR 0009).
 
 ## Report issue classifier
 

@@ -25,11 +25,12 @@ describe("AppLayout", () => {
   });
 
   it("shows later modules as unavailable instead of linking to them", async () => {
+    const { item: next, role } = nextUnbuiltModule();
+    mockApi(sessionApi(makeMe(role)));
     renderRoute("/");
 
     const nav = await screen.findByRole("navigation", { name: "Main" });
-    const next = nextUnbuiltModule();
-    expect(within(nav).getByRole("link", { name: /Projects/ })).toHaveAttribute("href", "/projects");
+    expect(within(nav).getByRole("link", { name: /Dashboard/ })).toHaveAttribute("href", "/");
     expect(within(nav).queryByRole("link", { name: new RegExp(next.label) })).not.toBeInTheDocument();
     const upcoming = within(nav).getByText(next.label).closest("[aria-disabled]");
     expect(upcoming).toHaveAttribute("aria-disabled", "true");

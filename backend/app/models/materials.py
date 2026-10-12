@@ -66,6 +66,9 @@ class MaterialRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # Set by the routing rule (BR-01) when the request is submitted: "qs" or "pm".
     approval_level: Mapped[str] = mapped_column(String(4), nullable=False)
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # BR-12 (Phase 10): the PM's override of whether this is a critical-path item. NULL: worked out from
+    # the programme (a critical or near-critical task linked to the item's BOQ section).
+    critical_override: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     project: Mapped[Project] = relationship(lazy="joined")
     boq_item: Mapped[BoqItem] = relationship(lazy="joined")

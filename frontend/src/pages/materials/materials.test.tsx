@@ -845,3 +845,102 @@ describe("Engineer views without costs", () => {
     expect(screen.queryByText("Total")).not.toBeInTheDocument();
   });
 });
+
+// --- BR-12: supplier on-time chances and critical-path items (Phase 10) ----------------------------------
+
+const ALT = "7b8c9d0e-1f2a-4b3c-8d4e-6f7a8b9c0d1e";
+const estimate = (id: string, name: string, chance: number, based_on: number, low = 0.1, high = 0.1) => ({
+  supplier_id: id, supplier_name: name, chance, chance_range: { low: chance - low, high: Math.min(chance + high, 1) },
+  based_on, low_data: based_on < 5, below_br12: chance < 0.5, model: "smoothed on-time rate", model_version: "1.0.0",
+});  // fmt: skip
+
+function outlook(criticalIds: string[], suppliers = [estimate(ALT, "Lanka Cement", 0.82, 24), estimate(SUP, "Kelani Building Supplies", 0.38, 9)]) {
+  return { project_id: PID, expected_delivery: addDaysIso(TODAY, 14), lead_time_days: 14, suppliers,
+           critical_request_ids: criticalIds, threshold: 0.5 };  // fmt: skip
+}
+
+const CRITICAL = {
+  request_id: RID, critical: true, from_programme: true, override: null, reason: "Linked to T-040, a critical task.",
+  can_override: true, float_days: 5,
+};  // fmt: skip
+
+describe("BR-12 (Phase 10)", () => {
+  it("shows the chosen supplier's chance and suggests a better one for a critical-path order", async () => {
+    const user = userEvent.setup();
+    materialsApi("procurement_officer", { [`/api/v1/projects/${PID}/supplier-outlook`]: () => jsonResponse(outlook([RID])) });
+    renderRoute("/purchase-orders");
+
+    await user.click(await screen.findByRole("checkbox", { name: "Select MR-0001" }));
+    await user.click(screen.getByRole("button", { name: "Create purchase order (1)" }));
+    const dialog = screen.getByRole("dialog", { name: "Create purchase order" });
+    await user.selectOptions(within(dialog).getByLabelText("Supplier"), SUP);
+
+    expect(await within(dialog).findByText("On time 38% (likely 28% to 48%), based on 9 deliveries")).toBeInTheDocument();
+    const notice = within(dialog).getByText("BR-12: consider another supplier").closest("[role]") as HTMLElement;
+    expect(notice).toHaveTextContent("MR-0001 is a critical-path item, and Kelani Building Supplies is likely to be late");
+    expect(notice).toHaveTextContent("Lanka Cement does better, if they supply it: on time 82% (likely 72% to 92%), based on 24 deliveries.");
+  });
+
+  it("calls a suggestion tentative when it rests on few deliveries, and says nothing for non-critical orders", async () => {
+    const user = userEvent.setup();
+    const thin = [estimate(ALT, "Lanka Cement", 0.7, 2), estimate(SUP, "Kelani Building Supplies", 0.4, 1)];
+    let critical = [RID];
+    materialsApi("procurement_officer", {
+      [`/api/v1/projects/${PID}/supplier-outlook`]: () => jsonResponse(outlook(critical, thin)),
+    });
+    renderRoute("/purchase-orders");
+
+    await user.click(await screen.findByRole("checkbox", { name: "Select MR-0001" }));
+    await user.click(screen.getByRole("button", { name: "Create purchase order (1)" }));
+    const dialog = screen.getByRole("dialog", { name: "Create purchase order" });
+    await user.selectOptions(within(dialog).getByLabelText("Supplier"), SUP);
+
+    expect(await within(dialog).findByText("BR-12: consider another supplier (tentative)")).toBeInTheDocument();
+    expect(within(dialog).getAllByText("Low data").length).toBeGreaterThan(0);
+    expect(within(dialog).getByText(/treat this as a hint, not a verdict/)).toBeInTheDocument();
+
+    critical = [];
+    const date = within(dialog).getByLabelText("Expected delivery");
+    await user.clear(date);
+    await user.type(date, addDaysIso(TODAY, 20));
+    await waitFor(() => {
+      expect(within(dialog).queryByText(/BR-12/)).not.toBeInTheDocument();
+    });
+  });
+
+  it("shows a request's critical-path status and suppliers, and lets the PM override it", async () => {
+    const user = userEvent.setup();
+    const fetchMock = materialsApi("project_manager", {
+      [`/api/v1/material-requests/${RID}/critical-path`]: (_url, init) =>
+        init?.method === "PUT"
+          ? jsonResponse({ ...CRITICAL, critical: false, override: false, reason: "Marked not critical by the project manager." })
+          : jsonResponse(CRITICAL),
+      [`/api/v1/projects/${PID}/supplier-outlook`]: () => jsonResponse(outlook([RID])),
+    });
+    renderRoute(`/materials/${RID}`);
+
+    expect(await screen.findByRole("heading", { name: /Critical path and suppliers/ })).toBeInTheDocument();
+    expect(await screen.findByText("Critical-path item")).toBeInTheDocument();
+    expect(screen.getByText("Linked to T-040, a critical task.")).toBeInTheDocument();
+    const list = await screen.findByRole("list", { name: "Suppliers by on-time chance" });
+    expect(within(list).getAllByRole("listitem")[0]).toHaveTextContent("Lanka Cement");
+
+    await user.click(screen.getByRole("button", { name: "Mark not critical" }));
+
+    expect(await screen.findByText("Marked not critical by the project manager.")).toBeInTheDocument();
+    const put = fetchMock.mock.calls.find(([input, init]) => urlOf(input).endsWith("/critical-path") && init?.method === "PUT");
+    expect(bodyOf(put?.[1])).toEqual({ critical: false });
+    expect(screen.getByRole("button", { name: "Use the programme" })).toBeInTheDocument();
+  });
+
+  it("does not offer the override to others", async () => {
+    materialsApi("site_engineer", {
+      [`/api/v1/material-requests/${RID}/critical-path`]: () => jsonResponse({ ...CRITICAL, can_override: false }),
+      [`/api/v1/projects/${PID}/supplier-outlook`]: () => jsonResponse(outlook([])),
+    });
+    renderRoute(`/materials/${RID}`);
+
+    expect(await screen.findByText("Critical-path item")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Mark not critical" })).not.toBeInTheDocument();
+  });
+});

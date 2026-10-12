@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { Role } from "../api/auth";
 import type { ReportAction } from "../api/issues";
 import type { ProjectDetail } from "../api/projects";
+import type { ProjectRisk } from "../api/risk";
 import type { Network, Progress, Task, TaskTiming } from "../api/schedule";
 import { slipText } from "../features/schedule/network";
 import { errorResponse, jsonResponse, makeMe, mockApi, renderRoute, requestTo, sessionApi } from "../test/utils";
@@ -65,6 +66,17 @@ const PROGRESS: Progress = {
   points: [{ date: "2026-03-02", planned: 0, actual: 0 }, { date: "2027-09-30", planned: 100, actual: null }],
 };  // fmt: skip
 
+/** A risk forecast whose likely delay is ``low`` to ``high`` days past the planned end (30 Sept 2027). */
+const riskWith = (low: number, high: number): ProjectRisk => ({
+  project_id: PID,
+  latest: {
+    score_date: "2026-10-11", score: 48, level: "medium", delay_days: String((low + high) / 2), overrun_pct: "4.00",
+    ranges: { delay_days: { low, high }, overrun_pct: { low: 1, high: 9 }, score: { low: 30, high: 66 } },
+    drivers: [], notes: [], model_version: "2.0.0", scored_at: "2026-10-11T00:30:00+00:00",
+  },
+  history: [],
+});  // fmt: skip
+
 function urlOf(input: RequestInfo | URL): string {
   return input instanceof Request ? input.url : input instanceof URL ? input.href : input;
 }
@@ -81,6 +93,7 @@ function scheduleApi(role: Role, extra: Record<string, (url: string, init?: Requ
     [`/api/v1/projects/${PID}/tasks`]: () => jsonResponse({ tasks: TASKS, weight_total: "30.00" }),
     [`/api/v1/projects/${PID}/progress`]: () => jsonResponse(PROGRESS),
     [`/api/v1/projects/${PID}/network`]: () => jsonResponse(NETWORK),
+    [`/api/v1/projects/${PID}/risk`]: () => jsonResponse(riskWith(30, 70)),
     ...extra,
   });
 }
@@ -93,14 +106,57 @@ describe("slipText", () => {
   });
 });
 
+describe("Forecast handover, two ways (Phase 10)", () => {
+  it("says nothing more when the programme date falls inside the model's range", async () => {
+    scheduleApi("quantity_surveyor", { [`/api/v1/projects/${PID}/risk`]: () => jsonResponse(riskWith(-5, 40)) });
+    renderRoute(`/projects/${PID}/schedule`);
+
+    const handover = await screen.findByRole("group", { name: "Forecast handover" });
+    expect(await within(handover).findByText("25 Sept 2027 to 09 Nov 2027")).toBeInTheDocument();
+    expect(handover).not.toHaveTextContent("later finish");
+  });
+
+  it("points out a programme running later than the model expects", async () => {
+    scheduleApi("project_manager", { [`/api/v1/projects/${PID}/risk`]: () => jsonResponse(riskWith(-20, 5)) });
+    renderRoute(`/projects/${PID}/schedule`);
+
+    const handover = await screen.findByRole("group", { name: "Forecast handover" });
+    expect(await within(handover).findByText(/The current pace points to a later finish than the risk model expects/)).toBeInTheDocument();
+  });
+
+  it("waits for the next scoring when there is no range yet", async () => {
+    const unscored = { project_id: PID, latest: null, history: [] };
+    scheduleApi("project_manager", { [`/api/v1/projects/${PID}/risk`]: () => jsonResponse(unscored) });
+    renderRoute(`/projects/${PID}/schedule`);
+
+    const handover = await screen.findByRole("group", { name: "Forecast handover" });
+    expect(await within(handover).findByText("from the next scoring")).toBeInTheDocument();
+  });
+
+  it("shows engineers only the programme's date (risk is for PMs and QSs)", async () => {
+    const fetchMock = scheduleApi("site_engineer");
+    renderRoute(`/projects/${PID}/schedule`);
+
+    const handover = await screen.findByRole("group", { name: "Forecast handover" });
+    expect(handover).toHaveTextContent("At current rates14 Oct 2027");
+    expect(handover).not.toHaveTextContent("Risk model");
+    expect(requestTo(fetchMock, `/projects/${PID}/risk`)).toBeUndefined();
+  });
+});
+
 describe("Gantt and forecast (Phase 9)", () => {
   it("shows the forecast handover, warnings, critical path, stop-work and rain on a pour", async () => {
     scheduleApi("project_manager");
     renderRoute(`/projects/${PID}/schedule`);
 
     const handover = await screen.findByRole("group", { name: "Forecast handover" });
-    expect(handover).toHaveTextContent("14 Oct 2027");
+    expect(handover).toHaveTextContent("At current rates14 Oct 2027");
     expect(handover).toHaveTextContent("12 working days late against 30 Sept 2027");
+    // The risk model's likely range, labelled, and the disagreement spelt out: the programme says
+    // 14 October, the model expects 30 October to 9 December.
+    expect(await within(handover).findByText("30 Oct 2027 to 09 Dec 2027")).toBeInTheDocument();
+    expect(handover).toHaveTextContent("Risk model, likely range");
+    expect(handover).toHaveTextContent("The risk model expects a later finish than the current pace suggests.");
     expect(screen.getByText(/No holidays are entered for 2027/)).toBeInTheDocument();
     expect(screen.getByText(/working days, Mon–Sat/)).toBeInTheDocument();
     const table = screen.getByRole("table", { name: /planned and forecast dates/ });

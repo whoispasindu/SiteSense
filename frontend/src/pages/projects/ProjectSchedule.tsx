@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { useProjectRisk } from "../../api/risk";
 import { useNetwork, useProgress, useTasks, type Task } from "../../api/schedule";
 import { useAuth } from "../../auth/context";
 import { Alert } from "../../components/ui/Alert";
@@ -15,7 +16,7 @@ import { SCurve } from "../../features/schedule/SCurve";
 import { TaskFormDialog } from "../../features/schedule/TaskFormDialog";
 import { TaskTable } from "../../features/schedule/TaskTable";
 import { Gantt } from "../../features/schedule/Gantt";
-import { slipText } from "../../features/schedule/network";
+import { HandoverTile } from "../../features/schedule/HandoverTile";
 import { varianceLabel } from "../../features/schedule/variance";
 import { useCurrentProject } from "./projectContext";
 
@@ -37,6 +38,8 @@ export function ProjectSchedule() {
   const tasks = useTasks(project.id);
   const progress = useProgress(project.id);
   const network = useNetwork(project.id);
+  const showRisk = can("risk:read");
+  const risk = useProjectRisk(project.id, showRisk);
   const [editing, setEditing] = useState<Task | "new" | null>(null);
   const canManage = can("schedule:manage");
 
@@ -66,13 +69,7 @@ export function ProjectSchedule() {
             <StatusBadge tone={variance.tone} label={variance.label} />
           </p>
         </div>
-        <KpiTile
-          icon="schedule"
-          label="Forecast handover"
-          value={net?.forecast_end ? formatDate(net.forecast_end) : "—"}
-          tone={net && net.slip_days > 0 ? "down" : "idle"}
-          note={net ? `${slipText(net.slip_days)} against ${formatDate(net.planned_end)}` : `Contract end ${formatDate(p.contract_end)}`}
-        />
+        <HandoverTile network={net} contractEnd={p.contract_end} risk={risk.data?.latest} showRisk={showRisk} />
       </div>
 
       {list.length > 0 && Math.abs(weightTotal - 100) > 0.01 ? (

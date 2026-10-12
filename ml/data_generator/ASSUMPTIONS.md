@@ -26,12 +26,29 @@ run reasonably well, a tail is not). The model never sees it, only its symptoms.
 
 | Factor | Rule |
 | --- | --- |
-| Base productivity | 1.0 + 0.12 × (quality − 0.7), ± 3% a week |
-| Rain | A heavy-rain day (10 mm or more, as in BR-06) loses 70% of a day's work; a wet day (2–10 mm) loses 15%. Programmes already allow for the town's usual weather for the month, so only rain beyond that slows the job, and a dry spell helps. After 60% of the work the building is closed in and rain has half the effect. |
+| Base productivity | `BASE_PACE` + 0.12 × (quality − 0.7), ± 3% a week. `BASE_PACE` is 1.096, **calibrated** (`python -m data_generator.simulate --calibrate`) so the median project still ends 10% of its planned duration late, as in v1. Read it as the programme's general time allowance: with no rain, crew or material trouble a site would finish about 9% early, and the wet season eats into that. |
+| Rain | See [Rain](#rain-risk-model-12) below. |
 | Crew | The crew drifts around 1 − 0.15 × (1 − quality) of the plan. Shortages start with a 4–8% chance a week (more on poorly run sites), last 2–6 weeks and cut the crew to 60–80%. Output scales with crew^0.7, capped at 110%. |
 | Deliveries | While 5–92% of the work is done, Poisson(0.6 + value / 800 M) deliveries a week. Each is on time with the project's supplier reliability (Beta(6, 2), better on well-run sites); otherwise it is 1 + Gamma(2, 3) × (1.5 − quality) days late. Each delivery still overdue holds up 4% of the week's work, up to 40%. |
 | Variations | 1.2% chance a week of extra scope: 2–8% more work and cost, not in the plan. (Variation counts are not a model input until Phase 8, so this is noise the model cannot see.) |
 | Noise | ± 4% of a week's progress |
+
+## Rain (risk model 1.2)
+
+Changed for issue #27. In v1 rain hardly mattered: programmes were assumed to allow for all of a
+town's usual weather, so rain only slowed a job in wetter-than-normal weeks, and over a project that
+evened out (about −2 days on average). Surveys of Sri Lankan building projects rank rainy weather as
+a leading cause of delay, which suggests programmes do not fully allow for the monsoon.
+
+| What | Assumption | To validate |
+| --- | --- | --- |
+| **Allowance** (`RAIN_ALLOWANCE`) | **0.5: programmes allow for half of the town's usual rain loss for the month.** Rain beyond that slows the job; a drier-than-allowed week helps. **This is an assumption, not measured data.** At 0.75 rain's weight in the model falls by about a third (model card, sensitivity) | The single most important number to replace with contractor data: how many working days per month their programmes set aside for rain, against the days actually lost |
+| Lost work by intensity (`RAIN_BANDS`) | 2–10 mm: 10% of the day; 10–25 mm (heavy, BR-06): 45%; 25 mm or more: 80% | Site diaries: hours lost against the day's rainfall |
+| The day after heavy rain (`RAIN_LINGER`) | Another 25% of the next day is lost (wet ground, dewatering, access) | Site diaries |
+| By stage (`RAIN_STAGES`) | Earthworks and substructure (first 30% of the work) × 1.2; the frame (to 60%) × 1.0; closed in × 0.4 | Which trades stop in rain |
+| What the model sees | `rain_days_next_14`: the 14-day forecast, as before. **New:** `wet_days_ahead`: heavy-rain working days expected from the town's climate (share of days with 10 mm or more, per month, 2012–2025) from tomorrow to the planned end, at least the next 28 days | The app uses the site's nearest of the seven towns |
+
+The town's "usual loss" for each month is the average of the same rule over 2012 to 2025.
 
 ## Cost
 
@@ -49,18 +66,34 @@ run reasonably well, a tail is not). The model never sees it, only its symptoms.
 | Progress gap and trend | Planned against actual S-curve position, with ± 1 point reporting noise; trend over the last three weeks |
 | Late deliveries | Deliveries due so far that arrived late or are still overdue, and their mean lateness |
 | Rain in the next 14 days | The real rainfall for the next 14 days, each day's heavy/not-heavy flipped with a 15% chance (a two-week forecast is often wrong) |
+| Wet days ahead (v1.2) | The town's climate (share of heavy-rain days per month) summed over the working days from tomorrow to the planned end, at least 28 days ahead |
 | Cost variance | Committed cost against the budgeted value of the same work: price drift, rework and expediting so far, ± 1.5 points. Overheads are not visible (the app does not track them yet) |
 | Crew against plan | Average reported crew over the last 12 working days against the planned crew, each report ± 8% |
 | Missing reports | Each working day's report is missing with chance 0.02 + 0.30 × (1 − quality)² |
 | Confirmed report issues (v1.1) | Per week, Poisson counts scaled by the share of reports filed: material delays 0.1 + 0.5 per overdue delivery; safety 0.05 + 0.6 × (1 − quality)²; design 0.08 plus 1.5 after each variation, fading by 40% a week. The model sees the last two weeks. Drawn from their own random stream, so adding them left every other number unchanged |
+
+## Suppliers (BR-12)
+
+A separate simulation (`deliveries.py`) for the supplier on-time model. Nothing here comes from real
+delivery records yet.
+
+| What | Assumption | To validate |
+| --- | --- | --- |
+| Suppliers | 150, each with a hidden base on-time chance from Beta(6, 2) × 1.05 (most fairly reliable, a tail not), between 20% and 98% | Real suppliers' on-time shares |
+| Orders | Per supplier, log-normal around 18 (1 to 300), placed on random days from 2016 to mid-2025, at a random one of the seven towns | |
+| Lead time | 2, 3, 5, 7, 10, 14, 21 or 30 days (mostly 7 to 14) | Typical lead times by material |
+| Wet season | Each supplier has a hidden sensitivity (0.5 to 1.5); the log-odds of being on time fall by 1.5 × sensitivity × the town's share of heavy-rain days in the delivery month | Whether deliveries really slip more in the monsoon |
+| Short lead time | Up to 0.6 log-odds lost at a lead time of zero, none from a week | Whether rushed orders really arrive later |
+| What the app knows | At each order: the supplier's and the company's orders already due by then, on time or late; never the hidden values. The company's rate starts at 80% (an assumption) and the supplier's is smoothed towards it as if by 5 deliveries | |
 
 ## Outcomes
 
 The project runs until all the work is done (or three times the planned duration, which never
 happened in the training set). Final delay = actual minus planned completion, in days. Final overrun
 = final cost against the budget, in %. The default run (300 projects, seed 2026) gives a median delay
-of 10% of the planned duration and a median overrun of 6.5%. Final risk bands: 40% Low, 33% Medium,
-27% High. The longest delay was 45% of the planned duration.
+of 10% of the planned duration (calibrated, see `BASE_PACE`) and a median overrun of 6.5%. Final risk
+bands: 40% Low, 31% Medium, 29% High (v1: 40%, 33%, 27%). The longest delay was 50% of the planned
+duration (v1: 45%).
 
 ## Known limits
 

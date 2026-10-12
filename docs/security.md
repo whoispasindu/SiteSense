@@ -39,7 +39,118 @@ here, newest first. The baseline design is in [ADR 0003](adr/0003-security-basel
 | Contract changes | The contract value and planned end change only through approved variations once a project is under way; claims are calculated (BR-08) and a database check keeps their figures consistent; one claim waits at a time (partial unique index and a project lock); variation approval locks the variation, project and budget line and applies everything in one transaction, audited before and after; each variation keeps the BR-09 limit it was routed with; only the Company Admin changes a limit (reason audited) | `rules/claims.py`, `rules/variations.py`, `services/claim_service.py`, `services/variation_service.py`, `services/project_service.py: contract_locked`, migration 0010 | `test_rules_cost.py`, `test_contract_api.py`, `test_the_contract_changes_only_through_variations_once_under_way` |
 | Client view | Separate schema with no internal cost or comment; only variations sent to the client, on their sites (404 otherwise); the client never reaches budgets, claims or the cost overview (TC-07) | `schemas/contract.py: ClientVariationOut`, `services/variation_service.py: client_out` | `test_the_client_queries_and_a_revision_goes_back_to_the_client`, `test_the_client_sees_only_their_sites`, role matrix |
 | Programme | Links only inside one project, never a loop (checked under a project row lock), lag 0–365, at most 2,000 per programme; one progress path refuses stopped tasks (BR-11) from the task list and daily reports; only a PM changes or clears a stop-work flag, audited; holidays only by the Company Admin, 2000 to 2100, audited; working-day arithmetic is bounded to 30 years and a network past it degrades with a warning; pour alerts read the forecast cache only and are de-duplicated by a fixed-length hash | `rules/calendar.py`, `rules/schedule.py`, `services/network_service.py`, `services/schedule_service.py: apply_progress`, `services/issue_service.py: set_stop_scope`, migration 0011 | `test_rules_schedule.py`, `test_network_api.py`, role matrix |
+| Risk and supplier models | Plain JSON only (`sitesense-risk-v2`, `sitesense-supplier-v1`, the rain climate), each validated on load (kinds, sizes, finite numbers, node counts, range inputs, constants); golden rows prove the pure-Python scorers match training, including SHAP values; CI retrains both models and the climate table and checks they reproduce; the what-if planner stores and changes nothing and only the PM uses it; sign constraints mean no recovery action can worsen a forecast; the BR-12 override is PM-only, strict-boolean and audited | `ai/risk/model.py`, `ai/risk/climate.py`, `ai/supplier/model.py`, `services/risk_service.py: what_if`, `services/supplier_service.py`, `ml/check_model.py` | `test_risk_model.py`, `test_risk_whatif.py`, `test_supplier_api.py`, `ml/tests`, role matrix |
 | Supply chain | Pinned deps, Dependabot (pip, npm, actions, docker), pip-audit, npm audit, dependency review, CodeQL `security-extended`, actions pinned to SHAs, `permissions: contents: read`, `persist-credentials: false` | `.github/` | CI |
+
+## Phase 10 review: 2026-10-12
+
+Scope:
+
+- risk model 1.2 (rain, issue #27) and 2.0: likely ranges, SHAP drivers, the straight line against
+  the trees;
+- the rain climate table;
+- the what-if planner and the project Risk tab;
+- the forecast handover shown two ways;
+- the supplier on-time model and BR-12: critical-path items, the PM's override (migration 0012), the
+  purchase-order and request screens;
+- the demo seed's supplier history.
+
+### OWASP Top 10 (2021) walk-through
+
+- **A01 Broken access control.** The 5 new endpoints are in the role matrix for every role.
+  - The what-if planner: only the PM (`risk:what_if`), on their own sites (404 otherwise).
+  - Supplier on-time, supplier outlook and critical-path reads: material readers. Project-specific
+    calls go through the site scope.
+  - The critical-path override: only the PM. The role is checked before the request is looked up,
+    so a non-PM learns nothing about whether it exists (fixed, below).
+  - Mutation-checked (below).
+- **A03 Injection.** Action ids are a closed list, each at most once, at most four. Costs are
+  decimals of 15 digits with 2 places, never negative. The override is a strict boolean (fixed,
+  below). Dates are parsed by the schema. Supplier names and reasons are rendered as text by React.
+- **A04 Insecure design.**
+  - The planner calculates only: no score, audit entry or project field changes (tested).
+  - Every input an action changes has a fixed direction in both models, and a test runs every
+    action and combination at both strengths against the shipped model: no forecast, and no end of
+    a range, gets worse.
+  - A blank action cost is called out, never treated as free.
+  - BR-12 suggests only; it never blocks or changes an order.
+  - Each range always contains its forecast, even where the fitted offsets cross.
+- **A05 / DoS.**
+  - A full what-if (four actions) takes about 100 ms on demo data; the supplier outlook about 16 ms.
+  - Model files are refused beyond fixed sizes (trees, nodes, towns).
+  - Supplier records are computed from order lines already due, company-wide, on each request. This
+    is fine at the current scale; an aggregate table is the step if it grows.
+- **A06 Vulnerable components.** scipy is now pinned for training only (the backend does not use it).
+  pip-audit **0** (backend and ML), npm audit **0**.
+- **A08 Data integrity.**
+  - Model and climate files are data, never code. Golden rows in each model file are checked against
+    the training code's own outputs, SHAP values included.
+  - CI retrains the risk model, the supplier model and the climate table from the commit, and checks
+    they match what ships.
+  - The override is audited (`material_request.critical_path_set`, before and after).
+- **Outbound calls.** None added. The rain climate is a local table, and `test_outbound_calls.py`
+  still lists only the weather client.
+
+### Privacy
+
+- A supplier's record pools every site's orders. Users see the rate, its range and how many
+  deliveries it rests on, never another site's orders.
+- Forecasts and drivers are about projects, never people. The new inputs are rain and deliveries.
+
+### Verification beyond unit tests
+
+- **Mutation checks: 19 of 19** deliberate faults fail a test:
+  - TreeSHAP not unwinding a repeated feature;
+  - ranges not ordered around the forecast, ignoring the programme still to run, or not stored;
+  - the crew cap removed;
+  - an action's effect collapsed to one number;
+  - entered costs not added, or blank costs treated as free;
+  - the planner opened to every risk reader;
+  - the 28-day floor on wet days ahead dropped;
+  - every site given the national climate;
+  - the supplier rate not smoothed;
+  - overdue lines counted as on time, or lines due today counted;
+  - the low-data and BR-12 lines moved;
+  - near-critical tasks or the PM's override ignored;
+  - anyone setting the override.
+
+  The first run caught 18. The survivor (costs not added) exposed a test that derived its expected
+  value from the response it checked; it now compares the same plan with and without the cost.
+- **Exactness.** The backend's TreeSHAP values match LightGBM's to 1e-13 on the golden rows and on
+  a 30-tree bagged model, and equal brute-force Shapley values on a small hand-built tree.
+- **In the browser** (demo data):
+  - the risk panel and dashboard ranking show every forecast with its range;
+  - the Schedule tab shows both handover dates, with the disagreement note;
+  - the planner with two actions and an entered cost moves the cost forecast by the cost's share of
+    the budget;
+  - procurement choosing an unreliable supplier for a critical-path request gets the BR-12
+    suggestion, with both suppliers' chances and deliveries.
+
+### Findings fixed during the review
+
+1. **"yes" was accepted as true** for the critical-path override (lax boolean parsing). It is a
+   strict boolean now; a test sends "yes" and gets 422.
+2. **The override revealed whether a request exists.** Non-PMs got 404 for requests outside their
+   view and 403 inside it. The role is now checked first: 403 for everyone who isn't the PM.
+3. **The straight line's explanations were nonsense.** The five project-type columns always sum to
+   one, duplicating the intercept, and the fit found huge cancelling coefficients. Predictions were
+   right, drivers were not. One type is now the reference category.
+4. **Quantile trees could not be constrained.** LightGBM refuses monotone constraints with the
+   quantile objective, so a recovery action could have widened a range upwards. Ranges are now
+   offsets around the forecast that depend on nothing an action changes.
+5. **The supplier model's recorded hash didn't match its file** (Windows line endings, normalised by
+   Git). Model and metrics files are now written with LF everywhere.
+6. **Two inputs had no direction in the overrun model** (crew and the 14-day rain forecast), so an
+   action touching them could, in principle, raise the cost forecast. Both are now constrained.
+
+### Open items
+
+- Real data: `RAIN_ALLOWANCE`, the supplier effects and the starting on-time rate are assumptions,
+  stated as such in the model cards. Replace them with a contractor's records.
+- The near-critical float for BR-12 is an environment setting (`SITESENSE_BR12_FLOAT_DAYS`), not a
+  screen for the Company Admin.
+- Supplier suggestions don't know which materials a supplier sells ("if they supply it").
+- Supplier records are recomputed per request; aggregate them if order history grows large.
 
 ## Phase 9 review: 2026-10-11
 

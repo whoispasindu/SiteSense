@@ -5,7 +5,7 @@ import type { Role } from "../../api/auth";
 import type { ProjectDetail, ProjectSummary } from "../../api/projects";
 import type { Driver, ProjectRisk, RiskRanking } from "../../api/risk";
 import { jsonResponse, makeMe, mockApi, renderRoute, requestTo, sessionApi } from "../../test/utils";
-import { delayText, driverEffect, overrunText, raisesRisk } from "./risk";
+import { delayRangeText, delayText, driverEffect, overrunRangeText, overrunText, raisesRisk, scoreRangeText } from "./risk";
 
 const SITE = { id: "0b6c2f4e-1d3a-4e5f-8a9b-1c2d3e4f5a6b", code: "COL-07", name: "Havelock Residences" };
 const PID = "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
@@ -27,28 +27,32 @@ const driver = (over: Partial<Driver>): Driver => ({
   delay_days: 22.4, overrun_pct: 0.6, ...over,
 });
 
+const RANGES = {
+  delay_days: { low: 44.2, high: 103.9 }, overrun_pct: { low: 3.1, high: 14.6 }, score: { low: 53, high: 100 },
+};
+
 const RISK: ProjectRisk = {
   project_id: PID,
   latest: {
-    score_date: "2026-10-10", score: 82, level: "high", delay_days: "71.6", overrun_pct: "8.75",
+    score_date: "2026-10-10", score: 82, level: "high", delay_days: "71.6", overrun_pct: "8.75", ranges: RANGES,
     drivers: [
       driver({ feature: "planned_duration_days", label: "Planned duration", kind: "context", value: "83 weeks", delay_days: 9.8, overrun_pct: 0.3 }),
       driver({}),
       driver({ feature: "avg_lateness_days", label: "Delivery lateness", value: "3.8 days on average", delay_days: -3.6, overrun_pct: 0 }),
     ],
     notes: ["Only 4 forecast days cached: rain scaled to 14 days."],
-    model_version: "1.0.0", scored_at: "2026-10-10T00:30:00+00:00",
+    model_version: "2.0.0", scored_at: "2026-10-10T00:30:00+00:00",
   },
-  history: [{ date: "2026-10-10", score: 82, level: "high" }],
+  history: [{ date: "2026-10-10", score: 82, level: "high", score_range: { low: 53, high: 100 } }],
 };
 
 const RANKING: RiskRanking = [
   { project_id: PID, code: "HR-2026-01", name: "Havelock Residences", site_code: "COL-07", status: "active", score: 82,
-    level: "high", delay_days: "71.6", overrun_pct: "8.75", top_driver: "Progress against plan: 8.0 points behind", score_date: "2026-10-10" },
+    level: "high", delay_days: "71.6", overrun_pct: "8.75", ranges: RANGES, top_driver: "Progress against plan: 8.0 points behind", score_date: "2026-10-10" },
   { project_id: PID2, code: "PRO-2026-02", name: "Peradeniya Road Offices", site_code: "KDY-02", status: "active", score: 32,
-    level: "low", delay_days: "7.2", overrun_pct: "0.2", top_driver: null, score_date: "2026-10-10" },
+    level: "low", delay_days: "7.2", overrun_pct: "0.2", ranges: null, top_driver: null, score_date: "2026-10-10" },
   { project_id: PID3, code: "FVA-2026-03", name: "Fort View Apartments", site_code: "GAL-11", status: "planning", score: null,
-    level: null, delay_days: null, overrun_pct: null, top_driver: null, score_date: null },
+    level: null, delay_days: null, overrun_pct: null, ranges: null, top_driver: null, score_date: null },
 ];  // fmt: skip
 
 function riskApi(role: Role, extra: Record<string, () => Response> = {}) {
@@ -75,12 +79,21 @@ describe("Dashboard risk ranking", () => {
       "Havelock Residences", "Peradeniya Road Offices", "Fort View Apartments",
     ]);  // fmt: skip
     expect(rows[0]).toHaveTextContent("High risk");
-    expect(rows[0]).toHaveTextContent("Forecast about 72 days late, 8.8% over budget");
+    // Every forecast comes with its likely range.
+    expect(rows[0]).toHaveTextContent(
+      "Forecast about 72 days late (likely 44 to 104 days late), 8.8% over budget (likely 3.1% to 14.6% over budget)",
+    );
+    expect(rows[0]).toHaveTextContent("53–100");
     expect(rows[0]).toHaveTextContent("Progress against plan: 8.0 points behind");
-    expect(within(rows[0]!).getByRole("meter", { name: "Risk score" })).toHaveAttribute("aria-valuetext", "82 out of 100, High risk");
+    expect(within(rows[0]!).getByRole("meter", { name: "Risk score" })).toHaveAttribute(
+      "aria-valuetext",
+      "82 out of 100, High risk, likely 53 to 100",
+    );
+    expect(within(rows[0]!).getByTestId("score-range")).toHaveStyle({ left: "53%", width: "47%" });
     expect(within(rows[0]!).getByRole("link")).toHaveAttribute("href", `/projects/${PID}`);
     expect(rows[1]).toHaveTextContent("Low risk");
     expect(rows[1]).toHaveTextContent("on budget");
+    expect(rows[1]).toHaveTextContent("range from the next scoring"); // scored before risk model v2
     expect(rows[2]).toHaveTextContent("Not scored yet");
     expect(within(rows[2]!).queryByRole("meter")).not.toBeInTheDocument();
   });
@@ -131,8 +144,12 @@ describe("Project risk panel", () => {
     expect(panel).toHaveTextContent("High risk");
     expect(panel).toHaveTextContent("about 72 days late");
     expect(panel).toHaveTextContent("8.8% over budget");
-    expect(panel).toHaveTextContent("An estimate from risk model v1.0.0, trained on simulated projects");
-    expect(panel).toHaveTextContent("Compared with a typical project at the same stage");
+    expect(panel).toHaveTextContent("likely 53 to 100");
+    expect(panel).toHaveTextContent("likely 44 to 104 days late");
+    expect(panel).toHaveTextContent("likely 3.1% to 14.6% over budget");
+    expect(panel).toHaveTextContent("An estimate from risk model v2.0.0, trained on simulated projects");
+    expect(panel).toHaveTextContent("Likely ranges hold 8 in 10 outcomes");
+    expect(panel).toHaveTextContent("from the average project the model learnt from (SHAP values)");
 
     const drivers = within(within(panel).getByRole("list", { name: "What moved the forecast" })).getAllByRole("listitem");
     // Signals the site can act on come before context such as the project's length.
@@ -175,6 +192,29 @@ describe("risk wording", () => {
     ["0.2", "on budget"], ["8.75", "8.8% over budget"], ["-3", "3.0% under budget"],
   ])("overrun %s reads %s", (pct, text) => {
     expect(overrunText(pct)).toBe(text);
+  });
+
+  it.each([
+    [{ low: 44.2, high: 103.9 }, "likely 44 to 104 days late"],
+    [{ low: -12, high: -3 }, "likely 3 to 12 days early"],
+    [{ low: -5.2, high: 30 }, "likely 5 days early to 30 days late"],
+    [{ low: 0, high: 12 }, "likely on time to 12 days late"],
+  ])("delay range %j reads %s", (range, text) => {
+    expect(delayRangeText(range)).toBe(text);
+  });
+
+  it.each([
+    [{ low: 3.1, high: 14.6 }, "likely 3.1% to 14.6% over budget"],
+    [{ low: -4, high: -1 }, "likely 1.0% to 4.0% under budget"],
+    [{ low: -2, high: 4.5 }, "likely 2.0% under budget to 4.5% over budget"],
+    [{ low: 0, high: 3 }, "likely on budget to 3.0% over budget"],
+  ])("overrun range %j reads %s", (range, text) => {
+    expect(overrunRangeText(range)).toBe(text);
+  });
+
+  it("gives the score's range, or one number when both ends agree", () => {
+    expect(scoreRangeText({ low: 53, high: 100 })).toBe("likely 53 to 100");
+    expect(scoreRangeText({ low: 100, high: 100 })).toBe("likely 100");
   });
 
   it("describes what a driver did", () => {

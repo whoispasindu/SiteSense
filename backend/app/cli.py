@@ -16,7 +16,7 @@ refuses to run in production.
 import argparse
 import os
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -46,6 +46,7 @@ from app.models import (
     BoqItem,
     BoqSection,
     DailyReport,
+    Delivery,
     MaterialRequest,
     ProgressClaim,
     ProgressSnapshot,
@@ -107,6 +108,17 @@ DEMO_SUPPLIERS = [
     ("Colombo Ready-Mix", "Asanka Perera", "+94 11 287 9002", "ready-mix concrete"),
     ("Ceylon Formwork Hire", "Dinesh Jayasuriya", "+94 11 260 1188", "formwork, scaffolding"),
     ("Hill Country Hardware", "Fathima Rizvi", "+94 81 222 6091", "waterproofing, plaster, hardware"),
+]
+
+# Supplier records for BR-12 (Phase 10): (supplier, BOQ item, orders, of which on time), delivered over the
+# past year to a finished job. One supplier is weak (under 50%), one has too few deliveries to judge.
+DEMO_HISTORY_PROJECT = ("NGR-2025-04", "Negombo Road Warehouse", "Lanka Logistics (Pvt) Ltd")
+DEMO_SUPPLIER_HISTORY = [
+    ("Kelani Building Supplies", ("B.01", "Cement, 50 kg bags", "bag", "2300"), 14, 12),
+    ("Southern Steel Traders", ("B.02", "Reinforcement steel", "kg", "330"), 10, 7),
+    ("Colombo Ready-Mix", ("B.03", "Ready-mix concrete, grade 25", "m3", "28500"), 12, 11),
+    ("Ceylon Formwork Hire", ("B.04", "Formwork hire", "m2", "950"), 9, 3),
+    ("Hill Country Hardware", ("B.05", "Waterproofing membrane", "m2", "1850"), 3, 2),
 ]
 
 # Havelock material requests and how far each gets:
@@ -314,6 +326,7 @@ def seed_dev() -> int:
             _seed_programme(db, target, programme, DEMO_PACE[code])
         _seed_reports(db)
         _seed_materials(db)
+        _seed_supplier_history(db)
         _seed_risk_inputs(db)
         _seed_issues(db)
         _seed_contract(db)
@@ -506,6 +519,79 @@ def _seed_materials(db: Session) -> None:
                 DeliveryIn(request_id=request.id, quantity=Decimal(delivered), delivered_on=today),
                 meta=meta,
             )
+
+
+def _seed_supplier_history(db: Session) -> None:
+    """A finished job with a year of deliveries, so each demo supplier has an on-time record (BR-12).
+
+    Completed projects are never risk-scored, so this history does not change the demo projects' risk.
+    Each supplier's late orders are spread through its record; dates are relative to today.
+    """
+    code, name, client = DEMO_HISTORY_PROJECT
+    if db.scalar(select(Project).where(Project.code == code)):
+        return
+    site = db.scalar(select(Site).where(Site.code == "COL-07"))
+    engineer = db.scalar(select(User).where(User.email == "engineer@sitesense.example"))
+    buyer = db.scalar(select(User).where(User.email == "procurement@sitesense.example"))
+    assert site is not None
+    assert engineer is not None
+    assert buyer is not None
+    today = clock.site_today()
+    project = Project(
+        code=code, name=name, site_id=site.id, client_name=client, project_type="industrial",
+        status="completed", contract_value=Decimal("240000000.00"), start_date=today - timedelta(days=420),
+        planned_end=today - timedelta(days=40),
+    )  # fmt: skip
+    db.add(project)
+    db.flush()
+    section = BoqSection(project_id=project.id, code="B", name="Structure and envelope", position=1)
+    db.add(section)
+    db.flush()
+    for position, (supplier_name, item_facts, orders, on_time) in enumerate(DEMO_SUPPLIER_HISTORY, start=1):
+        item_code, description, unit, rate = item_facts
+        supplier = db.scalar(select(Supplier).where(Supplier.name == supplier_name))
+        assert supplier is not None
+        item = BoqItem(
+            project_id=project.id, section_id=section.id, item_code=item_code, description=description,
+            unit=unit, quantity=Decimal("1000"), rate=Decimal(rate), amount=Decimal(rate) * 1000,
+            position=position,
+        )  # fmt: skip
+        db.add(item)
+        db.flush()
+        late_count = orders - on_time
+        late = {round((k + 0.5) * orders / late_count) for k in range(late_count)} if late_count else set()
+        for i in range(orders):
+            expected = today - timedelta(days=380 - i * (330 // orders))
+            shift = 3 + i % 8 if i in late else -(i % 2)  # late by days, or on the day or the day before
+            arrived = expected + timedelta(days=shift)
+            submitted = datetime.combine(expected - timedelta(days=21), time(9), clock.SITE_TIME_ZONE)
+            request = MaterialRequest(
+                number=materials_service.next_number(db, "MR"), project_id=project.id,
+                boq_item_id=item.id, requested_by=engineer.id, quantity=Decimal("10"),
+                unit_price=Decimal(rate), needed_by=expected, status="delivered", approval_level="qs",
+                submitted_at=submitted,
+            )  # fmt: skip
+            order = PurchaseOrder(
+                number=materials_service.next_number(db, "PO"), project_id=project.id,
+                supplier_id=supplier.id, issued_by=buyer.id, issued_at=submitted + timedelta(days=7),
+                expected_delivery=expected, status="delivered",
+            )  # fmt: skip
+            db.add_all([request, order])
+            db.flush()
+            line = PurchaseOrderLine(
+                purchase_order_id=order.id, request_id=request.id, quantity=Decimal("10"),
+                unit_price=Decimal(rate), amount=Decimal(rate) * 10, position=1,
+            )  # fmt: skip
+            db.add(line)
+            db.flush()
+            received = datetime.combine(arrived, time(15), clock.SITE_TIME_ZONE)
+            db.add(
+                Delivery(
+                    line_id=line.id, quantity=Decimal("10"), delivered_on=arrived, received_by=buyer.id,
+                    created_at=received,
+                )
+            )  # fmt: skip
+    db.commit()
 
 
 def _seed_risk_inputs(db: Session) -> None:

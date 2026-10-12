@@ -17,6 +17,7 @@ import { BoqImportPage } from "./pages/projects/BoqImportPage";
 import { BoqPage } from "./pages/projects/BoqPage";
 import { ProjectLayout } from "./pages/projects/ProjectLayout";
 import { ProjectClaims } from "./pages/projects/ProjectClaims";
+import { ProjectRisk } from "./pages/projects/ProjectRisk";
 import { ProjectOverview } from "./pages/projects/ProjectOverview";
 import { ProjectReports } from "./pages/projects/ProjectReports";
 import { ProjectSchedule } from "./pages/projects/ProjectSchedule";
@@ -31,6 +32,7 @@ import { RequestFormPage } from "./pages/materials/RequestFormPage";
 import { PurchaseOrderDetailPage } from "./pages/procurement/PurchaseOrderDetailPage";
 import { PurchaseOrdersPage } from "./pages/procurement/PurchaseOrdersPage";
 import { SuppliersPage } from "./pages/procurement/SuppliersPage";
+import { RiskPage } from "./pages/risk/RiskPage";
 import { SchedulePage } from "./pages/schedule/SchedulePage";
 import { RouteErrorPage } from "./pages/RouteErrorPage";
 import { VariationDetailPage } from "./pages/variations/VariationDetailPage";
@@ -145,6 +147,14 @@ export const routes: RouteObject[] = [
         ),
       },
       {
+        path: "risk",
+        element: (
+          <RequirePermission permission="risk:read">
+            <RiskPage />
+          </RequirePermission>
+        ),
+      },
+      {
         path: "variations/:variationId",
         element: (
           <RequirePermission permission="variations:manage">
@@ -207,6 +217,14 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission="reports:create">
                 <ReportFormPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "risk",
+            element: (
+              <RequirePermission permission="risk:read">
+                <ProjectRisk />
               </RequirePermission>
             ),
           },

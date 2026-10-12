@@ -21,6 +21,7 @@ from app.models import (
     Task,
     User,
 )
+from app.services import supplier_service
 from tests.conftest import make_settings
 from tests.report_fixtures import FakeWeather
 
@@ -105,9 +106,23 @@ def test_seed_dev_creates_sites_and_one_user_per_role(
         )
     ).all()
     assert len(overdue) == 2
-    statuses = sorted(r.status for r in cli_db.scalars(select(MaterialRequest)).all())
+    statuses = sorted(
+        r.status
+        for r in cli_db.scalars(select(MaterialRequest).where(MaterialRequest.project_id == havelock.id))
+    )
     assert statuses == ["approved", "change_requested", "delivered", "ordered", "pm_approval", "requested"]
     assert cli_db.scalar(select(func.count(Supplier.id))) == 5
+    # BR-12 (Phase 10): a finished job gives every supplier an on-time record, and is never risk-scored.
+    finished = cli_db.scalar(select(Project).where(Project.code == cli.DEMO_HISTORY_PROJECT[0]))
+    assert finished is not None
+    assert finished.status == "completed"
+    assert finished.id not in {s.project_id for s in scores}
+    records, _ = supplier_service.records(cli_db, clock.site_today())
+    by_name = {s.name: s.id for s in cli_db.scalars(select(Supplier))}
+    for name, _item, orders, on_time in cli.DEMO_SUPPLIER_HISTORY:
+        history = records[by_name[name]]
+        assert history.count >= orders  # plus any Havelock orders already due
+        assert history.on_time >= on_time
 
 
 def test_send_reminders_command(cli_db: Session, capsys: pytest.CaptureFixture[str]) -> None:

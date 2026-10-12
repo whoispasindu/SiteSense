@@ -34,7 +34,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     label: "Control",
     items: [
-      // Risk is on the dashboard and project pages since Phase 6; this page arrives with the what-if planner.
+      // Every project by risk; each project's Risk tab holds its trend and the what-if planner (Phase 10).
       { label: "Risk & what-if", path: "/risk", icon: "risk", phase: 10, permission: "risk:read" },
       { label: "Cost & claims", path: "/cost", icon: "cost", phase: 8, permission: "cost:read", aliases: ["/variations"] },
       { label: "Variations", path: "/client/variations", icon: "cost", phase: 8, permission: "client:portal" },

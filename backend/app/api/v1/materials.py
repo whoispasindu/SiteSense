@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 from decimal import Decimal
 from typing import Annotated, Literal
 
@@ -37,7 +38,8 @@ from app.schemas.materials import (
     SupplierOut,
     SupplierUpdate,
 )
-from app.services import materials_service, procurement_service, project_service
+from app.schemas.supplier import CriticalPathIn, CriticalPathOut, OnTimeOut, OutlookOut
+from app.services import materials_service, procurement_service, project_service, supplier_service
 from app.services.visibility import shape, shape_all
 
 router = APIRouter(tags=["materials"])
@@ -244,3 +246,42 @@ def record_delivery(
     return procurement_service.to_po_detail(
         procurement_service.record_delivery(db, user, order_id, body, meta=meta)
     )
+
+
+# --- Supplier on-time estimates and BR-12 (Phase 10) --------------------------------------------------
+
+
+@router.get("/suppliers/{supplier_id}/on-time", response_model=OnTimeOut)
+def supplier_on_time(
+    supplier_id: uuid.UUID,
+    user: Reader,
+    db: DbSession,
+    project_id: Annotated[uuid.UUID | None, Query()] = None,
+    expected_delivery: Annotated[date | None, Query()] = None,
+) -> OnTimeOut:
+    """The chance the supplier's next order arrives on time, with its range and the deliveries behind it."""
+    return supplier_service.on_time(db, user, supplier_id, project_id, expected_delivery)
+
+
+@router.get("/projects/{project_id}/supplier-outlook", response_model=OutlookOut)
+def supplier_outlook(
+    project_id: uuid.UUID,
+    user: Reader,
+    db: DbSession,
+    expected_delivery: Annotated[date | None, Query()] = None,
+) -> OutlookOut:
+    """Every active supplier for an order on this project, best first, and its critical-path requests."""
+    return supplier_service.outlook(db, user, project_id, expected_delivery)
+
+
+@router.get("/material-requests/{request_id}/critical-path", response_model=CriticalPathOut)
+def request_critical_path(request_id: uuid.UUID, user: Reader, db: DbSession) -> CriticalPathOut:
+    return supplier_service.critical_path(db, user, request_id)
+
+
+@router.put("/material-requests/{request_id}/critical-path", response_model=CriticalPathOut)
+def set_request_critical_path(
+    request_id: uuid.UUID, data: CriticalPathIn, user: Reader, db: DbSession, meta: Meta
+) -> CriticalPathOut:
+    """Project manager only: mark the request critical or not critical, or hand it back to the programme."""
+    return supplier_service.set_critical_path(db, user, request_id, data, meta=meta)

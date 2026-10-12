@@ -49,6 +49,7 @@ _LABELS: dict[str, tuple[str, str]] = {
     "late_deliveries_count": ("Late deliveries", "signal"),
     "avg_lateness_days": ("Delivery lateness", "signal"),
     "rain_days_next_14": ("Heavy rain forecast", "signal"),
+    "wet_days_ahead": ("Wet season ahead", "signal"),  # the site can protect the work or resequence it
     "budget_variance_pct": ("Committed cost against budget", "signal"),
     "crew_vs_plan_pct": ("Crew against plan", "signal"),
     "missing_reports_14": ("Missing daily reports", "signal"),
@@ -84,6 +85,8 @@ def describe(feature: str, values: dict[str, float]) -> str:
         return f"{v:.1f} days on average" if v else "none late"
     if feature == "rain_days_next_14":
         return _plural(v, "day") + " in the next 14"
+    if feature == "wet_days_ahead":
+        return f"about {_plural(v, 'heavy-rain day')} expected in the rest of the programme"
     if feature == "budget_variance_pct":
         return f"{v:+.1f}%"
     if feature == "crew_vs_plan_pct":

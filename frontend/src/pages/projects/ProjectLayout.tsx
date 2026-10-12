@@ -84,6 +84,14 @@ export function ProjectLayout() {
             Reports
           </NavLink>
         ) : null}
+        {can("risk:read") ? (
+          <NavLink
+            to={`/projects/${p.id}/risk`}
+            className={({ isActive }) => `${TAB} ${isActive ? "border-accent-line text-ink" : "border-transparent text-ink-faint hover:border-rule-strong hover:text-ink"}`}
+          >
+            Risk
+          </NavLink>
+        ) : null}
         {can("cost:read") ? (
           <NavLink
             to={`/projects/${p.id}/claims`}

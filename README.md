@@ -35,9 +35,11 @@ them, and clients see honest progress without internal costs.
   that hold back the tasks they stop
 - Daily site reports with photos and weather filled in automatically
 - Materials workflow from request to delivery, driven by 12 business rules
-- AI risk forecasts with drivers, ranges and a what-if recovery planner (v1 live: a daily delay and
-  cost-overrun score for every project, ranked on the dashboard; see the
+- AI risk forecasts with their likely ranges, SHAP drivers and a what-if recovery planner: a daily
+  delay and cost-overrun score for every project, ranked on the dashboard (see the
   [model card](docs/model-card-risk.md))
+- Supplier on-time chances, so orders for critical-path items steer away from unreliable suppliers
+  (BR-12; [model card](docs/model-card-supplier.md))
 - AI report reading that tags issues, always confirmed by a person
 - Cost control, progress claims with retention, and variation orders
 - Client portal with progress and variation approval
@@ -106,10 +108,10 @@ Every account uses the password in `SITESENSE_DEMO_PASSWORD` in your `.env`
 
 | Role | Email | Try this |
 | --- | --- | --- |
-| Project Manager | `pm@sitesense.example` | Dashboard ranked by risk; Cost & claims: approve the waiting progress claim; open Havelock Residences for the forecast and its drivers, and its Schedule tab for the critical path, forecast slip and rain on pour days; link tasks from a task's edit dialog; approve requests sent to the PM |
+| Project Manager | `pm@sitesense.example` | Dashboard ranked by risk; Cost & claims: approve the waiting progress claim; open Havelock Residences: its Risk tab has the forecast with its likely range, the 14-day trend and the what-if planner (tick weather protection: the monsoon is coming), and its Schedule tab for the critical path, forecast slip and rain on pour days; link tasks from a task's edit dialog; approve requests sent to the PM |
 | Quantity Surveyor | `qs@sitesense.example` | Enter the quoted price at the QS check and watch BR-01 and BR-13 decide who approves; price variation VO-0003; make a progress claim and see BR-08 calculate it; budget forecast |
 | Site Engineer | `engineer@sitesense.example` | File today's daily report for Havelock and write a problem or two: the AI check tags them for you to confirm (a safety issue can flag stop-work on chosen tasks); raise a material request |
-| Procurement Officer | `procurement@sitesense.example` | Order approved requests, record deliveries, manage suppliers |
+| Procurement Officer | `procurement@sitesense.example` | Order approved requests (choose Ceylon Formwork Hire for MR-0003 and BR-12 suggests a more reliable supplier), record deliveries, manage suppliers |
 | Company Admin | `admin@sitesense.example` | Users, sites, holidays, each project's variation limit (BR-09) and the audit log |
 | Client | `client@sitesense.example` | Variations: approve or query VO-0002, a roof plant room with a 10-day time impact (TC-10). The full portal arrives in Phase 12 |
 
@@ -125,7 +127,9 @@ Stop with `docker compose down`; `docker compose down -v` also deletes the local
 Havelock Residences comes with a full BOQ (`backend/app/seed_data/boq-havelock-residences.csv`,
 also a good file to try the import with), a linked programme with its concrete pours marked, a few
 weeks of daily reports, five suppliers and material requests at every stage (QS check, PM approval,
-ready to order, ordered, delivered, change requested).
+ready to order, ordered, delivered, change requested). A finished job, Negombo Road Warehouse, holds
+a year of deliveries, so each supplier has an on-time record: one is unreliable and one has too few
+deliveries to judge.
 
 Every open demo project is also given a risk score by the model, and the PM and QS dashboards rank
 the projects by it. Havelock runs short-handed with a few missed reports and late deliveries;
@@ -280,8 +284,8 @@ docs/           architecture, decision records, security reviews, model cards
 | 6 | Demo data and risk model v1 → **v0.1 MVP** | Done |
 | 7 | Report NLP classifier | Done |
 | 8 | Cost control, claims and variations | Done |
-| 9 | Advanced schedule | In review |
-| 10 | Risk model v2, what-if planner and supplier model | Planned |
+| 9 | Advanced schedule | Done |
+| 10 | Risk model v2, what-if planner and supplier model | In review |
 | 11 | Dashboard, alerts and AI briefing | Planned |
 | 12 | Client portal | Planned |
 | 13 | Hardening and deployment | Planned |

@@ -1,0 +1,83 @@
+{
+  "version": "1.0.0",
+  "shipped": "smoothed",
+  "choice": {
+    "logistic_minus_baseline_log_loss": {
+      "mean": -0.0037,
+      "low": -0.0084,
+      "high": 0.0014
+    },
+    "rule": "logistic only if the whole 95% interval is below zero"
+  },
+  "test": {
+    "logistic": {
+      "log_loss": 0.517,
+      "brier": 0.1727,
+      "auc": 0.751
+    },
+    "smoothed": {
+      "log_loss": 0.5235,
+      "brier": 0.1753,
+      "auc": 0.733
+    }
+  },
+  "test_by_history": {
+    "low_data": {
+      "orders": 150,
+      "log_loss": 0.5303,
+      "brier": 0.1761,
+      "auc": 0.661
+    },
+    "enough_data": {
+      "orders": 868,
+      "log_loss": 0.5224,
+      "brier": 0.1751,
+      "auc": 0.743
+    }
+  },
+  "calibration": [
+    {
+      "predicted": 0.443,
+      "actual": 0.5,
+      "orders": 204
+    },
+    {
+      "predicted": 0.579,
+      "actual": 0.532,
+      "orders": 203
+    },
+    {
+      "predicted": 0.728,
+      "actual": 0.779,
+      "orders": 204
+    },
+    {
+      "predicted": 0.812,
+      "actual": 0.828,
+      "orders": 203
+    },
+    {
+      "predicted": 0.918,
+      "actual": 0.912,
+      "orders": 204
+    }
+  ],
+  "coefficients": {
+    "supplier_logit": 1.0828,
+    "log_deliveries": 0.0026,
+    "lead_time_days": 0.0014,
+    "wet_share": -1.2386,
+    "short_lead": -0.8767,
+    "supplier_logit_x_log_deliveries": -0.0276
+  },
+  "split": {
+    "train_suppliers": 120,
+    "test_suppliers": 30,
+    "train_orders": 3688,
+    "test_orders": 1018
+  },
+  "on_time_share": 0.724,
+  "data_sha256": "da05084468e9d5145db8aab8ebb7592d4cd4f66c137eb9e02273685d1a46d7ec",
+  "trained_at": "2026-10-12T06:03:56+00:00",
+  "model_sha256": "feb7a42337cc2e768b5ec812cf4ae6a272cb4b501f6bb680781d485f8281510c"
+}
