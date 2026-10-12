@@ -133,7 +133,14 @@ export function ProjectFormDialog({ open, onClose, project }: ProjectFormDialogP
           </div>
         ) : null}
 
-        <TextField label="Project name" name="name" defaultValue={project?.name} autoComplete="off" error={errors.name} />
+        <TextField
+          label="Project name"
+          name="name"
+          defaultValue={project?.name}
+          autoComplete="off"
+          error={errors.name}
+          hint="Name projects by place or code, not by a person’s name."
+        />
         <TextField label="Client" name="client_name" defaultValue={project?.client_name} autoComplete="off" error={errors.client_name} />
 
         <div className="grid gap-5 sm:grid-cols-2">

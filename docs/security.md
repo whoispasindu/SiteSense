@@ -111,7 +111,10 @@ Scope:
 ### Privacy
 
 - Project names go to Anthropic when a key is set (the project owner's decision). A project named
-  after a person would carry that name. Name projects by place or code, as the demo does.
+  after a person would carry that name, so the project form says: "Name projects by place or code,
+  not by a person’s name."
+- High-severity emails follow only the author's confirmed severity, and only when the author asks
+  for the alert. The AI's suggestion alone alerts nobody, in the app or by email (tested).
 - An email's title can name the person who decided a variation ("VO-0003 approved by …"). These go
   to colleagues on the same project (PM, QS, the raiser), never to the client, whose only email is
   "VO-… needs your decision".

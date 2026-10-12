@@ -14,7 +14,16 @@ from app.ai.nlp.tagger import LOW_CONFIDENCE
 from app.ai.risk.features import build as build_features
 from app.core import clock
 from app.core.permissions import Role
-from app.models import AuditLog, Notification, Project, ReportAction, ReportIssue, RiskScore, User
+from app.models import (
+    AuditLog,
+    EmailOutbox,
+    Notification,
+    Project,
+    ReportAction,
+    ReportIssue,
+    RiskScore,
+    User,
+)
 from tests.materials_fixtures import Boq, Who, needed_by
 from tests.report_fixtures import Person, report_body
 
@@ -270,6 +279,42 @@ def test_high_severity_alerts_the_project_managers(
     assert note.title == "High-severity issue on HR-1"
     assert note.link == f"/reports/{report_id}"
     assert notes_of(db, engineer.user, "issue_high") == []
+
+
+def emails_to(db: Session, user: User) -> list[EmailOutbox]:
+    return list(db.scalars(select(EmailOutbox).where(EmailOutbox.user_id == user.id)))
+
+
+def test_high_severity_email_follows_the_authors_confirmation_never_the_ai(
+    api: TestClient, db: Session, report_project: Project, engineer: Person, manager: Person
+) -> None:
+    """Phase 11: the urgent email goes out only for a high severity the author has confirmed."""
+    report_id = file_report(api, report_project, engineer, "cement not delivered again")
+    [issue] = analyze(api, report_id, engineer)["issues"]
+    assert issue["severity"] == "high"  # the AI's suggestion
+    # A suggestion alone alerts nobody, in the app or by email.
+    assert notes_of(db, manager.user, "issue_high") == []
+    assert emails_to(db, manager.user) == []
+
+    # The author marks it medium: no alert can be asked for, and no email goes out.
+    refused = confirm(api, report_id, engineer, [keep(issue, severity="medium")], pm_alert=True)
+    assert refused.status_code == 422
+    assert confirm(api, report_id, engineer, [keep(issue, severity="medium")]).status_code == 200
+    assert notes_of(db, manager.user, "issue_high") == []
+    assert emails_to(db, manager.user) == []
+
+
+def test_a_confirmed_high_severity_issue_is_emailed_at_once(
+    api: TestClient, db: Session, report_project: Project, engineer: Person, manager: Person
+) -> None:
+    report_id = file_report(api, report_project, engineer, "cement not delivered again")
+    [issue] = analyze(api, report_id, engineer)["issues"]
+    confirm(api, report_id, engineer, [keep(issue)], pm_alert=True)
+
+    [email] = emails_to(db, manager.user)
+    assert (email.kind, email.subject) == ("urgent", "SiteSense: High-severity issue on HR-1")
+    assert "cement" not in email.body  # the report's words stay in the app
+    assert emails_to(db, engineer.user) == []
 
 
 def test_stop_work_is_cleared_only_by_the_project_manager(
