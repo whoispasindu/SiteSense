@@ -84,6 +84,7 @@ from app.services import (
     photos,
     portal_service,
     procurement_service,
+    report_service,
     risk_service,
     variation_service,
 )
@@ -915,6 +916,18 @@ def check_pours() -> int:
     return 0
 
 
+def strip_photo_metadata(dry_run: bool) -> int:
+    """One-off (Phase 12): re-encode stored photos that still carry a comment or other metadata."""
+    settings = get_settings()
+    database = Database(settings)
+    with database.session_factory() as db:
+        result = report_service.strip_stored_metadata(db, LocalStorage(settings.media_root), dry_run=dry_run)
+    database.dispose()
+    verb = "would clean" if dry_run else "cleaned"
+    print(f"Checked {result.photos} photos: {verb} {result.cleaned} files; {result.missing} files missing.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -927,6 +940,10 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("score-risk", help="score every open project's risk now")
     sub.add_parser("check-variance", help="forecast final cost per section and alert new overruns")
     sub.add_parser("check-pours", help="BR-06: alert PMs about concrete pours on heavy-rain days")
+    strip = sub.add_parser(
+        "strip-photo-metadata", help="re-encode stored photos that still carry a comment or other metadata"
+    )
+    strip.add_argument("--dry-run", action="store_true", help="count the files, change nothing")
     args = parser.parse_args(argv)
 
     if args.command == "create-admin":
@@ -941,6 +958,8 @@ def main(argv: list[str] | None = None) -> int:
         return check_variance()
     if args.command == "check-pours":
         return check_pours()
+    if args.command == "strip-photo-metadata":
+        return strip_photo_metadata(args.dry_run)
     return seed_dev()
 
 

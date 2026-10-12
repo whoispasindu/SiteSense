@@ -131,6 +131,7 @@ Tested with two clients on one site in `backend/tests/test_client_portal.py`.
 | `GET /api/v1/projects/{id}/photos` | PM, QS, Site Engineer | Every report photo with whether the client sees it |
 | `POST /api/v1/projects/{id}/photos/client-share` | **Project manager only** | Share or unshare up to 100 of the project's photos; all-or-nothing; audited |
 | `PATCH /api/v1/tasks/{id}` (`client_milestone`, `milestone_name`) | **Project manager only** | Strict boolean; a name only on a milestone |
+| `PATCH /api/v1/projects/{id}` (`defects_period_months`) | **Project manager only** | Whole months, 0 to 60 (strict); sets when the client's retention is due back |
 | `GET /api/v1/admin/projects`, `POST /api/v1/admin/users/{id}/projects` | Company Admin | Link a client account to projects (replaces the set; clients only; audited). The list carries no figures |
 
 ## Phase 11 endpoints

@@ -203,6 +203,7 @@ export function Payments({ projectId }: { projectId: string }) {
         <div>
           <dt className="text-xs text-ink-faint">Retention held</dt>
           <dd className="tabular text-lg font-semibold text-ink">{formatCompactLKR(c.retention_held)}</dd>
+          <dd className="text-xs text-ink-soft">Due back around {formatDate(c.retention_release.expected_on)}</dd>
           <dd className="text-xs text-ink-faint">{c.retention_note}</dd>
         </div>
       </dl>

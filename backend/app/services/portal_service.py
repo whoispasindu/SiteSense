@@ -47,15 +47,48 @@ from app.schemas.portal import (
     PhotosShareIn,
     ProjectPhotoOut,
     ProjectPhotos,
+    RetentionRelease,
 )
 from app.services import audit, client_access, handover_service, network_service, schedule_service
 from app.services.audit import RequestMeta
 from app.services.progress import actual_percent, planned_percent
 
 PHOTO_LIMIT = 60
-RETENTION_NOTE = (
-    "Retention is held back from each claim and released at the end of the defects period after handover."
-)
+
+
+def add_months(day: date, months: int) -> date:
+    """The same day ``months`` later, on the month's last day when it is shorter (31 Jan + 1 = 28 Feb)."""
+    month_index = day.month - 1 + months
+    year, month = day.year + month_index // 12, month_index % 12 + 1
+    last = (date(year + month // 12, month % 12 + 1, 1) - date.resolution).day
+    return date(year, month, min(day.day, last))
+
+
+def retention_release(db: Session, project: Project) -> RetentionRelease:
+    published = handover_service.latest_published(db, project.id)
+    handover = published.handover_date if published else project.planned_end
+    return RetentionRelease(
+        defects_period_months=project.defects_period_months,
+        handover_date=handover,
+        handover_published=published is not None,
+        expected_on=add_months(handover, project.defects_period_months),
+    )
+
+
+def retention_note(release: RetentionRelease) -> str:
+    months = release.defects_period_months
+    basis = "the expected handover" if release.handover_published else "the contract handover date"
+    if months == 0:
+        return (
+            "Retention is held back from each claim and released at handover: "
+            f"expected {release.expected_on:%d %B %Y}."
+        )
+    return (
+        f"Retention is held back from each claim and released at the end of the {months}-month defects "
+        f"period after handover: expected around {release.expected_on:%d %B %Y}, from {basis}."
+    )
+
+
 ZERO = Decimal("0.00")
 CENT = Decimal("0.01")
 
@@ -235,6 +268,7 @@ def claims_view(db: Session, user: User, project_id: uuid.UUID) -> ClientClaims:
         )
         for c in claims
     ]
+    release = retention_release(db, project)
     return ClientClaims(
         project_id=project.id,
         original_contract_value=project.contract_value - variations,
@@ -244,7 +278,8 @@ def claims_view(db: Session, user: User, project_id: uuid.UUID) -> ClientClaims:
         paid_to_date=sum((c.amount for c in claims if c.status == ClaimStatus.PAID.value), ZERO),
         # Retention is cumulative (5% of the value certified so far): the latest claim's figure is the total.
         retention_held=claims[0].retention if claims else ZERO,
-        retention_note=RETENTION_NOTE,
+        retention_release=release,
+        retention_note=retention_note(release),
         claims=out,
     )
 

@@ -9,6 +9,7 @@ Rules:
 """
 
 import uuid
+from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import exists, func, select
@@ -17,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.core import clock
 from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
+from app.core.logging import get_logger
 from app.core.permissions import Permission, Role, has_permission
 from app.core.scoping import scope_to_user_sites
 from app.integrations.storage import Storage
@@ -36,6 +38,8 @@ from app.schemas.report import (
 from app.services import audit, notification_service, photos, project_service, schedule_service, weather
 from app.services.audit import AuditAction, RequestMeta
 from app.services.notification_service import NewNotification
+
+log = get_logger(__name__)
 
 MAX_BACKDATE_DAYS = 7
 OPEN_STATUSES = {ProjectStatus.ACTIVE.value, ProjectStatus.ON_HOLD.value}
@@ -485,3 +489,45 @@ def send_missing_report_reminders(db: Session, day: date) -> int:
         created += notification_service.send(db, items)
     db.commit()
     return created
+
+
+@dataclass(frozen=True, slots=True)
+class MetadataSweep:
+    photos: int  # photos looked at
+    cleaned: int  # files rewritten without metadata (full and thumbnail counted apart)
+    missing: int  # files that could not be read
+
+
+def strip_stored_metadata(db: Session, storage: Storage, *, dry_run: bool = False) -> MetadataSweep:
+    """One-off clean-up (Phase 12): re-encode stored photos that still carry metadata.
+
+    Uploads before the Phase 12 fix kept a JPEG comment, which can hold a name or a place. Each stored
+    file (full size and thumbnail) is checked and, if it carries a comment, EXIF, XMP or an ICC profile,
+    rewritten from its pixels. Safe to run again: clean files are left alone. Audited once, with counts.
+    """
+    seen = cleaned = missing = 0
+    for photo in db.scalars(select(ReportPhoto).order_by(ReportPhoto.created_at)):
+        seen += 1
+        for key in (photo.storage_key, thumb_key(photo)):
+            try:
+                data = storage.read(key)
+            except OSError:
+                missing += 1
+                log.warning("photo_file_missing", photo_id=str(photo.id))
+                continue
+            clean = photos.without_metadata(data)
+            if clean is data:
+                continue
+            cleaned += 1
+            if not dry_run:
+                storage.save(key, clean)
+                if key == photo.storage_key:
+                    photo.size_bytes = len(clean)
+    if not dry_run:
+        audit.record(
+            db,
+            AuditAction.PHOTOS_METADATA_STRIPPED,
+            details={"photos": seen, "files_cleaned": cleaned, "files_missing": missing},
+        )
+        db.commit()
+    return MetadataSweep(photos=seen, cleaned=cleaned, missing=missing)

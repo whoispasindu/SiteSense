@@ -179,3 +179,18 @@ def test_score_risk_command(cli_db: Session, capsys: pytest.CaptureFixture[str])
     assert cli.main(["score-risk"]) == 0
 
     assert "Scored" in capsys.readouterr().out
+
+
+def test_strip_photo_metadata_command(
+    cli_db: Session, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("SITESENSE_DEMO_PASSWORD", DEMO_PASSWORD)
+    assert cli.main(["seed-dev"]) == 0
+    capsys.readouterr()
+
+    assert cli.main(["strip-photo-metadata", "--dry-run"]) == 0
+    assert capsys.readouterr().out.strip() == (
+        f"Checked {len(cli.DEMO_PHOTOS)} photos: would clean 0 files; 0 files missing."
+    )
+    assert cli.main(["strip-photo-metadata"]) == 0
+    assert "cleaned 0 files" in capsys.readouterr().out

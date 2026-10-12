@@ -225,6 +225,16 @@ migrate the `sitesense_test` database and run each test in a transaction that is
 Override the location with `SITESENSE_TEST_DATABASE_URL` and `SITESENSE_TEST_MIGRATION_DATABASE_URL`. Every pull request also runs dependency audits, a secret scan and
 CodeQL; see [docs/security.md](docs/security.md).
 
+### Upgrading an existing install
+
+After upgrading to Phase 12, link each client account to its projects (Users → the client), then
+clean photos uploaded before this release:
+
+```bash
+docker compose exec backend python -m app.cli strip-photo-metadata --dry-run
+docker compose exec backend python -m app.cli strip-photo-metadata
+```
+
 ## Configuration
 
 Backend settings are environment variables prefixed with `SITESENSE_`

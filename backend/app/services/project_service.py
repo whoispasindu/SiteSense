@@ -226,6 +226,7 @@ def project_detail(db: Session, project: Project) -> ProjectDetail:
             "description": project.description,
             "planned_crew": project.planned_crew,
             "working_week": project.working_week,
+            "defects_period_months": project.defects_period_months,
             "contract_locked": contract_locked(db, project),
             "sections": sections,
             "team": _team(db, project),
@@ -294,7 +295,14 @@ def update_project(
         raise BusinessRuleError("The planned end date must be on or after the start date.")
     if (end - start).days > MAX_PROJECT_DAYS:
         raise BusinessRuleError("A project can run for at most 15 years.")
-    for required in ("name", "client_name", "project_type", "status", "contract_value"):
+    for required in (
+        "name",
+        "client_name",
+        "project_type",
+        "status",
+        "contract_value",
+        "defects_period_months",
+    ):
         if required in changes and changes[required] is None:
             raise BusinessRuleError(f"{required.replace('_', ' ').capitalize()} cannot be empty.")
     changed = {k: v for k, v in changes.items() if getattr(project, k) != v}

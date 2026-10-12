@@ -62,6 +62,12 @@ const claimsSchema = z.object({
   claimed_to_date: decimal,
   paid_to_date: decimal,
   retention_held: decimal,
+  retention_release: z.object({
+    defects_period_months: z.number().int(),
+    handover_date: z.iso.date(),
+    handover_published: z.boolean(),
+    expected_on: z.iso.date(),
+  }),
   retention_note: z.string(),
   claims: z.array(
     z.object({

@@ -66,6 +66,8 @@ export const projectDetailSchema = projectSummarySchema.extend({
   // Planned average crew on site; the risk model compares reported crews with it.
   planned_crew: z.number().int().nullable(),
   working_week: z.string().optional(),
+  // Phase 12: months after handover before the retention is released.
+  defects_period_months: z.number().int().optional(),
   // Past planning, or with claims or variations: the contract changes only through approved variations.
   contract_locked: z.boolean().optional(),
   sections: z.array(sectionTotalsSchema),
@@ -174,6 +176,7 @@ export interface ProjectInput {
   description: string | null;
   planned_crew: number | null;
   working_week: string;
+  defects_period_months: number;
 }
 
 export function useSaveProject(id?: string) {

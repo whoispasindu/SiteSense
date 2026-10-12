@@ -28,6 +28,8 @@ def _upper(value: object) -> object:
 ProjectCode = Annotated[str, BeforeValidator(_upper), StringConstraints(pattern=r"^[A-Z0-9][A-Z0-9-]{1,23}$")]
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=160)]
 Money = Annotated[Decimal, Field(max_digits=16, decimal_places=2)]
+# Phase 12: the defects liability period, in months after handover (the retention is released after it).
+DefectsMonths = Annotated[int, Field(ge=0, le=60, strict=True)]
 
 # Longest contract period accepted. It bounds every week-by-week calculation (S-curves), so an
 # absurd date such as 9999-12-31 cannot turn one request into minutes of work.
@@ -65,6 +67,7 @@ class ProjectCreate(BaseModel):
     description: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)] | None = None
     planned_crew: PlannedCrew | None = None
     working_week: WorkingWeek = DEFAULT_WORKING_WEEK
+    defects_period_months: DefectsMonths = 12
 
     @model_validator(mode="after")
     def _dates_in_order(self) -> "ProjectCreate":
@@ -90,6 +93,7 @@ class ProjectUpdate(BaseModel):
     description: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)] | None = None
     planned_crew: PlannedCrew | None = None
     working_week: WorkingWeek | None = None
+    defects_period_months: DefectsMonths | None = None
 
 
 # Each response comes in two shapes. The base classes carry no rates or amounts and are what site
@@ -143,6 +147,7 @@ class ProjectDetailBasics(ProjectCard):
     description: str | None
     planned_crew: int | None
     working_week: str = DEFAULT_WORKING_WEEK
+    defects_period_months: int = 12
     sections: list[SectionBasics]
     team: list[TeamMember]
     created_at: datetime
@@ -153,6 +158,7 @@ class ProjectDetail(ProjectSummary):
     description: str | None
     planned_crew: int | None
     working_week: str = DEFAULT_WORKING_WEEK
+    defects_period_months: int = 12
     # Past planning (or with claims or variations): contract value and planned end change only through
     # approved variations.
     contract_locked: bool = False

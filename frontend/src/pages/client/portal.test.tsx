@@ -42,6 +42,7 @@ const CLAIMS: ClientClaims = {
   project_id: PID, original_contract_value: "1114000000.00", approved_variations: "850000.00",
   contract_value: "1114850000.00", claimed_to_date: "189710948.15", paid_to_date: "189710948.15",
   retention_held: "9984786.75",
+  retention_release: { defects_period_months: 12, handover_date: "2027-10-12", handover_published: true, expected_on: "2028-10-12" },
   retention_note: "Retention is held back from each claim and released at the end of the defects period after handover.",
   claims: [
     { number: "PC-0001", status: "paid", certified_pct: "17.93", certified_value: "199695734.90", retention: "9984786.75",
@@ -137,6 +138,7 @@ describe("The client portal", () => {
     expect(table).toHaveTextContent("17.93%");
     expect(table).toHaveTextContent("Paid 13 Oct 2026");
     expect(screen.getByText(/released at the end of the defects period/)).toBeInTheDocument();
+    expect(screen.getByText("Due back around 12 Oct 2028")).toBeInTheDocument();
     expect(screen.getByText(/plus LKR 850 k of approved variations/)).toBeInTheDocument();
   });
 

@@ -6,6 +6,18 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Upgrading
+
+- **Link existing client accounts to their projects.** From Phase 12, clients see only the projects
+  the Company Admin links them to (Users → the client → *Projects this client can see*), not every
+  project on their sites. Until linked, an existing client account sees no projects. There is no
+  automatic copy from sites, because that would carry over the cross-client exposure this fixes.
+- **Clean photos uploaded before this release:** run `python -m app.cli strip-photo-metadata` once
+  (add `--dry-run` to count first). It re-encodes any stored photo that still carries a JPEG comment
+  or other metadata, and is safe to run again.
+- Migrations 0014 to 0016 add the client portal tables, the client links and each project's defects
+  period (12 months for existing projects).
+
 ### Added
 
 - Phase 12, the client portal ([ADR 0015](docs/adr/0015-client-portal.md)):
@@ -25,6 +37,11 @@ uses [Semantic Versioning](https://semver.org/).
     Clients reach nothing else: portal pages, variation decisions, notifications and emails, photos.
     Another client's project, even on the same site, answers exactly like one that does not exist
     (tested with two clients on one site).
+  - **The defects period** per project (default 12 months, set on the project form). The client's
+    payments show when the retention is due back: the end of that period after the published
+    handover date (or the contract date before one is published).
+  - **`strip-photo-metadata`**, a one-off command that re-encodes stored photos still carrying a
+    comment or other metadata.
   - **A "Client view" tab** on each project:
     - the PM publishes the client's handover date with a reason, helped by the programme forecast and
       the risk model's range, or confirms it unchanged (both audited, and the client is notified of a

@@ -499,7 +499,15 @@ def test_the_client_sees_approved_claims_and_the_retention_held(
     assert Decimal(view["claimed_to_date"]) == Decimal("190000.00")
     assert Decimal(view["paid_to_date"]) == Decimal("95000.00")
     assert Decimal(view["retention_held"]) == Decimal("10000.00")  # cumulative: the latest claim's figure
-    assert "end of the defects period" in view["retention_note"]
+    # Released 12 months (the default defects period) after the contract handover: none is published.
+    assert view["retention_release"] == {
+        "defects_period_months": 12, "handover_date": "2027-03-31", "handover_published": False,
+        "expected_on": "2028-03-31",
+    }  # fmt: skip
+    assert view["retention_note"] == (
+        "Retention is held back from each claim and released at the end of the 12-month defects period "
+        "after handover: expected around 31 March 2028, from the contract handover date."
+    )
     assert "SECRET" not in str(view)
 
 
@@ -781,3 +789,99 @@ def test_a_photo_of_another_project_cannot_be_shared_through_this_one(
     assert photo is not None
     db.refresh(photo)
     assert photo.shared_with_client is False
+
+
+# --- The defects period and the retention release ---------------------------------------------------------
+
+
+def test_the_retention_release_follows_the_published_date_and_the_defects_period(
+    api: TestClient, db: Session, report_project: Project, report_task: Task, pm: Person, client: Person
+) -> None:
+    response = api.patch(
+        f"/api/v1/projects/{report_project.id}", json={"defects_period_months": 24}, headers=pm.headers
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["defects_period_months"] == 24
+    publish(api, report_project, pm, date(2027, 5, 31), "Lift delivery.")
+
+    release = get(api, f"/client/projects/{report_project.id}/claims", client)
+    assert release["retention_release"] == {
+        "defects_period_months": 24, "handover_date": "2027-05-31", "handover_published": True,
+        "expected_on": "2029-05-31",
+    }  # fmt: skip
+    assert "24-month defects period" in release["retention_note"]
+    assert "from the expected handover" in release["retention_note"]
+
+    api.patch(f"/api/v1/projects/{report_project.id}", json={"defects_period_months": 0}, headers=pm.headers)
+    note = get(api, f"/client/projects/{report_project.id}/claims", client)["retention_note"]
+    assert note == "Retention is held back from each claim and released at handover: expected 31 May 2027."
+
+
+@pytest.mark.parametrize("months", [-1, 61, None, "12"])
+def test_the_defects_period_is_checked(
+    api: TestClient, report_project: Project, pm: Person, months: object
+) -> None:
+    response = api.patch(
+        f"/api/v1/projects/{report_project.id}", json={"defects_period_months": months}, headers=pm.headers
+    )
+    assert response.status_code == 422
+
+
+def test_new_projects_default_to_twelve_months(api: TestClient, report_project: Project, pm: Person) -> None:
+    assert get(api, f"/projects/{report_project.id}", pm)["defects_period_months"] == 12
+
+
+@pytest.mark.parametrize(
+    ("start", "months", "expected"),
+    [
+        (date(2027, 1, 31), 1, date(2027, 2, 28)),
+        (date(2028, 1, 31), 1, date(2028, 2, 29)),
+        (date(2027, 3, 31), 12, date(2028, 3, 31)),
+        (date(2027, 11, 30), 3, date(2028, 2, 29)),
+        (date(2027, 6, 15), 0, date(2027, 6, 15)),
+    ],
+)
+def test_add_months(start: date, months: int, expected: date) -> None:
+    from app.services.portal_service import add_months
+
+    assert add_months(start, months) == expected
+
+
+# --- Cleaning metadata from photos stored before the fix ---------------------------------------------------
+
+
+def test_stored_photos_with_metadata_are_cleaned_once(
+    api: TestClient, app: FastAPI, db: Session, report_project: Project, engineer: Person
+) -> None:
+    from app.services import report_service
+
+    photo_id = file_report_with_photo(api, report_project, engineer)
+    photo = db.get(ReportPhoto, uuid.UUID(photo_id))
+    assert photo is not None
+    storage = app.state.storage
+    exif = Image.Exif()
+    exif[0x010F] = "PhoneMaker"
+    dirty = image_bytes("JPEG", (64, 48), exif=exif, comment=b"Taken by Kamal Perera")
+    storage.save(photo.storage_key, dirty)  # as an upload before the fix could have been stored
+
+    dry = report_service.strip_stored_metadata(db, storage, dry_run=True)
+    assert (dry.photos, dry.cleaned, dry.missing) == (1, 1, 0)
+    assert storage.read(photo.storage_key) == dirty  # a dry run changes nothing
+
+    done = report_service.strip_stored_metadata(db, storage)
+    assert (done.photos, done.cleaned, done.missing) == (1, 1, 0)
+    clean = storage.read(photo.storage_key)
+    image = Image.open(io.BytesIO(clean))
+    assert "comment" not in image.info
+    assert len(image.getexif()) == 0
+    assert b"Kamal" not in clean
+    db.refresh(photo)
+    assert photo.size_bytes == len(clean)
+    entry = db.scalars(select(AuditLog).where(AuditLog.action == "photo.metadata_stripped")).one()
+    assert entry.details == {"photos": 1, "files_cleaned": 1, "files_missing": 0}
+
+    again = report_service.strip_stored_metadata(db, storage)
+    assert again.cleaned == 0  # safe to run again
+
+    storage.delete(report_service.thumb_key(photo))
+    assert report_service.strip_stored_metadata(db, storage).missing == 1

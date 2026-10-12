@@ -90,6 +90,15 @@ class ClientClaim(BaseModel):
     paid_on: date | None
 
 
+class RetentionRelease(BaseModel):
+    """When the retention is due back: the end of the defects period after handover."""
+
+    defects_period_months: int
+    handover_date: date  # the published handover date, or the contract's planned end before one
+    handover_published: bool
+    expected_on: date
+
+
 class ClientClaims(BaseModel):
     project_id: uuid.UUID
     original_contract_value: Decimal
@@ -98,6 +107,7 @@ class ClientClaims(BaseModel):
     claimed_to_date: Decimal  # approved and paid claims
     paid_to_date: Decimal
     retention_held: Decimal  # running total held back so far
+    retention_release: RetentionRelease
     retention_note: str
     claims: list[ClientClaim]  # newest first
 

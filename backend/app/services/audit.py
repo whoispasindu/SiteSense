@@ -86,6 +86,7 @@ class AuditAction:
     HANDOVER_PUBLISHED = "project.handover_published"
     HANDOVER_CONFIRMED = "project.handover_confirmed"
     PHOTOS_CLIENT_SHARE_CHANGED = "photo.client_share_changed"
+    PHOTOS_METADATA_STRIPPED = "photo.metadata_stripped"  # the one-off clean-up of older uploads
 
 
 def record(

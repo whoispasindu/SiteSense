@@ -103,7 +103,7 @@ Scope:
 
 ### Verification beyond unit tests
 
-- **Mutation checks: 23 of 23** deliberate faults fail a test:
+- **Mutation checks: 30 of 30** deliberate faults fail a test:
   - cancelled projects shown;
   - any project, variation or photo opened by ID;
   - every variation listed;
@@ -121,7 +121,10 @@ Scope:
   - links kept after a role change;
   - an internal field added to a client schema;
   - publishing or sharing opened to readers;
-  - share changes not audited.
+  - share changes not audited;
+  - the photo clean-up writing on a dry run, or never writing;
+  - the retention date ignoring the published date, the defects period or short months;
+  - the defects period not strict, or unbounded.
 
   The first run caught 22. The survivor (sharing another project's photo) showed that the test only
   tried a random ID; it now tries a real photo of another project on the same site.
@@ -140,7 +143,9 @@ Scope:
    even with no arguments, so a comment such as a name or a place survived the "fresh" re-encode. The
    Phase 4 review had listed comments as dropped. The re-encode now clears the info dictionary, and a
    test uploads a commented JPEG and checks both sizes. Photos stored before the fix are cleaned on
-   the way to clients; staff copies keep any comment until re-uploaded.
+   the way to clients, and `python -m app.cli strip-photo-metadata` re-encodes the stored files once
+   (audited, safe to rerun). On the dev data it found nothing to clean, since the data was reseeded
+   after the fix; with metadata planted in one photo it cleaned that file and then found nothing.
 3. **Sharing could flush a half-updated photo.** Reading the user's ID mid-loop, after an earlier
    commit, triggered a query that flushed a row with `shared_with_client` set but no date. That broke
    the check constraint. The loop now reads its values first and runs with autoflush off. This was
@@ -152,7 +157,8 @@ Scope:
 
 - Existing client accounts must be linked to their projects after upgrading (no automatic backfill:
   it would recreate the site leak).
-- The defects-period end is not stored, so the retention note states the rule without a date.
+- The retention due date is an expectation (published handover plus the defects period). Recording
+  the actual handover date would make it exact.
 
 ## Phase 11 review: 2026-10-12
 

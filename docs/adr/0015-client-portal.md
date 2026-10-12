@@ -87,5 +87,9 @@ The project owner decided:
 - The Company Admin must link clients. It is one step, in the user's dialog.
 - Site assignment still exists for clients but no longer grants project access. It only decides which
   sites appear in their profile.
-- The defects-period end is not stored, so the note on retention states the rule without a date. A
-  per-project defects period could add it later.
+- Each project has a defects period (default 12 months, 0 to 60, set by the PM on the project form).
+  The client's retention is due back that long after the published handover date, or the contract
+  date before one is published. Without an actual handover date recorded, this is an expectation, and
+  the note says which date it counts from.
+- Photos uploaded before the fix may carry comments in staff copies. `python -m app.cli
+  strip-photo-metadata` re-encodes them once; client copies are cleaned on the way out regardless.
