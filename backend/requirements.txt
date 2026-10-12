@@ -22,3 +22,8 @@ APScheduler==3.11.3
 # fetched from a GitHub Release and checked against a SHA-256 manifest (scripts/fetch_models.py).
 onnxruntime==1.31.0
 tokenizers==0.23.3
+# Daily briefing (Phase 11): the official Anthropic SDK. Optional at run time: with no API key the
+# rule-based briefing is used. Only structured facts are ever sent (see app/ai/briefing).
+anthropic==1.13.0
+# Weekly PDF report (Phase 11). BSD licence; draws with its own canvas, no browser or system fonts.
+reportlab==5.0.1

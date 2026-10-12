@@ -55,14 +55,32 @@ const RANKING: RiskRanking = [
     level: null, delay_days: null, overrun_pct: null, ranges: null, top_driver: null, score_date: null },
 ];  // fmt: skip
 
-function riskApi(role: Role, extra: Record<string, () => Response> = {}) {
+/** The dashboard's portfolio, its high-risk count taken from the same ranking (null without risk access). */
+function portfolioFor(role: Role, ranking: RiskRanking) {
+  const seesRisk = role === "project_manager" || role === "quantity_surveyor";
+  return {
+    as_of: "2026-10-10",
+    kpis: {
+      active_projects: 1, total_projects: 1, average_actual_pct: null, average_planned_pct: null, behind_plan: 0,
+      reports_due_today: 0, reports_filed_today: 0, issues_this_week: 0, stop_work_open: 0, waiting_for_you: 0,
+      high_risk: seesRisk ? ranking.filter((r) => r.level === "high").length : null,
+    },
+    cost: null, risk: seesRisk ? ranking : null, issue_trend: [], weather: [], approvals: [],
+  };  // fmt: skip
+}
+
+function riskApi(role: Role, extra: Record<string, () => Response> = {}, ranking: RiskRanking = RANKING) {
   return mockApi({
     ...sessionApi(makeMe(role)),
+    "/api/v1/analytics/portfolio": () => jsonResponse(portfolioFor(role, ranking)),
+    "/api/v1/briefing/today": () =>
+      jsonResponse({ date: "2026-10-10", source: "rules", label: "Rule-based", model: null, generated_at: "2026-10-10T02:00:00Z", bullets: [], note: null }),
+    "/api/v1/notifications": () => jsonResponse({ unread: 0, items: [] }),
     "/api/v1/projects": () => jsonResponse([SUMMARY]),
     [`/api/v1/projects/${PID}`]: () => jsonResponse(DETAIL),
     "/api/v1/schedule/summary": () => jsonResponse([]),
     "/api/v1/reports/today": () => jsonResponse({ date: "2026-10-10", deadline: "2026-10-10T18:00:00+05:30", deadline_passed: false, projects: [] }),
-    "/api/v1/risk/projects": () => jsonResponse(RANKING),
+    "/api/v1/risk/projects": () => jsonResponse(ranking),
     [`/api/v1/projects/${PID}/risk`]: () => jsonResponse(RISK),
     ...extra,
   });
@@ -108,7 +126,7 @@ describe("Dashboard risk ranking", () => {
   });
 
   it("says when nothing is at high risk", async () => {
-    riskApi("project_manager", { "/api/v1/risk/projects": () => jsonResponse(RANKING.slice(1)) });
+    riskApi("project_manager", {}, RANKING.slice(1));
     renderRoute("/");
 
     const tile = await screen.findByRole("group", { name: "High risk" });
@@ -127,7 +145,7 @@ describe("Dashboard risk ranking", () => {
   });
 
   it("explains an empty portfolio", async () => {
-    riskApi("project_manager", { "/api/v1/risk/projects": () => jsonResponse([]) });
+    riskApi("project_manager", {}, []);
     renderRoute("/");
 
     expect(await screen.findByText("No open projects on your sites.")).toBeInTheDocument();

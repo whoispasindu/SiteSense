@@ -112,6 +112,19 @@ answers `404`, exactly like a missing record.
 
 Scores are written only by the scheduler, after daily reports and by the CLI; no endpoint writes them.
 
+## Phase 11 endpoints
+
+| Method and path | Who | Notes |
+| --- | --- | --- |
+| `GET /api/v1/analytics/portfolio` | PM, QS, Site Engineer, Procurement | One call for the dashboard, scoped to the user's sites. `cost` only with `cost:read` (PM, QS), `risk` and the high-risk count only with `risk:read`; otherwise `null`. The approval queue holds only what this person acts on, never their own request or variation, and no amounts |
+| `GET /api/v1/briefing/today` | PM, QS, Site Engineer, Procurement | Labelled AI-written or rule-based. Built from the reader's own allow-listed facts, which follow the same visibility; the model never receives report text, comments or names |
+| `GET /api/v1/reports/weekly.pdf` | **PM, QS only** (`cost:read`) | Holds budgets and forecasts. Audited (`report.weekly_downloaded`); `Cache-Control: no-store` |
+| `GET`, `PUT /api/v1/me/notification-preferences` | Everyone | Own choices only. Stop-work emails cannot be turned off; the weekly PDF only for PM and QS (`422` otherwise); strict booleans; changes audited |
+
+**Emails follow role visibility.** An email carries the alert's title, a fixed sentence and links,
+never the alert's body (comments, names, amounts, report text). The weekly PDF goes only to cost
+roles. Tested by `backend/tests/test_alerts_email.py`.
+
 ## Phase 10 endpoints
 
 | Method and path | Who | Notes |

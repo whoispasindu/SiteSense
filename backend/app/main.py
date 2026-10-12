@@ -18,6 +18,7 @@ from app.core.middleware import (
 )
 from app.core.rate_limit import RateLimiter
 from app.core.scheduler import build_scheduler
+from app.integrations import llm
 from app.integrations.storage import LocalStorage
 from app.integrations.weather import DisabledWeatherClient, OpenMeteoClient, WeatherClient
 
@@ -60,6 +61,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     if settings.weather_enabled:
         weather_client = OpenMeteoClient(settings.weather_timeout_seconds)
     app.state.weather_client = weather_client
+    # The daily briefing's model: None without an API key (then everyone gets the rule-based briefing).
+    app.state.briefing_llm = llm.from_settings(settings)
 
     register_error_handlers(app)
     app.include_router(api_router)

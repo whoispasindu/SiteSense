@@ -10,11 +10,28 @@ import ast
 from pathlib import Path
 
 APP = Path(__file__).parents[1] / "app"
-NETWORK_CLIENTS = {"httpx", "requests", "urllib3", "aiohttp", "socket", "smtplib", "ftplib", "http.client"}
+NETWORK_CLIENTS = {
+    "httpx",
+    "httpx2",
+    "requests",
+    "urllib3",
+    "aiohttp",
+    "socket",
+    "smtplib",
+    "ftplib",
+    "http.client",
+    "anthropic",
+}
 
 # Module -> what it sends. Report text: never, unless redacted first and tested.
 ALLOWED = {
     "integrations/weather.py": "a site's stored coordinates to Open-Meteo; no report text",
+    # Phase 11. Structured facts only (scores, ranges, counts, project codes and names, rule IDs);
+    # tests/test_briefing_leaks.py captures the real request and fails on report text or a name.
+    "integrations/llm.py": "the briefing facts to Claude; never report text, comments or people's names",
+    # Phase 11. Fixed templates: a notification's title, a fixed sentence, links; the weekly PDF to
+    # cost roles only. Never a notification's body (tests/test_alerts_email.py).
+    "integrations/email.py": "alert emails to the user's own address; never report text or bodies",
 }
 
 
@@ -52,4 +69,6 @@ def test_the_check_recognises_network_clients() -> None:
     assert _uses_network({"httpx"})
     assert _uses_network({"urllib.request"})
     assert _uses_network({"http.client.HTTPSConnection"})
+    assert _uses_network({"anthropic"})
+    assert _uses_network({"httpx2"})
     assert not _uses_network({"json", "app.services.issue_service"})

@@ -78,6 +78,9 @@ class AuditAction:
     HOLIDAY_REMOVED = "holiday.removed"
     STOP_WORK_SCOPE_CHANGED = "report_action.stop_scope_changed"
     CRITICAL_PATH_OVERRIDE = "material_request.critical_path_set"
+    # Phase 11: email choices and the weekly PDF (a cost export)
+    NOTIFICATION_PREFERENCES_CHANGED = "user.notification_preferences_changed"
+    WEEKLY_REPORT_DOWNLOADED = "report.weekly_downloaded"
 
 
 def record(

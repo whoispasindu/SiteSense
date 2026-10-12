@@ -216,10 +216,11 @@ async function send<TSchema extends z.ZodType, TBody>(
 }
 
 /**
- * Binary download (site photos) with the same auth and refresh rules as ``apiRequest``.
+ * Binary download (site photos, the weekly PDF) with the same auth and refresh rules as ``apiRequest``.
  * Photos are never public URLs: the page fetches them and shows a blob: URL.
  */
-export async function apiBlob(path: string, options: { signal?: AbortSignal } = {}): Promise<Blob> {
+export async function apiBlob(path: string, options: { signal?: AbortSignal; what?: string } = {}): Promise<Blob> {
+  const failed = `Could not load ${options.what ?? "the photo"}.`;
   if (!path.startsWith("/") || path.startsWith("//")) {
     throw new Error(`API paths must be absolute and same-origin, got "${path}"`);
   }
@@ -234,13 +235,13 @@ export async function apiBlob(path: string, options: { signal?: AbortSignal } = 
         signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(DEFAULT_TIMEOUT_MS)]) : AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
       });
     } catch {
-      throw new ApiError({ status: 0, code: "network_error", message: "Could not load the photo." });
+      throw new ApiError({ status: 0, code: "network_error", message: failed });
     }
   };
   let response = await attempt();
   if (response.status === 401 && (await refreshSession())) response = await attempt();
   if (!response.ok) {
-    throw new ApiError({ status: response.status, code: "http_error", message: "Could not load the photo." });
+    throw new ApiError({ status: response.status, code: "http_error", message: failed });
   }
   return response.blob();
 }

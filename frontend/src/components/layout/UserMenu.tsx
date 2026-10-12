@@ -126,6 +126,15 @@ export function UserMenu() {
             >
               Change password
             </Link>
+            <Link
+              to="/settings/notifications"
+              onClick={() => {
+                setOpen(false);
+              }}
+              className="flex min-h-10 items-center rounded-lg px-3 text-sm text-ink hover:bg-paper-sunk"
+            >
+              Email settings
+            </Link>
             <button
               type="button"
               onClick={() => void signOut()}

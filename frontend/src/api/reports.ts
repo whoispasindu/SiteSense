@@ -90,7 +90,7 @@ const todayStatusSchema = z.object({
 });
 export type TodayStatus = z.infer<typeof todayStatusSchema>;
 
-const weatherDaySchema = z.object({
+export const weatherDaySchema = z.object({
   date: z.iso.date(),
   summary: z.string(),
   weather_code: z.number().int().nullable(),

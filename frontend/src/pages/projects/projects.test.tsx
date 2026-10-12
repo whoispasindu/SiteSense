@@ -110,6 +110,10 @@ describe("ProjectsPage", () => {
 
     await user.click(await screen.findByRole("button", { name: "New project" }));
     const dialog = screen.getByRole("dialog", { name: "New project" });
+    // The briefing may send project names to the AI model (Phase 11), so names should not be people.
+    expect(within(dialog).getByLabelText("Project name")).toHaveAccessibleDescription(
+      "Name projects by place or code, not by a person’s name.",
+    );
     await user.click(within(dialog).getByRole("button", { name: "Create project" }));
     expect(within(dialog).getByText(/2–24 letters/)).toBeInTheDocument();
     expect(within(dialog).getByText("Choose a site.")).toBeInTheDocument();

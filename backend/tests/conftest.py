@@ -36,7 +36,7 @@ TEST_MIGRATION_URL = os.environ.get(
 
 PASSWORD = "Correct-Horse-Battery-9"
 
-pytest_plugins = ["tests.report_fixtures", "tests.materials_fixtures"]
+pytest_plugins = ["tests.report_fixtures", "tests.materials_fixtures", "tests.dashboard_fixtures"]
 
 
 @pytest.fixture(autouse=True)

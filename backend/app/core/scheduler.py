@@ -3,6 +3,9 @@
 - 18:00 site time: remind sites that have not filed today's report (BR-07).
 - 05:30 site time: refresh the weather forecast for every active site.
 - 06:00 site time: re-score every open project's risk (Phase 6), after the weather is fresh.
+- Every minute: send the emails waiting in the outbox (Phase 11).
+- 18:30 site time (``digest_hour``, ``digest_minute``): queue each user's evening digest.
+- Monday 07:00 site time: queue the weekly PDF for project managers and quantity surveyors who take it.
 
 Jobs are safe to run more than once (several API workers, a restart, the CLI): reminders are
 de-duplicated in the database and weather refresh is an upsert. Each job opens its own session
@@ -13,6 +16,7 @@ from collections.abc import Callable
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -22,7 +26,16 @@ from app.core.database import Database
 from app.core.logging import get_logger
 from app.integrations.weather import WeatherClient, WeatherUnavailableError
 from app.models import Site
-from app.services import cost_service, network_service, report_service, risk_service, weather
+from app.services import (
+    alerts,
+    channels,
+    cost_service,
+    network_service,
+    report_service,
+    risk_service,
+    weather,
+    weekly_report,
+)
 
 log = get_logger(__name__)
 
@@ -66,6 +79,25 @@ def run_variance_check(session_factory: Callable[[], Session]) -> int:
         return cost_service.check_all(db)
 
 
+def run_outbox(session_factory: Callable[[], Session], settings: Settings) -> tuple[int, int]:
+    with session_factory() as db:
+        return channels.send_pending(db, settings)
+
+
+def run_digests(session_factory: Callable[[], Session]) -> int:
+    with session_factory() as db:
+        queued = alerts.queue_digests(db)
+    log.info("digests_queued", queued=queued)
+    return queued
+
+
+def run_weekly_reports(session_factory: Callable[[], Session]) -> int:
+    with session_factory() as db:
+        queued = weekly_report.queue_weekly(db)
+    log.info("weekly_reports_queued", queued=queued)
+    return queued
+
+
 def _guarded(name: str, job: Callable[[], object]) -> Callable[[], None]:
     def run() -> None:
         try:
@@ -107,6 +139,24 @@ def build_scheduler(settings: Settings, database: Database, client: WeatherClien
         _guarded("variance_check", lambda: run_variance_check(database.session_factory)),
         CronTrigger(hour=6, minute=10, timezone=clock.SITE_TIME_ZONE),
         id="variance_check",
+        **common,
+    )
+    scheduler.add_job(
+        _guarded("email_outbox", lambda: run_outbox(database.session_factory, settings)),
+        IntervalTrigger(minutes=1, timezone=clock.SITE_TIME_ZONE),
+        id="email_outbox",
+        **{**common, "misfire_grace_time": 60},
+    )
+    scheduler.add_job(
+        _guarded("email_digest", lambda: run_digests(database.session_factory)),
+        CronTrigger(hour=settings.digest_hour, minute=settings.digest_minute, timezone=clock.SITE_TIME_ZONE),
+        id="email_digest",
+        **common,
+    )
+    scheduler.add_job(
+        _guarded("weekly_report", lambda: run_weekly_reports(database.session_factory)),
+        CronTrigger(day_of_week="mon", hour=7, minute=0, timezone=clock.SITE_TIME_ZONE),
+        id="weekly_report",
         **common,
     )
     return scheduler

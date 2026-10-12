@@ -4,6 +4,7 @@ from app.api.v1 import (
     admin,
     auth,
     contract,
+    dashboard,
     health,
     issues,
     materials,
@@ -21,6 +22,8 @@ api_router.include_router(auth.router)
 api_router.include_router(sites.router)
 api_router.include_router(projects.router)
 api_router.include_router(schedule.router)
+# Before reports: /reports/weekly.pdf must not be read as /reports/{report_id}.
+api_router.include_router(dashboard.router)
 api_router.include_router(reports.router)
 api_router.include_router(issues.router)
 api_router.include_router(materials.router)

@@ -149,6 +149,7 @@ def test_seed_dev_needs_a_valid_password(cli_db: Session, monkeypatch: pytest.Mo
 def test_seed_dev_refuses_production(monkeypatch: pytest.MonkeyPatch) -> None:
     production = make_settings(
         environment="production",
+        app_base_url="https://app.sitesense.example",
         cors_origins=["https://app.sitesense.example"],
         database_url="postgresql+psycopg://app:s3cure-pw@db:5432/sitesense",
         jwt_secret="a-real-production-secret-value-0123456789abcd",

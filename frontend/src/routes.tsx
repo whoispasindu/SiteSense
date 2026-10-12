@@ -34,6 +34,7 @@ import { PurchaseOrdersPage } from "./pages/procurement/PurchaseOrdersPage";
 import { SuppliersPage } from "./pages/procurement/SuppliersPage";
 import { RiskPage } from "./pages/risk/RiskPage";
 import { SchedulePage } from "./pages/schedule/SchedulePage";
+import { NotificationSettingsPage } from "./pages/settings/NotificationSettingsPage";
 import { RouteErrorPage } from "./pages/RouteErrorPage";
 import { VariationDetailPage } from "./pages/variations/VariationDetailPage";
 
@@ -154,6 +155,8 @@ export const routes: RouteObject[] = [
           </RequirePermission>
         ),
       },
+      // Every signed-in user, for their own email choices (linked from every alert email).
+      { path: "settings/notifications", element: <NotificationSettingsPage /> },
       {
         path: "variations/:variationId",
         element: (
