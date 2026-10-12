@@ -13,7 +13,7 @@ roles to permissions. That file is the single source of truth; this page explain
 | Quantity Surveyor | Assigned sites | Edit BOQ and budgets, approve requests within limit, prepare claims | Approve above limit |
 | Site Engineer | Assigned sites | Submit daily reports and material requests, confirm AI tags | Approve requests (TC-01) |
 | Procurement Officer | All sites | Manage suppliers, issue POs after approval, record deliveries | Approve requests |
-| Client | Assigned sites | Read progress, approve or query variations | See any internal cost |
+| Client | **Linked projects only** (Phase 12) | Follow progress, the published handover date, milestones, shared photos and approved claims; approve or query variations | See any internal cost, or any project they are not linked to, even on the same site |
 
 ## Site scoping (groundwork for BR-03)
 
@@ -111,6 +111,28 @@ answers `404`, exactly like a missing record.
 | `GET /api/v1/risk/projects` | PM, QS | Open projects on the caller's sites, highest risk first |
 
 Scores are written only by the scheduler, after daily reports and by the CLI; no endpoint writes them.
+
+## Phase 12 endpoints
+
+**Clients are linked to projects, not sites.** The Company Admin links each client account to the
+projects it may see. A project the client is not linked to (and anything on it: its variations,
+claims and photos) answers exactly like one that does not exist. Only linked clients are notified.
+Tested with two clients on one site in `backend/tests/test_client_portal.py`.
+
+| Method and path | Who | Notes |
+| --- | --- | --- |
+| `GET /api/v1/client/projects` | Client | Their linked projects, not cancelled |
+| `GET /api/v1/client/projects/{id}` | Client, linked | Progress, the published handover date and history, milestones, shared photos. Client-only schema, no internal fields (TC-07) |
+| `GET /api/v1/client/projects/{id}/claims` | Client, linked | Approved and paid claims, the contract value, the retention held |
+| `GET /api/v1/client/photos/{id}` | Client, linked | Shared photos only, with no metadata |
+| `GET /api/v1/client/variations`, `/client/variations/{id}`, `POST /variations/{id}/client-decision` | Client, linked | Phase 8, now per project |
+| `GET /api/v1/projects/{id}/handover` | PM, QS, Site Engineer | The published date, history, suggestions and reminder |
+| `POST /api/v1/projects/{id}/handover`, `.../handover/confirm` | **Project manager only** | Publish a date with a reason for the client, or confirm it unchanged. Audited; clients told of a new date |
+| `GET /api/v1/projects/{id}/photos` | PM, QS, Site Engineer | Every report photo with whether the client sees it |
+| `POST /api/v1/projects/{id}/photos/client-share` | **Project manager only** | Share or unshare up to 100 of the project's photos; all-or-nothing; audited |
+| `PATCH /api/v1/tasks/{id}` (`client_milestone`, `milestone_name`) | **Project manager only** | Strict boolean; a name only on a milestone |
+| `PATCH /api/v1/projects/{id}` (`defects_period_months`) | **Project manager only** | Whole months, 0 to 60 (strict); sets when the client's retention is due back |
+| `GET /api/v1/admin/projects`, `POST /api/v1/admin/users/{id}/projects` | Company Admin | Link a client account to projects (replaces the set; clients only; audited). The list carries no figures |
 
 ## Phase 11 endpoints
 

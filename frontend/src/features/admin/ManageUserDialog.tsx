@@ -1,6 +1,15 @@
 import { useState } from "react";
 
-import { useAssignSites, useResetPassword, useSites, useUpdateUser, type AdminUser } from "../../api/admin";
+import {
+  useAdminProjects,
+  useAssignProjects,
+  useAssignSites,
+  useResetPassword,
+  useSites,
+  useUpdateUser,
+  type AdminProject,
+  type AdminUser,
+} from "../../api/admin";
 import { ROLE_LABELS, ROLES, roleSchema, type Role } from "../../api/auth";
 import { useAuth } from "../../auth/context";
 import { Alert } from "../../components/ui/Alert";
@@ -24,7 +33,11 @@ export function ManageUserDialog({ user, onClose }: { user: AdminUser | null; on
   const sites = useSites();
   const updateUser = useUpdateUser();
   const assignSites = useAssignSites();
+  const assignProjects = useAssignProjects();
   const resetPassword = useResetPassword();
+  const isClient = user?.role === "client";
+  const projects = useAdminProjects(isClient);
+  const [projectIds, setProjectIds] = useState<string[] | null>(null);
   const [role, setRole] = useState<Role | null>(null);
   const [siteIds, setSiteIds] = useState<string[] | null>(null);
   const [confirming, setConfirming] = useState<"deactivate" | "reset" | null>(null);
@@ -35,15 +48,18 @@ export function ManageUserDialog({ user, onClose }: { user: AdminUser | null; on
   const isSelf = me?.id === user.id;
   const chosenRole = role ?? user.role;
   const chosenSites = siteIds ?? user.sites.map((s) => s.id);
-  const error = updateUser.error ?? assignSites.error ?? resetPassword.error;
+  const chosenProjects = projectIds ?? user.projects.map((p) => p.id);
+  const error = updateUser.error ?? assignSites.error ?? assignProjects.error ?? resetPassword.error;
 
   function close() {
     setRole(null);
     setSiteIds(null);
+    setProjectIds(null);
     setConfirming(null);
     setTemporary(null);
     updateUser.reset();
     assignSites.reset();
+    assignProjects.reset();
     resetPassword.reset();
     onClose();
   }
@@ -105,6 +121,24 @@ export function ManageUserDialog({ user, onClose }: { user: AdminUser | null; on
               }}
             >
               Save sites
+            </Button>
+          </Section>
+        ) : null}
+
+        {isClient ? (
+          <Section title="Projects this client can see">
+            <p className="text-sm text-ink-soft">
+              Clients see only these projects in their portal: progress, the handover date, shared photos, approved
+              claims and variations. Never anything on another project, even on the same site.
+            </p>
+            <ProjectCheckboxes projects={projects.data ?? []} selected={chosenProjects} onChange={setProjectIds} />
+            <Button
+              disabled={projectIds === null || assignProjects.isPending}
+              onClick={() => {
+                assignProjects.mutate({ id: user.id, projectIds: chosenProjects }, { onSuccess: close });
+              }}
+            >
+              Save projects
             </Button>
           </Section>
         ) : null}
@@ -177,5 +211,52 @@ export function ManageUserDialog({ user, onClose }: { user: AdminUser | null; on
         ) : null}
       </div>
     </Dialog>
+  );
+}
+
+function ProjectCheckboxes({
+  projects,
+  selected,
+  onChange,
+}: {
+  projects: AdminProject[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const shown = projects.filter((p) => p.status !== "cancelled" || selected.includes(p.id));
+  if (shown.length === 0) return <p className="text-sm text-ink-faint">No projects yet.</p>;
+  return (
+    <fieldset>
+      <legend className="sr-only">Linked projects</legend>
+      <div className="grid gap-2">
+        {shown.map((project) => {
+          const checked = selected.includes(project.id);
+          return (
+            <label
+              key={project.id}
+              className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-sm ${
+                checked ? "border-accent-line bg-hivis/10" : "border-rule hover:border-rule-strong"
+              }`}
+            >
+              <input
+                type="checkbox"
+                className="size-4 accent-[var(--color-ink)]"
+                checked={checked}
+                onChange={(e) => {
+                  onChange(e.target.checked ? [...selected, project.id] : selected.filter((id) => id !== project.id));
+                }}
+              />
+              <span className="shrink-0 font-mono text-xs font-medium whitespace-nowrap">{project.code}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-ink">{project.name}</span>
+                <span className="block truncate text-xs text-ink-faint">
+                  {project.client_name} · site {project.site_code}
+                </span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
   );
 }

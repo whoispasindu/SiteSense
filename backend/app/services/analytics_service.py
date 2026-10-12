@@ -54,7 +54,13 @@ from app.schemas.analytics import (
 )
 from app.schemas.report import WeatherDayOut
 from app.schemas.risk import RiskRanking
-from app.services import cost_service, materials_service, risk_service, schedule_service
+from app.services import (
+    cost_service,
+    handover_service,
+    materials_service,
+    risk_service,
+    schedule_service,
+)
 
 OPEN_STATUSES = (ProjectStatus.ACTIVE.value, ProjectStatus.ON_HOLD.value)
 HEAVY_RAIN_MM = Decimal("10.0")  # BR-06
@@ -355,4 +361,7 @@ def portfolio(db: Session, user: User) -> Portfolio:
         ],
         weather=site_weather(db, projects, today),
         approvals=queue[:APPROVALS_LIMIT],
+        handover_reminders=handover_service.reminders(db, user)
+        if _can(user, Permission.PROJECTS_MANAGE)
+        else None,
     )

@@ -7,7 +7,6 @@ import { vi } from "vitest";
 import { ROLE_LABELS, type Me, type Role } from "../api/auth";
 import { setAccessToken } from "../api/client";
 import { AuthProvider } from "../auth/AuthProvider";
-import { isAvailable, NAV_GROUPS, type NavItem } from "../components/layout/navigation";
 import { CURRENT_PHASE, PHASES } from "../lib/programme";
 import { routes } from "../routes";
 
@@ -124,17 +123,5 @@ export function renderRoute(path = "/") {
 
 /** The first menu module a project manager can see that is not built yet (changes every phase). */
 /** The next module not built yet, and a role whose menu would show it (the PM's first, if any). */
-export function nextUnbuiltModule(): { item: NavItem; role: Role } {
-  const roles: Role[] = ["project_manager", "quantity_surveyor", "site_engineer", "procurement_officer", "client", "admin"];
-  for (const role of roles) {
-    const allowed = new Set(ROLE_PERMISSIONS[role]);
-    const item = NAV_GROUPS.flatMap((g) => g.items).find(
-      (i) => !isAvailable(i) && (i.permission === undefined || allowed.has(i.permission)),
-    );
-    if (item) return { item, role };
-  }
-  throw new Error("Every module is built: update the tests that rely on an unbuilt one.");
-}
-
 export const currentPhaseName = (): string => PHASES[CURRENT_PHASE]?.name ?? "";
 export const previousPhaseName = (): string => PHASES[CURRENT_PHASE - 1]?.name ?? "";

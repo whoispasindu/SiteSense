@@ -41,6 +41,12 @@ const baseSchema = z.object({
     .transform((v) => (v === "" ? null : Number(v))),
   // Phase 9: the days the site works, as ISO weekdays ("123456" = Monday to Saturday).
   working_week: z.string().regex(/^[1-7]{1,7}$/, "Choose at least one working day."),
+  // Phase 12: the defects liability period; the retention is released after it.
+  defects_period_months: z
+    .string()
+    .trim()
+    .refine((v) => /^\d{1,2}$/.test(v) && Number(v) <= 60, "Enter whole months, 0 to 60.")
+    .transform(Number),
 });
 
 const WEEKDAYS = [
@@ -216,6 +222,16 @@ export function ProjectFormDialog({ open, onClose, project }: ProjectFormDialogP
           className="tabular"
           hint="Average people on site. The risk forecast compares daily report crews with it."
           error={errors.planned_crew}
+        />
+
+        <TextField
+          label="Defects period (months)"
+          name="defects_period_months"
+          inputMode="numeric"
+          defaultValue={String(project?.defects_period_months ?? 12)}
+          className="tabular"
+          hint="After handover. The retention is released at its end; the client's portal shows when."
+          error={errors.defects_period_months}
         />
 
         <label className="block space-y-1.5">

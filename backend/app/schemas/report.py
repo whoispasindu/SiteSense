@@ -81,6 +81,7 @@ class PhotoOut(BaseModel):
     height: int
     size_bytes: int
     created_at: datetime
+    shared_with_client: bool = False  # Phase 12: the PM shared it with the client
 
 
 class ReportProgressOut(BaseModel):

@@ -56,6 +56,11 @@ class Task(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # Set when progress first goes above 0% and when it reaches 100%: the forecast's actual dates.
     actual_start: Mapped[date | None] = mapped_column(Date, nullable=True)
     actual_finish: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Phase 12: shown to the client as a milestone, under an optional client-friendly name.
+    client_milestone: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    milestone_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
 
     __table_args__ = (
         CheckConstraint("planned_end >= planned_start", name="dates_in_order"),
@@ -66,6 +71,7 @@ class Task(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint(
             "actual_finish IS NULL OR actual_finish >= actual_start", name="actual_dates_in_order"
         ),
+        CheckConstraint("milestone_name IS NULL OR client_milestone", name="milestone_name_when_milestone"),
         Index(
             "uq_tasks_project_code", "project_id", "code", unique=True, postgresql_where="code IS NOT NULL"
         ),

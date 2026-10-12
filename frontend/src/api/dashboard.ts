@@ -80,6 +80,22 @@ const approvalSchema = z.object({
 });
 export type ApprovalItem = z.infer<typeof approvalSchema>;
 
+/** Why a published handover date may be out of date (Phase 12, project managers only). */
+export const reminderSchema = z.object({
+  reasons: z.array(z.string()),
+  forecast_gap_days: z.number().int().nullable(),
+  days_since_review: z.number().int(),
+});
+
+const handoverReminderItemSchema = z.object({
+  project_id: z.uuid(),
+  code: z.string(),
+  name: z.string(),
+  published_date: z.iso.date(),
+  reminder: reminderSchema,
+});
+export type HandoverReminderItem = z.infer<typeof handoverReminderItemSchema>;
+
 const portfolioSchema = z.object({
   as_of: z.iso.date(),
   kpis: kpisSchema,
@@ -88,6 +104,7 @@ const portfolioSchema = z.object({
   issue_trend: z.array(issueWeekSchema),
   weather: z.array(siteWeatherSchema),
   approvals: z.array(approvalSchema),
+  handover_reminders: z.array(handoverReminderItemSchema).nullable().optional(),
 });
 export type Portfolio = z.infer<typeof portfolioSchema>;
 

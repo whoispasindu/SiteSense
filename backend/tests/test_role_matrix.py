@@ -78,6 +78,8 @@ ENDPOINTS = [
     Endpoint("PATCH", "/api/v1/admin/users/{user_id}", ADMIN_ONLY, {"full_name": "Renamed Person"}),
     Endpoint("POST", "/api/v1/admin/users/{user_id}/sites", ADMIN_ONLY, {"site_ids": ["{site_id}"]}),
     Endpoint("POST", "/api/v1/admin/users/{user_id}/reset-password", ADMIN_ONLY),
+    Endpoint("POST", "/api/v1/admin/users/{user_id}/projects", ADMIN_ONLY, {"project_ids": ["{project_id}"]}),
+    Endpoint("GET", "/api/v1/admin/projects", ADMIN_ONLY),
     Endpoint("GET", "/api/v1/admin/sites", ADMIN_ONLY),
     Endpoint("POST", "/api/v1/admin/sites", ADMIN_ONLY,
              {"code": "MTX-1", "name": "Matrix", "location": "Galle"}),
@@ -191,6 +193,17 @@ ENDPOINTS = [
     Endpoint("GET", "/api/v1/me/notification-preferences", ALL_ROLES),
     Endpoint("PUT", "/api/v1/me/notification-preferences", ALL_ROLES,
              {"email_urgent": True, "email_digest": False}),
+    Endpoint("GET", "/api/v1/client/projects", CLIENT_ONLY),
+    Endpoint("GET", "/api/v1/client/projects/{project_id}", CLIENT_ONLY),
+    Endpoint("GET", "/api/v1/client/projects/{project_id}/claims", CLIENT_ONLY),
+    Endpoint("GET", "/api/v1/client/photos/{photo_id}", CLIENT_ONLY),
+    Endpoint("GET", "/api/v1/projects/{project_id}/handover", SCHEDULE_READERS),
+    Endpoint("POST", "/api/v1/projects/{project_id}/handover", PM_ONLY,
+             {"handover_date": "2026-12-31", "reason": "Matrix check"}),
+    Endpoint("POST", "/api/v1/projects/{project_id}/handover/confirm", PM_ONLY),
+    Endpoint("GET", "/api/v1/projects/{project_id}/photos", REPORT_READERS),
+    Endpoint("POST", "/api/v1/projects/{project_id}/photos/client-share", PM_ONLY,
+             {"photo_ids": ["{photo_id}"], "shared": True}),
 ]  # fmt: skip
 
 

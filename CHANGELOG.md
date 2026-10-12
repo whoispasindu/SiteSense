@@ -6,8 +6,51 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Upgrading
+
+- **Link existing client accounts to their projects.** From Phase 12, clients see only the projects
+  the Company Admin links them to (Users → the client → *Projects this client can see*), not every
+  project on their sites. Until linked, an existing client account sees no projects. There is no
+  automatic copy from sites, because that would carry over the cross-client exposure this fixes.
+- **Clean photos uploaded before this release:** run `python -m app.cli strip-photo-metadata` once
+  (add `--dry-run` to count first). It re-encodes any stored photo that still carries a JPEG comment
+  or other metadata, and is safe to run again.
+- Migrations 0014 to 0016 add the client portal tables, the client links and each project's defects
+  period (12 months for existing projects).
+
 ### Added
 
+- Phase 12, the client portal ([ADR 0015](docs/adr/0015-client-portal.md)):
+  - **The portal**, under a simpler top navigation:
+    - progress and the S-curve;
+    - the handover date the PM published, with the reason and earlier dates (the contract date until
+      one is published);
+    - milestones with their status in words;
+    - the photos the PM shared;
+    - payments: approved and paid claims with the full breakdown, the contract value with approved
+      variations, and the retention held so far (released at the end of the defects period);
+    - variations waiting for a decision.
+
+    No budgets, costs, rates, risk scores or internal comments: client responses use their own
+    schemas, and a test walks every one of them for internal fields at any depth (TC-07).
+  - **Client access per project.** The Company Admin links client accounts to projects (audited).
+    Clients reach nothing else: portal pages, variation decisions, notifications and emails, photos.
+    Another client's project, even on the same site, answers exactly like one that does not exist
+    (tested with two clients on one site).
+  - **The defects period** per project (default 12 months, set on the project form). The client's
+    payments show when the retention is due back: the end of that period after the published
+    handover date (or the contract date before one is published).
+  - **`strip-photo-metadata`**, a one-off command that re-encodes stored photos still carrying a
+    comment or other metadata.
+  - **A "Client view" tab** on each project:
+    - the PM publishes the client's handover date with a reason, helped by the programme forecast and
+      the risk model's range, or confirms it unchanged (both audited, and the client is notified of a
+      new date);
+    - flags milestones (suggested ones mapped to tasks by keyword);
+    - shares or unshares photos, one at a time or in bulk.
+
+    The PM's dashboard flags a published date as outdated when the programme forecast is more than 7
+    working days later than it, or when it has not been reviewed for 30 days.
 - Phase 11, the dashboard, alerts and the AI daily briefing ([ADR 0014](docs/adr/0014-dashboard-alerts-briefing.md)):
   - **Today's briefing** at the top of the dashboard: 3 to 5 points on what needs attention, each
     with the records it rests on (counted by the server). Written by Claude (Haiku by default,
@@ -122,6 +165,11 @@ uses [Semantic Versioning](https://semver.org/).
     `POST /reports/{id}/issues/confirm`, `POST /report-actions/{id}/close`,
     `GET /projects/{id}/report-actions`.
   - Training code, synthetic data generator and labelling guide in `ml/nlp/`.
+
+### Fixed
+
+- Photo uploads kept a JPEG comment from the original file. The re-encode now drops it with every
+  other piece of metadata, and copies shown to clients are checked again on the way out.
 
 ### Changed
 

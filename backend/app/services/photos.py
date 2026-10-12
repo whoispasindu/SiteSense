@@ -50,8 +50,10 @@ def sniff_format(data: bytes) -> str | None:
 def _encode(image: Image.Image, edge: int, quality: int) -> bytes:
     copy = image.copy()
     copy.thumbnail((edge, edge), Image.Resampling.LANCZOS)
+    # Pillow writes a JPEG comment carried in ``info`` even without arguments, so the copy keeps
+    # nothing from the original file: no comment, EXIF, XMP or ICC profile.
+    copy.info.clear()
     out = io.BytesIO()
-    # No exif/icc arguments: Pillow writes none, so no metadata survives.
     copy.save(out, format="JPEG", quality=quality, optimize=True, progressive=True)
     return out.getvalue()
 
@@ -85,3 +87,22 @@ def process(data: bytes) -> ProcessedPhoto:
     with Image.open(io.BytesIO(full)) as stored:
         width, height = stored.size
     return ProcessedPhoto(full=full, thumb=_encode(rgb, THUMB_EDGE, quality=75), width=width, height=height)
+
+
+# Metadata a JPEG can carry: EXIF (GPS, device, timestamps), XMP, ICC profiles and comments.
+_METADATA_KEYS = ("exif", "xmp", "XML:com.adobe.xmp", "icc_profile", "comment", "photoshop")
+
+
+def without_metadata(data: bytes) -> bytes:
+    """The photo as a client may see it (Phase 12): no EXIF, GPS, device, timestamps or comments.
+
+    Photos are already re-encoded without metadata when uploaded, so this is a second check on the
+    way out: a stored file that carries any (one written by an older version, or put in place by
+    hand) is re-encoded from its pixels before it leaves the server.
+    """
+    with Image.open(io.BytesIO(data)) as image:
+        if not image.getexif() and not any(key in image.info for key in _METADATA_KEYS):
+            return data
+        image.load()
+        rgb = ImageOps.exif_transpose(image).convert("RGB")
+    return _encode(rgb, max(rgb.size), quality=85)

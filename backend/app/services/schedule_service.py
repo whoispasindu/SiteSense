@@ -33,7 +33,7 @@ CENTI = Decimal("0.01")
 BEHIND_TOLERANCE = 5.0
 
 
-def _plan(task: Task) -> TaskPlan:
+def plan(task: Task) -> TaskPlan:
     return TaskPlan(task.planned_start, task.planned_end, task.weight, task.percent_complete)
 
 
@@ -58,7 +58,7 @@ def to_task_out(
     critical: set[uuid.UUID] | None = None,
     stopped: set[uuid.UUID] | None = None,
 ) -> TaskOut:
-    planned_today = round(planned_fraction(_plan(task), clock.site_today()) * 100, 1)
+    planned_today = round(planned_fraction(plan(task), clock.site_today()) * 100, 1)
     return TaskOut(
         id=task.id,
         project_id=task.project_id,
@@ -73,6 +73,8 @@ def to_task_out(
         percent_complete=task.percent_complete.quantize(CENTI),
         is_critical=task.id in (critical or set()),
         is_concrete_pour=task.is_concrete_pour,
+        client_milestone=task.client_milestone,
+        milestone_name=task.milestone_name,
         stopped=task.id in (stopped or set()),
         actual_start=task.actual_start,
         actual_finish=task.actual_finish,
@@ -121,7 +123,7 @@ def get_task(db: Session, user: User, task_id: uuid.UUID) -> tuple[Task, Project
 
 def record_snapshot(db: Session, project: Project) -> None:
     """Upsert today's actual progress. Called after every change that can move it."""
-    value = Decimal(str(actual_percent([_plan(t) for t in _tasks(db, project)])))
+    value = Decimal(str(actual_percent([plan(t) for t in _tasks(db, project)])))
     stmt = insert(ProgressSnapshot).values(
         id=uuid.uuid4(), project_id=project.id, snapshot_date=clock.site_today(), actual_percent=value
     )
@@ -233,9 +235,16 @@ def update_task(
         "weight",
         "percent_complete",
         "is_concrete_pour",
+        "client_milestone",
     ):
         if required in changes and changes[required] is None:
             raise BusinessRuleError(f"{required.replace('_', ' ').capitalize()} cannot be empty.")
+    # Phase 12: a milestone name only on a client milestone; unflagging a task drops its name.
+    milestone = changes.get("client_milestone", task.client_milestone)
+    if changes.get("milestone_name") and not milestone:
+        raise BusinessRuleError("A milestone name needs the task to be a client milestone.")
+    if not milestone:
+        changes["milestone_name"] = None
     if "boq_section_id" in changes:
         _check_section(db, project, changes["boq_section_id"])
 
@@ -299,7 +308,7 @@ def delete_task(db: Session, task: Task, project: Project, *, actor: User, meta:
 
 def progress(db: Session, project: Project) -> ProgressOut:
     tasks = _tasks(db, project)
-    plans = [_plan(t) for t in tasks]
+    plans = [plan(t) for t in tasks]
     today = clock.site_today()
     start = min([project.start_date, *(t.planned_start for t in tasks)])
     end = max([project.planned_end, *(t.planned_end for t in tasks)])
@@ -332,7 +341,7 @@ def summaries(db: Session, user: User) -> list[ScheduleSummary]:
         return []
     by_project: dict[uuid.UUID, list[TaskPlan]] = {}
     for task in db.scalars(select(Task).where(Task.project_id.in_([p.id for p in projects]))).all():
-        by_project.setdefault(task.project_id, []).append(_plan(task))
+        by_project.setdefault(task.project_id, []).append(plan(task))
     out = []
     for summary in projects:
         plans = by_project.get(summary.id, [])

@@ -52,6 +52,29 @@ class SiteAssignment(BaseModel):
     site_ids: list[uuid.UUID] = Field(max_length=200)
 
 
+class ProjectAssignment(BaseModel):
+    """Phase 12: the projects a client account may see (replaces the whole set)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    project_ids: list[uuid.UUID] = Field(max_length=200)
+
+
+class ProjectRef(BaseModel):
+    id: uuid.UUID
+    code: str
+    name: str
+
+
+class AdminProjectOut(ProjectRef):
+    """A project as the Company Admin needs it to link clients: no contract figures."""
+
+    site_code: str
+    status: str
+    client_name: str
+    clients: int  # client accounts linked to it
+
+
 class UserOut(BaseModel):
     id: uuid.UUID
     email: str
@@ -64,6 +87,7 @@ class UserOut(BaseModel):
     last_login_at: datetime | None
     created_at: datetime
     sites: list[SiteSummary]
+    projects: list[ProjectRef] = Field(default_factory=list)  # clients only: the projects they may see
 
 
 class UserCreated(BaseModel):

@@ -19,8 +19,11 @@ D = Decimal
 
 
 @pytest.fixture
-def client_user(team: Callable[..., Who]) -> Who:
-    return team(Role.CLIENT)
+def client_user(team: Callable[..., Who], boq: Boq, db: Session) -> Who:
+    client = team(Role.CLIENT)
+    client.user.client_projects = [boq.project]  # Phase 12: clients see the projects they are linked to
+    db.commit()
+    return client
 
 
 @pytest.fixture
@@ -270,9 +273,12 @@ def test_br09_a_small_qs_variation_goes_to_the_pm_and_applies(
 
 
 def test_tc10_client_approves_a_variation_with_time_impact(
-    api: TestClient, db: Session, boq: Boq, qs: Who, pm: Who, client_user: Who, task: Task
-) -> None:
+    api: TestClient, db: Session, boq: Boq, qs: Who, pm: Who, client_user: Who, task: Task,
+    team: Callable[..., Who],
+) -> None:  # fmt: skip
     """TC-10: contract value, budget and schedule update; audit entry created."""
+    # A client on the same site but not linked to this project (Phase 12) is never told about it.
+    neighbour = team(Role.CLIENT)
     variation = raise_variation(
         api,
         boq,
@@ -284,6 +290,7 @@ def test_tc10_client_approves_a_variation_with_time_impact(
     )
     assert (variation["status"], variation["needs_client"]) == ("awaiting_client", True)
     assert len(notes_of(db, client_user, "variation_for_client")) == 1
+    assert notes_of(db, neighbour, "variation_for_client") == []
     seen = api.get(f"/api/v1/client/variations/{variation['id']}", headers=client_user.headers).json()
     assert seen["reason_for_client"] == "It changes the completion date by 14 days."
     assert seen["can_decide"] is True

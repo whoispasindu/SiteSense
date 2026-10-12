@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from sqlalchemy import Connection, func, select
@@ -11,10 +12,12 @@ from app.core.security import verify_password
 from app.models import (
     AuditLog,
     DailyReport,
+    HandoverPublication,
     MaterialRequest,
     ProgressSnapshot,
     Project,
     PurchaseOrder,
+    ReportPhoto,
     RiskScore,
     Site,
     Supplier,
@@ -42,9 +45,10 @@ class _TestDatabase:
 
 
 @pytest.fixture
-def cli_db(monkeypatch: pytest.MonkeyPatch, db_connection: Connection) -> Iterator[Session]:
+def cli_db(monkeypatch: pytest.MonkeyPatch, db_connection: Connection, tmp_path: Path) -> Iterator[Session]:
     monkeypatch.setattr(cli, "Database", lambda _settings: _TestDatabase(db_connection))
-    monkeypatch.setattr(cli, "get_settings", make_settings)
+    # The demo seed stores photos (Phase 12): into a per-test folder, never the source tree.
+    monkeypatch.setattr(cli, "get_settings", lambda: make_settings(media_root=str(tmp_path / "media")))
     with Session(bind=db_connection, join_transaction_mode="create_savepoint") as session:
         yield session
 
@@ -123,6 +127,19 @@ def test_seed_dev_creates_sites_and_one_user_per_role(
         history = records[by_name[name]]
         assert history.count >= orders  # plus any Havelock orders already due
         assert history.on_time >= on_time
+    # Phase 12: the client portal has milestones, a published handover date with history, and photos,
+    # all but the newest shared.
+    milestones = [t.milestone_name for t in tasks if t.client_milestone]
+    assert sorted(milestones) == sorted(cli.DEMO_MILESTONES.values())  # type: ignore[type-var]
+    published = cli_db.scalars(
+        select(HandoverPublication).where(HandoverPublication.project_id == havelock.id)
+    ).all()
+    assert [p.kind for p in published] == ["published", "published"]
+    photos = cli_db.scalars(
+        select(ReportPhoto).join(DailyReport).where(DailyReport.project_id == havelock.id)
+    ).all()
+    assert len(photos) == len(cli.DEMO_PHOTOS)
+    assert sum(p.shared_with_client for p in photos) == len(cli.DEMO_PHOTOS) - 1
 
 
 def test_send_reminders_command(cli_db: Session, capsys: pytest.CaptureFixture[str]) -> None:
@@ -162,3 +179,18 @@ def test_score_risk_command(cli_db: Session, capsys: pytest.CaptureFixture[str])
     assert cli.main(["score-risk"]) == 0
 
     assert "Scored" in capsys.readouterr().out
+
+
+def test_strip_photo_metadata_command(
+    cli_db: Session, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("SITESENSE_DEMO_PASSWORD", DEMO_PASSWORD)
+    assert cli.main(["seed-dev"]) == 0
+    capsys.readouterr()
+
+    assert cli.main(["strip-photo-metadata", "--dry-run"]) == 0
+    assert capsys.readouterr().out.strip() == (
+        f"Checked {len(cli.DEMO_PHOTOS)} photos: would clean 0 files; 0 files missing."
+    )
+    assert cli.main(["strip-photo-metadata"]) == 0
+    assert "cleaned 0 files" in capsys.readouterr().out

@@ -116,6 +116,14 @@ export function ProjectLayout() {
             Schedule
           </NavLink>
         ) : null}
+        {can("schedule:read") ? (
+          <NavLink
+            to={`/projects/${p.id}/client`}
+            className={({ isActive }) => `${TAB} ${isActive ? "border-accent-line text-ink" : "border-transparent text-ink-faint hover:border-rule-strong hover:text-ink"}`}
+          >
+            Client view
+          </NavLink>
+        ) : null}
       </nav>
 
       <div className="mt-8">

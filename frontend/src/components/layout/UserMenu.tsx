@@ -42,7 +42,7 @@ function ThemeSwitch() {
 }
 
 /** Signed-in user chip with a menu: role, sites, theme, change password, sign out. */
-export function UserMenu() {
+export function UserMenu({ onDark = false }: { onDark?: boolean }) {
   const { user, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const menuId = useId();
@@ -75,17 +75,17 @@ export function UserMenu() {
         onClick={() => {
           setOpen((v) => !v);
         }}
-        className="flex min-h-10 items-center gap-2.5 rounded-lg py-1 pr-2 pl-1 hover:bg-paper-sunk"
+        className={`flex min-h-10 items-center gap-2.5 rounded-lg py-1 pr-2 pl-1 ${onDark ? "hover:bg-asphalt-raised" : "hover:bg-paper-sunk"}`}
       >
         <span
           aria-hidden="true"
-          className="grid size-8 place-items-center rounded-full bg-asphalt text-xs font-semibold text-hivis"
+          className={`grid size-8 place-items-center rounded-full text-xs font-semibold ${onDark ? "bg-hivis text-asphalt" : "bg-asphalt text-hivis"}`}
         >
           {initials(user.full_name)}
         </span>
         <span className="hidden text-left leading-tight md:block">
-          <span className="block max-w-44 truncate text-sm font-medium text-ink">{user.full_name}</span>
-          <span className="block text-xs text-ink-faint">{user.role_label}</span>
+          <span className={`block max-w-44 truncate text-sm font-medium ${onDark ? "text-white" : "text-ink"}`}>{user.full_name}</span>
+          <span className={`block text-xs ${onDark ? "text-asphalt-muted" : "text-ink-faint"}`}>{user.role_label}</span>
         </span>
         <span className="sr-only md:hidden">Account menu for {user.full_name}</span>
       </button>

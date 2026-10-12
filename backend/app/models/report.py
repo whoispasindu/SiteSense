@@ -10,6 +10,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -86,10 +87,19 @@ class ReportPhoto(UUIDPrimaryKeyMixin, Base):
     caption: Mapped[str | None] = mapped_column(String(200), nullable=True)
     position: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Phase 12: private by default; the project manager shares chosen photos with the client.
+    shared_with_client: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    shared_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    shared_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     report: Mapped[DailyReport] = relationship(back_populates="photos")
 
-    __table_args__ = (CheckConstraint("size_bytes > 0", name="size_positive"),)
+    __table_args__ = (
+        CheckConstraint("size_bytes > 0", name="size_positive"),
+        CheckConstraint("shared_with_client = (shared_at IS NOT NULL)", name="shared_when_dated"),
+    )
 
 
 class ReportProgress(UUIDPrimaryKeyMixin, Base):

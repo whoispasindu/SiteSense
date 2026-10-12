@@ -14,8 +14,10 @@ refuses to run in production.
 """
 
 import argparse
+import io
 import os
 import sys
+import uuid
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -41,12 +43,14 @@ from app.core.security import (
     hash_password,
     validate_password,
 )
+from app.integrations.storage import LocalStorage
 from app.integrations.weather import OpenMeteoClient
 from app.models import (
     BoqItem,
     BoqSection,
     DailyReport,
     Delivery,
+    HandoverPublication,
     MaterialRequest,
     ProgressClaim,
     ProgressSnapshot,
@@ -54,6 +58,7 @@ from app.models import (
     PurchaseOrder,
     PurchaseOrderLine,
     ReportIssue,
+    ReportPhoto,
     Site,
     Supplier,
     Task,
@@ -69,12 +74,17 @@ from app.schemas.contract import (
     VariationIn,
 )
 from app.schemas.materials import DecisionIn, DeliveryIn, OrderLineIn, PurchaseOrderCreate, RequestCreate
+from app.schemas.portal import HandoverIn, PhotosShareIn
 from app.services import (
     audit,
     claim_service,
     cost_service,
+    handover_service,
     materials_service,
+    photos,
+    portal_service,
     procurement_service,
+    report_service,
     risk_service,
     variation_service,
 )
@@ -146,6 +156,9 @@ DEMO_SITES = [
     ("COL-07", "Havelock Residences", "Colombo 05", 6.8836, 79.8650),
     ("KDY-02", "Peradeniya Road Offices", "Kandy", 7.2735, 80.6127),
     ("GAL-11", "Fort View Apartments", "Galle", 6.0329, 80.2168),
+    # The finished job behind the supplier history (Phase 10), on its own site: another client's
+    # project never shares a site with Havelock's, and clients are linked to projects anyway (Phase 12).
+    ("NEG-04", "Negombo Road Warehouse", "Negombo", 7.2008, 79.8737),
 ]
 
 SEED_DATA = Path(__file__).parent / "seed_data"
@@ -332,6 +345,7 @@ def seed_dev() -> int:
         _seed_contract(db)
         risk_service.score_all(db)
         cost_service.check_all(db)
+        _seed_portal(db, LocalStorage(settings.media_root))
     database.dispose()
     print(
         f"Seeded {len(DEMO_SITES)} sites, {created} new demo users and {new_projects} new projects "
@@ -530,7 +544,7 @@ def _seed_supplier_history(db: Session) -> None:
     code, name, client = DEMO_HISTORY_PROJECT
     if db.scalar(select(Project).where(Project.code == code)):
         return
-    site = db.scalar(select(Site).where(Site.code == "COL-07"))
+    site = db.scalar(select(Site).where(Site.code == "NEG-04"))
     engineer = db.scalar(select(User).where(User.email == "engineer@sitesense.example"))
     buyer = db.scalar(select(User).where(User.email == "procurement@sitesense.example"))
     assert site is not None
@@ -748,6 +762,119 @@ def _seed_contract(db: Session) -> None:
     )  # fmt: skip
 
 
+DEMO_MILESTONES = {
+    "T-020": "Foundations complete",
+    "T-050": "Structure complete",
+    "T-070": "Roof complete",
+    "T-090": "Finishes complete",
+    "T-110": "Handover",
+}
+# (days ago, levels of frame drawn, caption)
+DEMO_PHOTOS = [
+    (5, 3, "Level 3 slab poured, north side"),
+    (4, 4, "Level 4 columns and formwork"),
+    (2, 4, "Level 4 slab reinforcement before the pour"),
+    (1, 5, "Level 5 starter bars"),
+]
+
+
+def _demo_photo(levels: int) -> bytes:
+    """A drawn picture of the frame going up (the demo has no real site photos)."""
+    from PIL import Image, ImageDraw
+
+    width, height = 1200, 800
+    image = Image.new("RGB", (width, height))
+    draw = ImageDraw.Draw(image)
+    for y in range(height):  # sky
+        shade = int(200 + 40 * y / height)
+        draw.line([(0, y), (width, y)], fill=(150, shade - 20, 235))
+    draw.rectangle([0, 640, width, height], fill=(121, 104, 82))  # ground
+    floor = 80
+    left, right = 300, 900
+    for level in range(levels + 1):
+        y = 640 - level * floor
+        draw.rectangle([left - 20, y - 14, right + 20, y], fill=(176, 176, 170))  # slab
+        if level < levels:
+            for x in range(left, right + 1, 120):
+                draw.rectangle([x - 10, y - floor, x + 10, y - 14], fill=(160, 160, 154))  # columns
+    top = 640 - levels * floor
+    for x in range(left + 60, right, 120):  # starter bars
+        draw.line([(x, top - 14), (x, top - 60)], fill=(120, 60, 40), width=3)
+    draw.line([(1020, 640), (1020, 120)], fill=(240, 190, 30), width=14)  # crane mast
+    draw.line([(700, 130), (1150, 130)], fill=(240, 190, 30), width=10)  # jib
+    draw.line([(820, 130), (820, top - 40)], fill=(60, 60, 60), width=2)  # hook line
+    out = io.BytesIO()
+    image.save(out, format="JPEG", quality=88)
+    return out.getvalue()
+
+
+def _seed_portal(db: Session, storage: LocalStorage) -> None:
+    """The client portal for Havelock: milestones, a published handover date, and shared photos."""
+    project = db.scalar(select(Project).where(Project.code == "HR-2026-01"))
+    pm = db.scalar(select(User).where(User.email == "pm@sitesense.example"))
+    engineer = db.scalar(select(User).where(User.email == "engineer@sitesense.example"))
+    if project is None or pm is None or engineer is None:
+        return
+    client = db.scalar(select(User).where(User.email == "client@sitesense.example"))
+    if client is not None and project not in client.client_projects:
+        client.client_projects = [*client.client_projects, project]  # the client sees Havelock only
+    db.commit()
+    if db.scalar(select(HandoverPublication.id).where(HandoverPublication.project_id == project.id)):
+        return
+    meta = RequestMeta(ip_address=None, user_agent="seed-dev")
+
+    for task in db.scalars(select(Task).where(Task.project_id == project.id)):
+        if task.code in DEMO_MILESTONES:
+            task.client_milestone = True
+            task.milestone_name = DEMO_MILESTONES[task.code]
+    db.commit()
+
+    # An earlier date published at the start, then today's, which follows the programme.
+    first = handover_service.publish(
+        db, pm, project,
+        HandoverIn(handover_date=project.planned_end, reason="The contract date: work is starting on plan."),
+        meta=meta,
+    )  # fmt: skip
+    first.published_at = clock.utcnow() - timedelta(days=150)
+    db.commit()
+    forecast = handover_service.programme_forecast(db, project) or project.planned_end
+    handover_service.publish(
+        db, pm, project,
+        HandoverIn(
+            handover_date=max(forecast, project.planned_end),
+            reason="Heavy October rain held up the frame; the forecast includes the catch-up plan.",
+        ),
+        meta=meta,
+    )  # fmt: skip
+
+    reports = {
+        (clock.site_today() - r.report_date).days: r
+        for r in db.scalars(select(DailyReport).where(DailyReport.project_id == project.id))
+    }
+    shared: list[uuid.UUID] = []
+    for days_ago, levels, caption in DEMO_PHOTOS:
+        report = reports.get(days_ago)
+        if report is None:
+            continue
+        # Through the same processing as an upload, onto an earlier report (uploads close after the day).
+        processed = photos.process(_demo_photo(levels))
+        stem = uuid.uuid4().hex
+        storage.save(f"{stem}.jpg", processed.full)
+        storage.save(f"{stem}_thumb.jpg", processed.thumb)
+        photo = ReportPhoto(
+            report_id=report.id, uploaded_by=engineer.id, storage_key=f"{stem}.jpg",
+            content_type="image/jpeg",
+            size_bytes=len(processed.full), width=processed.width, height=processed.height, caption=caption,
+            position=1, created_at=report.submitted_at,
+        )  # fmt: skip
+        db.add(photo)
+        db.flush()
+        if days_ago != 1:  # the newest stays private: the PM has not looked at it yet
+            shared.append(photo.id)
+    if shared:
+        portal_service.set_shared(db, pm, project, PhotosShareIn(photo_ids=shared, shared=True), meta=meta)
+
+
 def send_reminders() -> int:
     database = Database(get_settings())
     created = run_report_reminders(database.session_factory)
@@ -789,6 +916,18 @@ def check_pours() -> int:
     return 0
 
 
+def strip_photo_metadata(dry_run: bool) -> int:
+    """One-off (Phase 12): re-encode stored photos that still carry a comment or other metadata."""
+    settings = get_settings()
+    database = Database(settings)
+    with database.session_factory() as db:
+        result = report_service.strip_stored_metadata(db, LocalStorage(settings.media_root), dry_run=dry_run)
+    database.dispose()
+    verb = "would clean" if dry_run else "cleaned"
+    print(f"Checked {result.photos} photos: {verb} {result.cleaned} files; {result.missing} files missing.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -801,6 +940,10 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("score-risk", help="score every open project's risk now")
     sub.add_parser("check-variance", help="forecast final cost per section and alert new overruns")
     sub.add_parser("check-pours", help="BR-06: alert PMs about concrete pours on heavy-rain days")
+    strip = sub.add_parser(
+        "strip-photo-metadata", help="re-encode stored photos that still carry a comment or other metadata"
+    )
+    strip.add_argument("--dry-run", action="store_true", help="count the files, change nothing")
     args = parser.parse_args(argv)
 
     if args.command == "create-admin":
@@ -815,6 +958,8 @@ def main(argv: list[str] | None = None) -> int:
         return check_variance()
     if args.command == "check-pours":
         return check_pours()
+    if args.command == "strip-photo-metadata":
+        return strip_photo_metadata(args.dry_run)
     return seed_dev()
 
 

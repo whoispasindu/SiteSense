@@ -73,6 +73,10 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # BR-09: variations above this (either way) need the client's approval. Set to 1% of the contract
     # value when the project is created; only the Company Admin can change it (audited).
     variation_limit: Mapped[Decimal] = mapped_column(MONEY, nullable=False, default=_default_variation_limit)
+    # Phase 12: months after handover before the retention is released (the defects liability period).
+    defects_period_months: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=12, server_default="12"
+    )
     # Phase 9: the days the site works, as ISO weekdays ("123456" = Monday to Saturday).
     working_week: Mapped[str] = mapped_column(
         String(7), nullable=False, default="123456", server_default="123456"
@@ -88,6 +92,7 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint("planned_end >= start_date", name="dates_in_order"),
         CheckConstraint("planned_crew IS NULL OR planned_crew BETWEEN 1 AND 5000", name="planned_crew_range"),
         CheckConstraint("variation_limit >= 0", name="variation_limit_non_negative"),
+        CheckConstraint("defects_period_months BETWEEN 0 AND 60", name="defects_period_range"),
         CheckConstraint("working_week ~ '^[1-7]{1,7}$'", name="working_week_format"),
         CheckConstraint(
             "status IN ('planning', 'active', 'on_hold', 'completed', 'cancelled')", name="status_valid"

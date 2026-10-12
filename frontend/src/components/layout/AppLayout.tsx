@@ -1,15 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router";
 
+import { useAuth } from "../../auth/context";
 import { Icon } from "../ui/icons";
+import { ClientLayout } from "./ClientLayout";
 import { SidebarContent } from "./Sidebar";
 import { TopBar } from "./TopBar";
 
 /**
- * App shell: fixed asphalt sidebar on large screens; on phones the same navigation opens in a
+ * App shell for staff: fixed asphalt sidebar on large screens; on phones the same navigation opens in a
  * native modal <dialog>, which gives focus trapping, Escape-to-close and inert background for free.
  */
 export function AppLayout() {
+  const { can } = useAuth();
+  // Clients get a simpler top navigation (Phase 12); everyone else the site-office sidebar.
+  return can("client:portal") ? <ClientLayout /> : <StaffLayout />;
+}
+
+function StaffLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
 

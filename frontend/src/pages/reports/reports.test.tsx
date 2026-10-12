@@ -29,7 +29,7 @@ const TASK: Task = {
   id: TID, project_id: PID, code: "T-040", name: "Frame: ground to level 4", boq_section_id: null,
   boq_section_code: null, planned_start: "2026-06-15", planned_end: "2026-12-30", weight: "17.10",
   percent_complete: "71.20", is_critical: true, position: 1, planned_percent_today: 84.8, state: "behind",
-  progress_updated_at: null, is_concrete_pour: true, stopped: false, actual_start: "2026-06-15", actual_finish: null,
+  progress_updated_at: null, is_concrete_pour: true, client_milestone: false, milestone_name: null, stopped: false, actual_start: "2026-06-15", actual_finish: null,
 };
 
 const WEATHER: Weather = {

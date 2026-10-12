@@ -5,6 +5,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { AuditLogPage } from "./pages/admin/AuditLogPage";
 import { HolidaysPage } from "./pages/admin/HolidaysPage";
 import { VariationLimitsPage } from "./pages/admin/VariationLimitsPage";
+import { ClientProjectPage } from "./pages/client/ClientPortalPage";
 import { ClientVariationPage, ClientVariationsPage } from "./pages/client/ClientVariationsPage";
 import { CostPage } from "./pages/cost/CostPage";
 import { SitesPage } from "./pages/admin/SitesPage";
@@ -17,6 +18,7 @@ import { BoqImportPage } from "./pages/projects/BoqImportPage";
 import { BoqPage } from "./pages/projects/BoqPage";
 import { ProjectLayout } from "./pages/projects/ProjectLayout";
 import { ProjectClaims } from "./pages/projects/ProjectClaims";
+import { ProjectClientView } from "./pages/projects/ProjectClientView";
 import { ProjectRisk } from "./pages/projects/ProjectRisk";
 import { ProjectOverview } from "./pages/projects/ProjectOverview";
 import { ProjectReports } from "./pages/projects/ProjectReports";
@@ -166,6 +168,14 @@ export const routes: RouteObject[] = [
         ),
       },
       {
+        path: "client/projects/:projectId",
+        element: (
+          <RequirePermission permission="client:portal">
+            <ClientProjectPage />
+          </RequirePermission>
+        ),
+      },
+      {
         path: "client/variations",
         element: (
           <RequirePermission permission="client:portal">
@@ -199,6 +209,14 @@ export const routes: RouteObject[] = [
         children: [
           { index: true, element: <ProjectOverview /> },
           { path: "boq", element: <BoqPage /> },
+          {
+            path: "client",
+            element: (
+              <RequirePermission permission="schedule:read">
+                <ProjectClientView />
+              </RequirePermission>
+            ),
+          },
           {
             path: "schedule",
             element: (

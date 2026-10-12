@@ -11,6 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, StrictBool
 
+from app.schemas.portal import HandoverReminderItem
 from app.schemas.report import WeatherDayOut
 from app.schemas.risk import RiskRanking
 
@@ -94,6 +95,8 @@ class Portfolio(BaseModel):
     issue_trend: list[IssueWeek]  # the last 8 weeks, oldest first
     weather: list[SiteWeather]
     approvals: list[ApprovalItem]  # oldest first
+    # Phase 12: published handover dates that look out of date (project managers only, else None).
+    handover_reminders: list[HandoverReminderItem] | None = None
 
 
 # --- The daily briefing ---------------------------------------------------------------------------------

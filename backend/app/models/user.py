@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
@@ -17,11 +18,24 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
+if TYPE_CHECKING:
+    from app.models.project import Project
+
 user_site_assignments = Table(
     "user_site_assignments",
     Base.metadata,
     Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
     Column("site_id", ForeignKey("sites.id", ondelete="CASCADE"), primary_key=True, index=True),
+    Column("assigned_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
+# Phase 12: which projects a client account may see. Clients reach a project only through this link,
+# never through its site, so two clients on one site never see each other's projects.
+project_clients = Table(
+    "project_clients",
+    Base.metadata,
+    Column("project_id", ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True),
+    Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True),
     Column("assigned_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
@@ -78,6 +92,10 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     sites: Mapped[list[Site]] = relationship(
         secondary=user_site_assignments, lazy="selectin", order_by=Site.code
+    )
+    # Clients only (Phase 12): the projects they may see.
+    client_projects: Mapped[list["Project"]] = relationship(
+        secondary=project_clients, lazy="selectin", order_by="Project.code"
     )
 
     __table_args__ = (

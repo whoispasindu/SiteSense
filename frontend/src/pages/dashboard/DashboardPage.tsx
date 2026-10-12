@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router";
 
 import { ApiError } from "../../api/client";
-import { downloadWeeklyReport, usePortfolio, type Kpis, type SiteWeather } from "../../api/dashboard";
+import { downloadWeeklyReport, usePortfolio, type HandoverReminderItem, type Kpis, type SiteWeather } from "../../api/dashboard";
 import { useHealth, useReadiness } from "../../api/health";
 import { useProjects } from "../../api/projects";
 import { useScheduleSummary } from "../../api/schedule";
@@ -25,6 +25,7 @@ import { TodayReports } from "../../features/reports/TodayReports";
 import { WeatherStrip } from "../../features/reports/WeatherStrip";
 import { RiskRankingPanel } from "../../features/risk/RiskRankingPanel";
 import { varianceLabel } from "../../features/schedule/variance";
+import { formatDate } from "../../features/projects/dates";
 import { formatSiteDate, greeting, siteTodayIso } from "../../lib/time";
 
 function ScheduleHealth() {
@@ -174,6 +175,33 @@ function SiteWeatherPanel({ sites, today }: { sites: SiteWeather[]; today: strin
   );
 }
 
+/** Phase 12: published handover dates that look out of date, so the client is not left with an old one. */
+function HandoverReminders({ items }: { items: HandoverReminderItem[] }) {
+  if (items.length === 0) return null;
+  return (
+    <Sheet className="border-signal-medium/40 p-5">
+      <SectionHeading annotation="what your clients see">Handover dates to review</SectionHeading>
+      <ul aria-label="Handover dates to review" className="divide-y divide-rule">
+        {items.map((item) => (
+          <li key={item.project_id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <span className="min-w-0">
+              <span className="block font-medium text-ink">
+                {item.name} <span className="font-mono text-xs font-normal text-ink-faint">{item.code}</span>
+              </span>
+              <span className="block text-sm text-ink-soft">
+                Published {formatDate(item.published_date)}. {item.reminder.reasons.join(" ")}
+              </span>
+            </span>
+            <Link to={`/projects/${item.project_id}/client`} className="text-sm font-medium text-survey hover:underline">
+              Review the date
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Sheet>
+  );
+}
+
 function WeeklyReportButton({ today }: { today: string }) {
   const [state, setState] = useState<"idle" | "busy" | "error">("idle");
   return (
@@ -220,6 +248,7 @@ function PortfolioOverview() {
       {data ? (
         <>
           <DashboardKpis kpis={data.kpis} approver={approver} />
+          {data.handover_reminders ? <HandoverReminders items={data.handover_reminders} /> : null}
           {approver ? (
             <div className="grid gap-6 xl:grid-cols-2">
               <ApprovalQueue items={data.approvals} total={data.kpis.waiting_for_you} />

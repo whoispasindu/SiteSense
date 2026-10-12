@@ -35,6 +35,7 @@ class AuditAction:
     USER_REACTIVATED = "user.reactivated"
     USER_PASSWORD_RESET = "user.password_reset"  # noqa: S105 - event name
     USER_SITES_ASSIGNED = "user.sites_assigned"
+    USER_PROJECTS_ASSIGNED = "user.projects_assigned"  # Phase 12: a client's projects
     SITE_CREATED = "site.created"
     SITE_UPDATED = "site.updated"
     PROJECT_CREATED = "project.created"
@@ -81,6 +82,11 @@ class AuditAction:
     # Phase 11: email choices and the weekly PDF (a cost export)
     NOTIFICATION_PREFERENCES_CHANGED = "user.notification_preferences_changed"
     WEEKLY_REPORT_DOWNLOADED = "report.weekly_downloaded"
+    # Phase 12: the client portal
+    HANDOVER_PUBLISHED = "project.handover_published"
+    HANDOVER_CONFIRMED = "project.handover_confirmed"
+    PHOTOS_CLIENT_SHARE_CHANGED = "photo.client_share_changed"
+    PHOTOS_METADATA_STRIPPED = "photo.metadata_stripped"  # the one-off clean-up of older uploads
 
 
 def record(
