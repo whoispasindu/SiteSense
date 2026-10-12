@@ -2,7 +2,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { makeMe, mockApi, nextUnbuiltModule, renderRoute, sessionApi } from "../test/utils";
+import { makeMe, mockApi, renderRoute, sessionApi } from "../test/utils";
 
 describe("NotFoundPage", () => {
   it("renders inside the shell for unknown routes and links home", async () => {
@@ -17,12 +17,4 @@ describe("NotFoundPage", () => {
     expect(router.state.location.pathname).toBe("/");
   });
 
-  it("treats not-yet-built modules as unknown routes", async () => {
-    const { item: next, role } = nextUnbuiltModule();
-    mockApi(sessionApi(makeMe(role)));
-    renderRoute(next.path);
-
-    expect(await screen.findByRole("heading", { name: "Off the drawings." })).toBeInTheDocument();
-    expect(screen.getByRole("banner")).not.toHaveTextContent(next.label);
-  });
 });

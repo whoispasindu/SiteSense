@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import type { Role } from "../api/auth";
-import { errorResponse, makeMe, mockApi, renderRoute, requestTo, sessionApi, tokenResponse } from "../test/utils";
+import { errorResponse, jsonResponse, makeMe, mockApi, renderRoute, requestTo, sessionApi, tokenResponse } from "../test/utils";
 import { safeNextPath } from "./context";
 
 describe("safeNextPath", () => {
@@ -80,7 +80,7 @@ const MENU: Record<Role, { visible: string[]; hidden: string[] }> = {
     hidden: ["Users", "Site reports", "Cost & claims"],
   },
   client: {
-    visible: ["Client portal"],
+    visible: ["Your projects", "Variations"],
     hidden: ["Projects", "Materials", "Users", "Cost & claims", "Risk & what-if"],
   },
 };
@@ -96,10 +96,11 @@ describe("role-based menu (Phase 1 'Done when')", () => {
   });
 
   it("gives clients their own home instead of the internal dashboard", async () => {
-    mockApi(sessionApi(makeMe("client", { full_name: "Mr. Jayawardena" })));
+    mockApi({ ...sessionApi(makeMe("client", { full_name: "Mr. Jayawardena" })), "/api/v1/client/projects": () => jsonResponse([]) });
     renderRoute("/");
 
-    expect(await screen.findByRole("heading", { name: "Welcome, Mr. Jayawardena." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Your projects" })).toBeInTheDocument();
+    expect(screen.getByText("Welcome, Mr. Jayawardena")).toBeInTheDocument();
     expect(screen.queryByText("System readings")).not.toBeInTheDocument();
   });
 });

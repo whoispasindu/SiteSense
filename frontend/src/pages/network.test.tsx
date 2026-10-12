@@ -30,7 +30,7 @@ const DETAIL: ProjectDetail = {
 const task = (id: string, code: string, pct: string, over: Partial<Task> = {}): Task => ({
   id, project_id: PID, code, name: `Task ${code}`, boq_section_id: null, boq_section_code: null,
   planned_start: "2026-09-01", planned_end: "2026-11-30", weight: "10.00", percent_complete: pct, is_critical: false,
-  is_concrete_pour: false, stopped: false, actual_start: pct === "0.00" ? null : "2026-09-01", actual_finish: null,
+  is_concrete_pour: false, client_milestone: false, milestone_name: null, stopped: false, actual_start: pct === "0.00" ? null : "2026-09-01", actual_finish: null,
   position: 1, planned_percent_today: 40, state: "on_track", progress_updated_at: null, ...over,
 });  // fmt: skip
 

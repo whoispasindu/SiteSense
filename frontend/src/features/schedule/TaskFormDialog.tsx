@@ -29,6 +29,14 @@ const taskFormSchema = z.object({
     .trim()
     .refine((v) => /^\d{1,3}(\.\d{1,2})?$/.test(v) && Number(v) > 0 && Number(v) <= 100, "A share between 0.01 and 100 %."),
   is_concrete_pour: z.preprocess((v) => v === "on", z.boolean()),
+  client_milestone: z.preprocess((v) => v === "on", z.boolean()),
+  milestone_name: z
+    .string()
+    .trim()
+    .max(80, "Up to 80 characters.")
+    .refine((v) => v === "" || v.length >= 2, "At least 2 characters, or leave it empty.")
+    .optional()
+    .transform((v) => v || null),
 });
 
 type Field = keyof z.infer<typeof taskFormSchema>;
@@ -46,6 +54,7 @@ export function TaskFormDialog({ project, task, open, onClose }: TaskFormDialogP
   const save = task ? update : create;
   const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
   const [sectionId, setSectionId] = useState(task?.boq_section_id ?? "");
+  const [milestone, setMilestone] = useState(task?.client_milestone ?? false);
   const section = project.sections.find((s) => s.id === sectionId);
 
   function close() {
@@ -70,8 +79,10 @@ export function TaskFormDialog({ project, task, open, onClose }: TaskFormDialogP
     if (!parsed.success || Object.keys(next).length > 0) return;
 
     const options = { onSuccess: close };
-    if (task) update.mutate({ id: task.id, ...parsed.data }, options);
-    else create.mutate(parsed.data, options);
+    // A name only travels with a milestone; unticking clears it.
+    const data = { ...parsed.data, milestone_name: parsed.data.client_milestone ? parsed.data.milestone_name : null };
+    if (task) update.mutate({ id: task.id, ...data }, options);
+    else create.mutate(data, options);
   }
 
   return (
@@ -125,6 +136,34 @@ export function TaskFormDialog({ project, task, open, onClose }: TaskFormDialogP
             </span>
           </span>
         </label>
+        <div className="space-y-3">
+          <label className="flex min-h-11 items-center gap-3 text-sm">
+            <input
+              type="checkbox"
+              name="client_milestone"
+              checked={milestone}
+              onChange={(event) => {
+                setMilestone(event.target.checked);
+              }}
+              className="size-4 accent-[var(--color-ink)]"
+            />
+            <span>
+              Client milestone
+              <span className="block text-xs text-ink-faint">Shown to the client in their portal, with its expected date.</span>
+            </span>
+          </label>
+          {milestone ? (
+            <TextField
+              label="Name for the client (optional)"
+              name="milestone_name"
+              defaultValue={task?.milestone_name ?? ""}
+              placeholder="Structure complete"
+              autoComplete="off"
+              error={errors.milestone_name}
+              hint="Leave empty to use the task's name."
+            />
+          ) : null}
+        </div>
         {task?.is_critical ? (
           <p className="text-sm text-signal-high">On the critical path: any delay here moves the handover date.</p>
         ) : null}

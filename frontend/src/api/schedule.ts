@@ -22,6 +22,8 @@ export const taskSchema = z.object({
   percent_complete: decimal,
   is_critical: z.boolean(), // on the forecast critical path (Phase 9: calculated)
   is_concrete_pour: z.boolean(), // BR-06
+  client_milestone: z.boolean(), // Phase 12: shown to the client
+  milestone_name: z.string().nullable(), // the client-friendly name, if any
   stopped: z.boolean(), // BR-11
   actual_start: z.iso.date().nullable(),
   actual_finish: z.iso.date().nullable(),
@@ -99,6 +101,8 @@ export interface TaskInput {
   weight?: string;
   percent_complete?: string;
   is_concrete_pour?: boolean;
+  client_milestone?: boolean;
+  milestone_name?: string | null;
 }
 
 /** Any task change moves the curve: refresh tasks, progress and the portfolio summary together. */

@@ -6,7 +6,7 @@ import { timeAgo } from "../../lib/time";
 import { Icon } from "../ui/icons";
 
 /** Bell with an unread count; the panel lists the latest notifications (reminders, new reports). */
-export function NotificationBell() {
+export function NotificationBell({ onDark = false }: { onDark?: boolean }) {
   const notifications = useNotifications();
   const markRead = useMarkRead();
   const markAll = useMarkAllRead();
@@ -51,7 +51,9 @@ export function NotificationBell() {
         onClick={() => {
           setOpen((v) => !v);
         }}
-        className="relative inline-flex size-10 items-center justify-center rounded-lg text-ink-soft hover:bg-paper-sunk hover:text-ink"
+        className={`relative inline-flex size-10 items-center justify-center rounded-lg ${
+          onDark ? "text-asphalt-text hover:bg-asphalt-raised hover:text-white" : "text-ink-soft hover:bg-paper-sunk hover:text-ink"
+        }`}
       >
         <Icon name="bell" className="size-5" />
         {unread ? (

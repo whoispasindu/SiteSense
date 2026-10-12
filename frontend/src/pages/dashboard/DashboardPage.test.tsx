@@ -177,6 +177,22 @@ describe("DashboardPage", () => {
     expect(screen.getByRole("group", { name: "Waiting for you" })).toHaveTextContent("2");
   });
 
+  it("asks the PM to review a published handover date that looks out of date", async () => {
+    api("project_manager", {
+      portfolio: portfolio({
+        handover_reminders: [
+          { project_id: HAVELOCK.id, code: HAVELOCK.code, name: HAVELOCK.name, published_date: "2027-09-30",
+            reminder: { reasons: ["Not reviewed for 31 days."], forecast_gap_days: 2, days_since_review: 31 } },
+        ],
+      }),
+    });  // fmt: skip
+    renderRoute("/");
+
+    const list = await screen.findByRole("list", { name: "Handover dates to review" });
+    expect(list).toHaveTextContent("Published 30 Sept 2027. Not reviewed for 31 days.");
+    expect(within(list).getByRole("link", { name: "Review the date" })).toHaveAttribute("href", `/projects/${HAVELOCK.id}/client`);
+  });
+
   it("lists the approval queue with links", async () => {
     api();
     renderRoute("/");

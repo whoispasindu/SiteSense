@@ -32,6 +32,7 @@ function makeUser(overrides: Partial<AdminUser>): AdminUser {
     last_login_at: "2026-10-09T03:30:00+00:00",
     created_at: "2026-10-01T08:00:00+00:00",
     sites: [{ id: SITE_A.id, code: SITE_A.code, name: SITE_A.name }],
+    projects: [],
     ...overrides,
   };
 }
@@ -196,6 +197,45 @@ describe("UsersPage", () => {
     await user.click(within(dialog).getByRole("button", { name: "Reset password" }));
     await user.click(within(dialog).getByRole("button", { name: "Reset password" }));
     expect(await screen.findByTestId("temporary-password")).toHaveTextContent("Zz9yy-Xx8ww-Vv7uu-Tt6ss");
+  });
+
+  it("links a client account to the projects it may see", async () => {
+    const user = userEvent.setup();
+    const CLIENT = makeUser({
+      id: "55555555-5555-4555-8555-555555555555", email: "owner@client.lk", full_name: "Mr. Jayawardena",
+      role: "client", role_label: "Client", projects: [],
+    });  // fmt: skip
+    const projects = [
+      { id: "66666666-6666-4666-8666-666666666666", code: "HR-2026-01", name: "Havelock Residences", site_code: "COL-07", status: "active", client_name: "Havelock Developers", clients: 0 },
+      { id: "77777777-7777-4777-8777-777777777777", code: "HR-2", name: "Havelock Towers", site_code: "COL-07", status: "active", client_name: "Other Holdings", clients: 1 },
+    ];  // fmt: skip
+    const fetchMock = adminApi({
+      "/api/v1/admin/users": () => page([CLIENT, SELF]),
+      "/api/v1/admin/projects": () => jsonResponse(projects),
+      [`/api/v1/admin/users/${CLIENT.id}/projects`]: () => jsonResponse({ ...CLIENT, projects: [projects[0]] }),
+    });
+    renderRoute("/admin/users");
+
+    await user.click(await screen.findByRole("button", { name: "Manage Mr. Jayawardena" }));
+    const dialog = screen.getByRole("dialog", { name: "Mr. Jayawardena" });
+    expect(within(dialog).getByText(/Never anything on another project, even on the same site/)).toBeInTheDocument();
+    const towers = await within(dialog).findByRole("checkbox", { name: /Havelock Towers/ });
+    expect(towers.closest("label")).toHaveTextContent("Other Holdings · site COL-07");
+    await user.click(within(dialog).getByRole("checkbox", { name: /HR-2026-01/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save projects" }));
+    await waitFor(() => {
+      expect(requestTo(fetchMock, `/admin/users/${CLIENT.id}/projects`)?.body).toBe(
+        JSON.stringify({ project_ids: [projects[0]?.id] }),
+      );
+    });
+  });
+
+  it("shows no project picker for staff", async () => {
+    const user = userEvent.setup();
+    adminApi();
+    renderRoute("/admin/users");
+    await user.click(await screen.findByRole("button", { name: "Manage Kasun Perera" }));
+    expect(screen.queryByRole("button", { name: "Save projects" })).not.toBeInTheDocument();
   });
 
   it("does not let admins change their own role or deactivate themselves", async () => {

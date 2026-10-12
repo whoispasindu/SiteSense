@@ -2,7 +2,8 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { makeMe, mockApi, nextUnbuiltModule, renderRoute, sessionApi } from "../../test/utils";
+import { makeMe, mockApi, renderRoute, sessionApi } from "../../test/utils";
+import { isAvailable, NAV_GROUPS } from "./navigation";
 
 describe("AppLayout", () => {
   beforeEach(() => {
@@ -24,17 +25,18 @@ describe("AppLayout", () => {
     expect(within(nav).getByRole("link", { name: /Dashboard/ })).toHaveAttribute("aria-current", "page");
   });
 
-  it("shows later modules as unavailable instead of linking to them", async () => {
-    const { item: next, role } = nextUnbuiltModule();
-    mockApi(sessionApi(makeMe(role)));
+  it("links every module now that every phase's module is built", async () => {
+    mockApi(sessionApi(makeMe("project_manager")));
     renderRoute("/");
-
     const nav = await screen.findByRole("navigation", { name: "Main" });
-    expect(within(nav).getByRole("link", { name: /Dashboard/ })).toHaveAttribute("href", "/");
-    expect(within(nav).queryByRole("link", { name: new RegExp(next.label) })).not.toBeInTheDocument();
-    const upcoming = within(nav).getByText(next.label).closest("[aria-disabled]");
-    expect(upcoming).toHaveAttribute("aria-disabled", "true");
-    expect(upcoming).toHaveTextContent(new RegExp(`Coming in phase\\s*P?${String(next.phase)}`));
+    expect(within(nav).queryByText("Soon")).not.toBeInTheDocument();
+  });
+
+  it("would show a later module as unavailable (the gating rule)", () => {
+    const item = { label: "Later", path: "/later", icon: "projects", phase: 15 } as const;
+    expect(isAvailable(item)).toBe(false);
+    expect(isAvailable(item, 15)).toBe(true);
+    expect(NAV_GROUPS.flatMap((g) => g.items).every((i) => isAvailable(i))).toBe(true);
   });
 
   it("opens and closes the mobile navigation", async () => {

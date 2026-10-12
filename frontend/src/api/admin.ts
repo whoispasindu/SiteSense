@@ -19,6 +19,8 @@ export const userSchema = z.object({
   last_login_at: z.iso.datetime({ offset: true }).nullable(),
   created_at: z.iso.datetime({ offset: true }),
   sites: z.array(siteSummarySchema),
+  // Clients only (Phase 12): the projects they may see.
+  projects: z.array(z.object({ id: z.uuid(), code: z.string(), name: z.string() })).default([]),
 });
 export type AdminUser = z.infer<typeof userSchema>;
 
@@ -106,6 +108,42 @@ export function useAssignSites() {
         body: { site_ids: siteIds },
       }).then((r) => r.data),
     onSuccess: invalidate,
+  });
+}
+
+const adminProjectSchema = z.object({
+  id: z.uuid(),
+  code: z.string(),
+  name: z.string(),
+  site_code: z.string(),
+  status: z.string(),
+  client_name: z.string(),
+  clients: z.number().int(),
+});
+export type AdminProject = z.infer<typeof adminProjectSchema>;
+
+/** Every project, to link client accounts to (Phase 12). No contract figures. */
+export function useAdminProjects(enabled = true) {
+  return useQuery({
+    queryKey: ["admin", "projects"] as const,
+    queryFn: ({ signal }) => apiRequest("/admin/projects", z.array(adminProjectSchema), { signal }).then((r) => r.data),
+    enabled,
+  });
+}
+
+export function useAssignProjects() {
+  const invalidate = useInvalidateUsers();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, projectIds }: { id: string; projectIds: string[] }) =>
+      apiRequest(`/admin/users/${encodeURIComponent(id)}/projects`, userSchema, {
+        method: "POST",
+        body: { project_ids: projectIds },
+      }).then((r) => r.data),
+    onSuccess: async () => {
+      await invalidate();
+      await queryClient.invalidateQueries({ queryKey: ["admin", "projects"] });
+    },
   });
 }
 
