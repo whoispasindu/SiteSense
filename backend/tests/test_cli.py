@@ -109,12 +109,15 @@ def test_seed_dev_creates_sites_and_one_user_per_role(
             PurchaseOrder.project_id == havelock.id, PurchaseOrder.expected_delivery < clock.site_today()
         )
     ).all()
-    assert len(overdue) == 2
+    assert len(overdue) == 2 + len(cli.DEMO_PRICE_RISE)  # two late, plus the spring orders (on time)
     statuses = sorted(
         r.status
         for r in cli_db.scalars(select(MaterialRequest).where(MaterialRequest.project_id == havelock.id))
     )
-    assert statuses == ["approved", "change_requested", "delivered", "ordered", "pm_approval", "requested"]
+    assert statuses == [
+        "approved", "change_requested", "delivered", "delivered", "delivered", "ordered", "pm_approval",
+        "requested",
+    ]  # fmt: skip
     assert cli_db.scalar(select(func.count(Supplier.id))) == 5
     # BR-12 (Phase 10): a finished job gives every supplier an on-time record, and is never risk-scored.
     finished = cli_db.scalar(select(Project).where(Project.code == cli.DEMO_HISTORY_PROJECT[0]))

@@ -181,3 +181,25 @@ def test_seed_dev_runs_in_production_only_in_demo_mode(
     assert cli.main(["seed-dev"]) == 1
     # Past the production guard: stopped only by the password check.
     assert "Set SITESENSE_DEMO_PASSWORD" in capsys.readouterr().err
+
+
+def test_the_demo_has_one_project_at_each_risk_level(
+    monkeypatch: pytest.MonkeyPatch, owner_connection: Connection, tmp_path: Path
+) -> None:
+    """The guide's demo company: three projects at different risk levels (on the day this was set up;
+    the scores move as the programme dates come closer, like a real project's)."""
+    from datetime import UTC, datetime
+
+    from app.core import clock
+    from app.models import RiskScore
+
+    monkeypatch.setattr(clock, "utcnow", lambda: datetime(2026, 10, 16, 2, 0, tzinfo=UTC))
+    monkeypatch.setattr(cli, "Database", lambda _settings: _TestDatabase(owner_connection))
+    monkeypatch.setattr(cli, "get_settings", lambda: make_settings(media_root=str(tmp_path / "media")))
+    monkeypatch.setenv("SITESENSE_DEMO_PASSWORD", DEMO_PASSWORD)
+    assert cli.main(["seed-dev"]) == 0
+
+    with Session(bind=owner_connection, join_transaction_mode="create_savepoint") as db:
+        rows = db.execute(select(Project.code, RiskScore.level).join(RiskScore)).all()
+    levels = {row.code: row.level for row in rows}
+    assert levels == {"HR-2026-01": "high", "FVA-2026-03": "medium", "PRO-2026-02": "low"}

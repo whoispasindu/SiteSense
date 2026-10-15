@@ -134,6 +134,15 @@ DEMO_SUPPLIER_HISTORY = [
     ("Hill Country Hardware", ("B.05", "Waterproofing membrane", "m2", "1850"), 3, 2),
 ]
 
+# Havelock's substructure concrete and steel, bought in the spring after a price rise at about the
+# full BOQ rates, so none of the budget's margin is left (about 10% over budget on what is committed).
+# With the slow frame this makes Havelock the demo's high-risk project; Fort View is medium and
+# Peradeniya low (Phase 13). (item, quantity, unit price, delivered days ago, supplier)
+DEMO_PRICE_RISE = [
+    ("B.03", "640", "38900", 150, "Colombo Ready-Mix"),
+    ("B.04", "58000", "389", 170, "Southern Steel Traders"),
+]
+
 # Havelock material requests and how far each gets:
 # (item, quantity, unit price, needed in days, stage, supplier, delivered quantity)
 DEMO_REQUESTS: list[tuple[str, str, str, int, str, str | None, str | None]] = [
@@ -657,10 +666,54 @@ def _seed_risk_inputs(db: Session) -> None:
             po.expected_delivery = today - timedelta(days=4 if line.deliveries else 9)
             for delivery in line.deliveries:
                 delivery.delivered_on = today - timedelta(days=1)
+    buyer = db.scalar(select(User).where(User.email == "procurement@sitesense.example"))
+    if havelock is not None and engineer is not None and buyer is not None:
+        _seed_price_rise(db, havelock, engineer, buyer)
     if peradeniya is not None and pm is not None:
         for days_ago in range(14):
             file(peradeniya, pm, days_ago, 41 + days_ago % 4)
     db.commit()
+
+
+def _seed_price_rise(db: Session, project: Project, engineer: User, buyer: User) -> None:
+    """Havelock's spring orders at the higher prices (``DEMO_PRICE_RISE``). Skipped if already there."""
+    today = clock.site_today()
+    for item_code, quantity, price, days_ago, supplier_name in DEMO_PRICE_RISE:
+        item = db.scalar(
+            select(BoqItem).where(BoqItem.project_id == project.id, BoqItem.item_code == item_code)
+        )
+        supplier = db.scalar(select(Supplier).where(Supplier.name == supplier_name))
+        if item is None or supplier is None:
+            continue
+        if db.scalar(select(MaterialRequest.id).where(MaterialRequest.boq_item_id == item.id)):
+            continue
+        arrived = today - timedelta(days=days_ago)
+        submitted = datetime.combine(arrived - timedelta(days=21), time(9), clock.SITE_TIME_ZONE)
+        qty, unit_price = Decimal(quantity), Decimal(price)
+        request = MaterialRequest(
+            number=materials_service.next_number(db, "MR"), project_id=project.id, boq_item_id=item.id,
+            requested_by=engineer.id, quantity=qty, unit_price=unit_price, needed_by=arrived,
+            status="delivered", approval_level="pm", submitted_at=submitted,
+        )  # fmt: skip
+        order = PurchaseOrder(
+            number=materials_service.next_number(db, "PO"), project_id=project.id, supplier_id=supplier.id,
+            issued_by=buyer.id, issued_at=submitted + timedelta(days=7), expected_delivery=arrived,
+            status="delivered",
+        )  # fmt: skip
+        db.add_all([request, order])
+        db.flush()
+        line = PurchaseOrderLine(
+            purchase_order_id=order.id, request_id=request.id, quantity=qty, unit_price=unit_price,
+            amount=qty * unit_price, position=1,
+        )  # fmt: skip
+        db.add(line)
+        db.flush()
+        db.add(
+            Delivery(
+                line_id=line.id, quantity=qty, delivered_on=arrived, received_by=buyer.id,
+                created_at=datetime.combine(arrived, time(15), clock.SITE_TIME_ZONE),
+            )
+        )  # fmt: skip
 
 
 def _seed_issues(db: Session) -> None:

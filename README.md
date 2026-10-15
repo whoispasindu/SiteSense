@@ -123,7 +123,7 @@ company's data.
 
 | Role | Email | Try this |
 | --- | --- | --- |
-| Project Manager | `pm@sitesense.example` | Dashboard ranked by risk; Cost & claims: approve the waiting progress claim; open Havelock Residences: its Risk tab has the forecast with its likely range, the 14-day trend and the what-if planner (tick weather protection: the monsoon is coming), and its Schedule tab for the critical path, forecast slip and rain on pour days; link tasks from a task's edit dialog; approve requests sent to the PM |
+| Project Manager | `pm@sitesense.example` | Dashboard ranked by risk: Havelock Residences high, Fort View Apartments medium, Peradeniya Road Offices low; Cost & claims: approve the waiting progress claim; open Havelock Residences: its Risk tab has the forecast with its likely range, the 14-day trend and the what-if planner (tick weather protection: the monsoon is coming), and its Schedule tab for the critical path, forecast slip and rain on pour days; link tasks from a task's edit dialog; approve requests sent to the PM |
 | Quantity Surveyor | `qs@sitesense.example` | Enter the quoted price at the QS check and watch BR-01 and BR-13 decide who approves; price variation VO-0003; make a progress claim and see BR-08 calculate it; budget forecast |
 | Site Engineer | `engineer@sitesense.example` | File today's daily report for Havelock and write a problem or two: the AI check tags them for you to confirm (a safety issue can flag stop-work on chosen tasks); raise a material request |
 | Procurement Officer | `procurement@sitesense.example` | Order approved requests (choose Ceylon Formwork Hire for MR-0003 and BR-12 suggests a more reliable supplier), record deliveries, manage suppliers |
@@ -147,8 +147,14 @@ a year of deliveries, so each supplier has an on-time record: one is unreliable 
 deliveries to judge.
 
 Every open demo project is also given a risk score by the model, and the PM and QS dashboards rank
-the projects by it. Havelock runs short-handed with a few missed reports and late deliveries;
-Peradeniya is ahead of plan. Scores are recalculated every morning and after each daily report.
+the projects by it, one at each level. Havelock is high: its substructure concrete and steel were
+bought at the full BOQ rates after a price rise (about 10% over budget on what is committed), and
+it runs short-handed with a few missed reports and late deliveries. Fort View, still in planning,
+is medium; Peradeniya is ahead of plan and low. Scores are recalculated every morning and after
+each daily report, so they drift as the programme dates come closer.
+
+`docker compose exec backend python -m app.cli reset-demo` puts everything back to the seeded data
+(demo mode only); with demo mode on, the API also does this every night at 03:00 site time.
 
 These operator commands run the scheduled jobs on demand:
 
