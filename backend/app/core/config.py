@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     # Per-client-IP request budgets for the auth endpoints (per minute).
     login_rate_per_minute: int = Field(default=10, ge=1)
     refresh_rate_per_minute: int = Field(default=30, ge=1)
-    # BOQ imports parse spreadsheets (CPU-heavy): a small per-IP budget.
+    # BOQ imports parse spreadsheets (CPU-heavy): a small per-user budget.
     boq_import_rate_per_minute: int = Field(default=20, ge=1)
 
     # --- Site reports (Phase 4) -------------------------------------------------------------
@@ -83,10 +83,14 @@ class Settings(BaseSettings):
     media_root: str = "var/media"
     max_photo_bytes: int = Field(default=10 * 1_048_576, ge=1024, le=50 * 1_048_576)
     max_photos_per_report: int = Field(default=12, ge=1, le=50)
-    # Photo decoding is CPU-heavy: a per-IP budget.
+    # Photo decoding is CPU-heavy: a per-user budget.
     photo_upload_rate_per_minute: int = Field(default=60, ge=1)
-    # Analysing a report runs the text classifier (up to 0.4 s of CPU): a per-IP budget.
+    # Analysing a report runs the text classifier (up to 0.4 s of CPU): a per-user budget.
     analyze_rate_per_minute: int = Field(default=30, ge=1)
+    # Phase 13: every write (POST, PUT, PATCH, DELETE) shares one budget per signed-in user (per IP
+    # before sign-in), and the heavy reads and runs (what-if, weekly PDF) have a smaller one.
+    write_rate_per_minute: int = Field(default=120, ge=1)
+    heavy_rate_per_minute: int = Field(default=20, ge=1)
     # Open-Meteo forecast (free, no key). Off: the app uses cached forecasts only.
     weather_enabled: bool = True
     weather_cache_hours: int = Field(default=3, ge=1, le=48)

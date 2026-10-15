@@ -113,6 +113,14 @@ the API afterwards (`docker compose restart backend`).
 Every account uses the password in `SITESENSE_DEMO_PASSWORD` in your `.env`
 (`SiteSense-Demo-2026!` unless you changed it).
 
+**Two-step codes are skipped for these demo accounts.** Company Admins, project managers, quantity
+surveyors and procurement officers normally must set up two-step sign-in (a code from an
+authenticator app) before they can use SiteSense. Local Docker runs with `SITESENSE_DEMO_MODE=true`,
+which skips that requirement for the seeded demo accounts only, so anyone can sign in with the
+password above; a banner on every page says it is demo data. Any account you create yourself
+still has to set up two-step sign-in if its role needs it. Never turn demo mode on for a real
+company's data.
+
 | Role | Email | Try this |
 | --- | --- | --- |
 | Project Manager | `pm@sitesense.example` | Dashboard ranked by risk; Cost & claims: approve the waiting progress claim; open Havelock Residences: its Risk tab has the forecast with its likely range, the 14-day trend and the what-if planner (tick weather protection: the monsoon is coming), and its Schedule tab for the critical path, forecast slip and rain on pour days; link tasks from a task's edit dialog; approve requests sent to the PM |
@@ -255,6 +263,10 @@ Backend settings are environment variables prefixed with `SITESENSE_`
 | `SITESENSE_SESSION_MAX_DAYS` | Absolute session limit | `30` |
 | `SITESENSE_LOGIN_MAX_FAILURES` / `SITESENSE_LOCKOUT_MINUTES` | Account lockout | `5` / `15` |
 | `SITESENSE_LOGIN_RATE_PER_MINUTE` | Sign-in attempts per IP per minute | `10` |
+| `SITESENSE_WRITE_RATE_PER_MINUTE` | Writes (POST, PUT, PATCH, DELETE) per signed-in user per minute | `120` |
+| `SITESENSE_HEAVY_RATE_PER_MINUTE` | What-if runs and weekly PDFs per user per minute | `20` |
+| `SITESENSE_MFA_KEY` | Encrypts two-step secrets and keys recovery codes; 32+ characters, not the JWT secret (changing it resets every enrolment) | development value (refused in production) |
+| `SITESENSE_DEMO_MODE` | Demo banner, logged emails, and the seeded demo accounts skip two-step codes; never for real data | `false` (`true` in local Docker) |
 | `SITESENSE_COOKIE_SECURE` | Secure flag on the refresh cookie | `true` |
 | `SITESENSE_MEDIA_ROOT` | Folder for site photos (mount a persistent volume in production) | `var/media` |
 | `SITESENSE_MAX_PHOTO_BYTES` / `SITESENSE_MAX_PHOTOS_PER_REPORT` | Photo limits | `10485760` / `12` |
@@ -272,7 +284,22 @@ Backend settings are environment variables prefixed with `SITESENSE_`
 | `SITESENSE_DIGEST_HOUR` / `SITESENSE_DIGEST_MINUTE` | Evening digest time, site time | `18` / `30` |
 
 In production the API refuses to start with debug on, wildcard or plain-HTTP origins, the
-example database password, a plain-HTTP `SITESENSE_APP_BASE_URL`, or a mail server without TLS.
+example database password, a plain-HTTP `SITESENSE_APP_BASE_URL`, a mail server without TLS, the
+development or a reused `SITESENSE_MFA_KEY`, or two-step enforcement off.
+
+### Two-step sign-in
+
+Required for Company Admins, project managers, quantity surveyors and procurement officers (they
+see costs or run the company); optional for site engineers and clients, under **Two-step sign-in**
+in the account menu. Setting up shows a QR code for any authenticator app (Google Authenticator,
+Microsoft Authenticator, 2FAS…) and ten single-use recovery codes. Codes are time-based (RFC 6238),
+each works once, and wrong codes count towards the same lockout as wrong passwords. The
+authenticator secret is stored encrypted, recovery codes only as keyed hashes.
+
+Lost phone: sign in with a recovery code, then ask a Company Admin to reset two-step sign-in
+(Users → the person → Reset two-step sign-in). Resets sign the person out everywhere and are
+recorded in the audit log. An admin cannot reset their own; they use a recovery code, or another
+admin resets it.
 
 ### The AI briefing
 
@@ -354,8 +381,8 @@ docs/           architecture, decision records, security reviews, model cards
 | 9 | Advanced schedule | Done |
 | 10 | Risk model v2, what-if planner and supplier model | Done |
 | 11 | Dashboard, alerts and AI briefing | Done |
-| 12 | Client portal | In review |
-| 13 | Hardening and deployment | Planned |
+| 12 | Client portal | Done |
+| 13 | Hardening and deployment | In review |
 | 14 | Testing, UAT and evaluation → **v1.0** | Planned |
 | Later | Public demo: a hosted instance with seeded data | Planned |
 

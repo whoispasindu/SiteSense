@@ -1,7 +1,8 @@
 """Operator commands.
 
     python -m app.cli create-admin --email admin@company.lk --name "Nimal Perera"
-    python -m app.cli seed-dev            # local development only
+    python -m app.cli seed-dev            # local development, or production in demo mode
+    python -m app.cli reset-demo          # demo mode only: back to the seeded data
     python -m app.cli send-reminders      # missing daily report reminders now (BR-07)
     python -m app.cli refresh-weather     # fetch the 14-day forecast for every active site
     python -m app.cli score-risk          # score every open project's risk now
@@ -10,7 +11,8 @@
 
 ``create-admin`` prints a one-time temporary password; the admin must change it at first sign-in.
 ``seed-dev`` creates demo sites and one account per role using SITESENSE_DEMO_PASSWORD, and
-refuses to run in production.
+refuses to run in production unless SITESENSE_DEMO_MODE is on. ``reset-demo`` deletes everything
+(as the schema owner) and seeds again; it refuses outside demo mode.
 """
 
 import argparse
@@ -79,6 +81,7 @@ from app.services import (
     audit,
     claim_service,
     cost_service,
+    demo_service,
     handover_service,
     materials_service,
     photos,
@@ -265,8 +268,8 @@ def create_admin(email: str, name: str) -> int:
 
 def seed_dev() -> int:
     settings = get_settings()
-    if settings.is_production:
-        print("seed-dev refuses to run in production.", file=sys.stderr)
+    if settings.is_production and not settings.demo_mode:
+        print("seed-dev refuses to run in production unless SITESENSE_DEMO_MODE is on.", file=sys.stderr)
         return 1
     password = os.environ.get("SITESENSE_DEMO_PASSWORD", "")
     try:
@@ -878,6 +881,24 @@ def _seed_portal(db: Session, storage: LocalStorage) -> None:
         portal_service.set_shared(db, pm, project, PhotosShareIn(photo_ids=shared, shared=True), meta=meta)
 
 
+def reset_demo() -> int:
+    """Phase 13: the demo back to its seeded state (nightly in demo mode, or by hand)."""
+    settings = get_settings()
+    try:
+        result = demo_service.reset_as_owner(settings, LocalStorage(settings.media_root))
+    except demo_service.DemoResetRefusedError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    print(f"Removed {result.rows} rows and {result.photo_files} photo files.")
+    status = seed_dev()
+    if status != 0:
+        return status
+    if settings.weather_enabled:
+        refresh_site_weather()
+    check_pours()
+    return score_risk()
+
+
 def send_reminders() -> int:
     database = Database(get_settings())
     created = run_report_reminders(database.session_factory)
@@ -938,6 +959,7 @@ def main(argv: list[str] | None = None) -> int:
     admin.add_argument("--email", required=True)
     admin.add_argument("--name", required=True)
     sub.add_parser("seed-dev", help="create demo sites and one user per role (not in production)")
+    sub.add_parser("reset-demo", help="demo mode only: delete everything and seed the demo again")
     sub.add_parser("send-reminders", help="remind sites missing today's daily report")
     sub.add_parser("refresh-weather", help="fetch the 14-day forecast for every active site")
     sub.add_parser("score-risk", help="score every open project's risk now")
@@ -953,6 +975,8 @@ def main(argv: list[str] | None = None) -> int:
         return create_admin(args.email, args.name)
     if args.command == "send-reminders":
         return send_reminders()
+    if args.command == "reset-demo":
+        return reset_demo()
     if args.command == "refresh-weather":
         return refresh_site_weather()
     if args.command == "score-risk":

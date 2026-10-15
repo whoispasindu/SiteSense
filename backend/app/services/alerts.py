@@ -29,6 +29,7 @@ from app.core import clock
 from app.core.config import get_settings
 from app.core.errors import BusinessRuleError
 from app.core.permissions import Role
+from app.integrations import email as email_client
 from app.models import EmailOutbox, Notification, NotificationPreference, User
 from app.schemas.analytics import NotificationPreferencesIn, NotificationPreferencesOut
 from app.services import audit
@@ -194,7 +195,7 @@ def preferences_out(db: Session, user: User) -> NotificationPreferencesOut:
         weekly_report=wants_weekly_report(user, prefs),
         weekly_report_available=user.role in WEEKLY_ROLES,
         stop_work_always=True,
-        email_configured=bool(settings.smtp_host),
+        email_configured=email_client.configured(settings),
         digest_time=f"{settings.digest_hour:02d}:{settings.digest_minute:02d}",
         weekly_time=WEEKLY_TIME,
     )

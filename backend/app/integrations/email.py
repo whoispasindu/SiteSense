@@ -27,7 +27,9 @@ class OutboundEmail:
 
 
 def configured(settings: Settings) -> bool:
-    return bool(settings.smtp_host)
+    """Whether emails are really sent. In demo mode they never are: the demo addresses are not real
+    mailboxes, so every email is written to the log instead."""
+    return bool(settings.smtp_host) and not settings.demo_mode
 
 
 def build(settings: Settings, email: OutboundEmail) -> EmailMessage:

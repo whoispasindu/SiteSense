@@ -78,7 +78,7 @@ def get_boq(project_id: uuid.UUID, user: Reader, db: DbSession) -> BoqOut | BoqB
 @router.post(
     "/{project_id}/boq/import",
     response_model=ImportReport,
-    dependencies=[Depends(rate_limit("boq-import", "boq_import_rate_per_minute"))],
+    dependencies=[Depends(rate_limit("boq-import", "boq_import_rate_per_minute", per_user=True))],
 )
 def import_boq(
     project_id: uuid.UUID,

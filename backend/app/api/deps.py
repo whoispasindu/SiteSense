@@ -133,9 +133,39 @@ def require_trusted_origin(request: Request, settings: AppSettings) -> None:
 # --- Rate limiting --------------------------------------------------------------------------
 
 
-def rate_limit(bucket: str, setting_name: str) -> Callable[..., None]:
+WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+# The sign-in steps already have their own per-IP budgets; counting them here as well would let a
+# burst of bad requests from an office lock its people out of signing in.
+SIGN_IN_PATHS = frozenset({"/api/v1/auth/login", "/api/v1/auth/mfa/verify", "/api/v1/auth/refresh"})
+
+
+def _caller_key(request: Request, settings: Settings, meta: RequestMeta) -> str:
+    """The signed-in user when the request carries a valid token, otherwise the client IP.
+
+    Per-user budgets mean one office behind a shared IP does not share one budget, and a forged
+    token cannot borrow someone else's: an invalid token falls back to the IP.
+    """
+    try:
+        return f"user:{decode_access_token(_bearer_token(request), settings).user_id}"
+    except (TokenError, UnauthorizedError):
+        return f"ip:{meta.ip_address}"
+
+
+def rate_limit(bucket: str, setting_name: str, *, per_user: bool = False) -> Callable[..., None]:
+    """A per-minute budget for one kind of request. Sign-in steps count per IP (there is no user yet);
+    the rest count per signed-in user."""
+
     def dependency(request: Request, settings: AppSettings, meta: Meta) -> None:
         limiter: RateLimiter = request.app.state.rate_limiter
-        limiter.hit(f"{bucket}:{meta.ip_address}", limit=getattr(settings, setting_name))
+        who = _caller_key(request, settings, meta) if per_user else f"ip:{meta.ip_address}"
+        limiter.hit(f"{bucket}:{who}", limit=getattr(settings, setting_name))
 
     return dependency
+
+
+def limit_writes(request: Request, settings: AppSettings, meta: Meta) -> None:
+    """Phase 13: one budget for every write across the API, so no write endpoint is unlimited."""
+    if request.method not in WRITE_METHODS or request.url.path in SIGN_IN_PATHS:
+        return
+    limiter: RateLimiter = request.app.state.rate_limiter
+    limiter.hit(f"write:{_caller_key(request, settings, meta)}", limit=settings.write_rate_per_minute)

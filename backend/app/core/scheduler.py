@@ -6,6 +6,7 @@
 - Every minute: send the emails waiting in the outbox (Phase 11).
 - 18:30 site time (``digest_hour``, ``digest_minute``): queue each user's evening digest.
 - Monday 07:00 site time: queue the weekly PDF for project managers and quantity surveyors who take it.
+- 03:00 site time, demo mode only: reset the demo to its seeded data (Phase 13).
 
 Jobs are safe to run more than once (several API workers, a restart, the CLI): reminders are
 de-duplicated in the database and weather refresh is an upsert. Each job opens its own session
@@ -98,6 +99,13 @@ def run_weekly_reports(session_factory: Callable[[], Session]) -> int:
     return queued
 
 
+def run_demo_reset() -> int:
+    # Imported here: the CLI imports this module for the other jobs.
+    from app.cli import reset_demo
+
+    return reset_demo()
+
+
 def _guarded(name: str, job: Callable[[], object]) -> Callable[[], None]:
     def run() -> None:
         try:
@@ -159,4 +167,11 @@ def build_scheduler(settings: Settings, database: Database, client: WeatherClien
         id="weekly_report",
         **common,
     )
+    if settings.demo_mode:
+        scheduler.add_job(
+            _guarded("demo_reset", run_demo_reset),
+            CronTrigger(hour=3, minute=0, timezone=clock.SITE_TIME_ZONE),
+            id="demo_reset",
+            **common,
+        )
     return scheduler
