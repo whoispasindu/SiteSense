@@ -88,6 +88,9 @@ export function makeMe(role: Role = "site_engineer", overrides: Partial<Me> = {}
     site_scoped: ["project_manager", "quantity_surveyor", "site_engineer", "client"].includes(role),
     sites: [{ id: "0b6c2f4e-1d3a-4e5f-8a9b-1c2d3e4f5a6b", code: "COL-07", name: "Havelock Residences" }],
     must_change_password: false,
+    mfa_enabled: false,
+    mfa_setup_required: false,
+    demo_mode: false,
     ...overrides,
   };
 }

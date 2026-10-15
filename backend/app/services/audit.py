@@ -29,6 +29,12 @@ class AuditAction:
     LOGOUT = "auth.logout"
     REFRESH_REUSE_DETECTED = "auth.refresh_reuse_detected"
     PASSWORD_CHANGED = "auth.password_changed"  # noqa: S105 - event name
+    # Phase 13: two-step sign-in
+    MFA_ENABLED = "auth.mfa_enabled"
+    MFA_DISABLED = "auth.mfa_disabled"
+    MFA_RECOVERY_CODES_RENEWED = "auth.mfa_recovery_codes_renewed"
+    MFA_RESET = "user.mfa_reset"  # by the Company Admin
+    MFA_CHALLENGED = "auth.mfa_challenged"  # password right, code asked for
     USER_CREATED = "user.created"
     USER_UPDATED = "user.updated"
     USER_DEACTIVATED = "user.deactivated"

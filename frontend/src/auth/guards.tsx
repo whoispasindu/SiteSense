@@ -16,7 +16,8 @@ function GateLoader() {
   );
 }
 
-/** Signed-in users only; a temporary password must be replaced before anything else. */
+/** Signed-in users only; a temporary password must be replaced, and two-step sign-in set up where the
+ * role needs it, before anything else. */
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { status, user, endedBy } = useAuth();
   const location = useLocation();
@@ -29,6 +30,10 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   }
   if (user.must_change_password && location.pathname !== "/change-password") {
     return <Navigate to="/change-password" replace />;
+  }
+  // Phase 13: roles that need two-step sign-in set it up before anything else.
+  if (!user.must_change_password && user.mfa_setup_required && location.pathname !== "/two-step-setup") {
+    return <Navigate to="/two-step-setup" replace />;
   }
   return children;
 }
@@ -45,7 +50,11 @@ export function AnonymousOnly({ children }: { children: ReactNode }) {
   const [params] = useSearchParams();
   if (status === "loading") return <GateLoader />;
   if (status === "authenticated" && user) {
-    const destination = user.must_change_password ? "/change-password" : safeNextPath(params.get("next"));
+    const destination = user.must_change_password
+      ? "/change-password"
+      : user.mfa_setup_required
+        ? "/two-step-setup"
+        : safeNextPath(params.get("next"));
     return <Navigate to={destination} replace />;
   }
   return children;

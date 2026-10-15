@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     Column,
@@ -12,6 +13,7 @@ from sqlalchemy import (
     String,
     Table,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -82,6 +84,14 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Boolean, default=True, server_default="true", nullable=False
     )
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    # Phase 13: two-step sign-in. Secrets are AES-GCM encrypted (app.core.secretbox), never plain.
+    mfa_secret: Mapped[str | None] = mapped_column(Text, nullable=True)  # the confirmed one
+    mfa_pending_secret: Mapped[str | None] = mapped_column(Text, nullable=True)  # during enrolment
+    mfa_enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The last 30-second step a code was accepted for: a code works once only.
+    mfa_last_step: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    # Seeded demo account: in demo mode it skips two-step enforcement (Phase 13).
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     failed_login_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -99,6 +109,8 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
 
     __table_args__ = (
+        CheckConstraint("mfa_enabled = (mfa_secret IS NOT NULL)", name="mfa_secret_when_enabled"),
+        CheckConstraint("mfa_enabled = (mfa_enabled_at IS NOT NULL)", name="mfa_enabled_dated"),
         CheckConstraint("email = lower(email)", name="email_lowercase"),
         CheckConstraint("failed_login_count >= 0", name="failed_login_count_non_negative"),
     )
@@ -121,3 +133,18 @@ class RefreshToken(UUIDPrimaryKeyMixin, Base):
     replaced_by_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(200), nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
+
+
+class MfaRecoveryCode(UUIDPrimaryKeyMixin, Base):
+    """A one-use code for when the authenticator is lost (Phase 13). Stored keyed-hashed, never plain."""
+
+    __tablename__ = "mfa_recovery_codes"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (UniqueConstraint("user_id", "code_hash", name="uq_mfa_recovery_codes_user_code"),)

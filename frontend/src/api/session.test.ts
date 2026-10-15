@@ -107,10 +107,21 @@ describe("auth API", () => {
   it("signIn stores the token in memory only", async () => {
     mockApi({ "/api/v1/auth/login": () => tokenResponse(makeMe("admin"), "token-from-login") });
 
-    const me = await signIn("admin@sitesense.example", "pw");
+    const result = await signIn("admin@sitesense.example", "pw");
 
-    expect(me.role).toBe("admin");
+    expect(result.kind === "session" ? result.user.role : null).toBe("admin");
     expect(getAccessToken()).toBe("token-from-login");
+  });
+
+  it("signIn returns a challenge, and no token, when a code is due", async () => {
+    mockApi({
+      "/api/v1/auth/login": () => jsonResponse({ mfa_required: true, mfa_token: "challenge-token-0123456789", expires_in: 300 }),
+    });
+
+    const result = await signIn("pm@sitesense.example", "pw");
+
+    expect(result).toEqual({ kind: "challenge", token: "challenge-token-0123456789" });
+    expect(getAccessToken()).toBeNull();
   });
 
   it("resumeSession returns null when signed out", async () => {

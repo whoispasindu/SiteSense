@@ -58,6 +58,18 @@ class Settings(BaseSettings):
     session_max_days: int = Field(default=30, ge=1, le=90)
     # Refresh cookie is Secure by default; browsers accept Secure cookies on http://localhost.
     cookie_secure: bool = True
+    # Two-step sign-in (Phase 13): encrypts the authenticator secrets at rest and keys the recovery
+    # codes. 32+ characters; changing it invalidates every enrolment. Generate like jwt_secret.
+    mfa_key: SecretStr = SecretStr("dev-only-insecure-mfa-key-change-me-000000000000000")
+    # How long the step between password and code may take.
+    mfa_challenge_minutes: int = Field(default=5, ge=1, le=15)
+    mfa_rate_per_minute: int = Field(default=10, ge=1, le=100)
+    # Whether roles in MFA_ROLES must set up two-step sign-in. Always on in production (checked below);
+    # the test suite turns it off by default and its two-step tests turn it back on.
+    mfa_enforced: bool = True
+    # Demo mode: the seeded demo accounts skip two-step enforcement so anyone can sign in, and a
+    # "Demo data" banner shows. Never for a real company.
+    demo_mode: bool = False
     login_max_failures: int = Field(default=5, ge=3, le=20)
     lockout_minutes: int = Field(default=15, ge=1, le=1440)
     # Per-client-IP request budgets for the auth endpoints (per minute).
@@ -108,11 +120,11 @@ class Settings(BaseSettings):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
 
-    @field_validator("jwt_secret")
+    @field_validator("jwt_secret", "mfa_key")
     @classmethod
     def _validate_jwt_secret(cls, value: SecretStr) -> SecretStr:
         if len(value.get_secret_value()) < 32:
-            raise ValueError("jwt_secret must be at least 32 characters")
+            raise ValueError("secrets must be at least 32 characters")
         return value
 
     @field_validator("database_url", "migration_database_url")
@@ -140,6 +152,13 @@ class Settings(BaseSettings):
         secret = self.jwt_secret.get_secret_value()
         if "change-me" in secret or "insecure" in secret:
             problems.append("jwt_secret is the development default")
+        mfa_key = self.mfa_key.get_secret_value()
+        if "change-me" in mfa_key or "insecure" in mfa_key:
+            problems.append("mfa_key is the development default")
+        if mfa_key == secret:
+            problems.append("mfa_key must differ from jwt_secret")
+        if not self.mfa_enforced:
+            problems.append("two-step sign-in must be enforced (mfa_enforced)")
         if not self.cookie_secure:
             problems.append("cookie_secure must be on")
         if not self.app_base_url.startswith("https://"):

@@ -4,6 +4,7 @@ import {
   useAdminProjects,
   useAssignProjects,
   useAssignSites,
+  useResetMfa,
   useResetPassword,
   useSites,
   useUpdateUser,
@@ -35,12 +36,13 @@ export function ManageUserDialog({ user, onClose }: { user: AdminUser | null; on
   const assignSites = useAssignSites();
   const assignProjects = useAssignProjects();
   const resetPassword = useResetPassword();
+  const resetMfa = useResetMfa();
   const isClient = user?.role === "client";
   const projects = useAdminProjects(isClient);
   const [projectIds, setProjectIds] = useState<string[] | null>(null);
   const [role, setRole] = useState<Role | null>(null);
   const [siteIds, setSiteIds] = useState<string[] | null>(null);
-  const [confirming, setConfirming] = useState<"deactivate" | "reset" | null>(null);
+  const [confirming, setConfirming] = useState<"deactivate" | "reset" | "mfa" | null>(null);
   const [temporary, setTemporary] = useState<string | null>(null);
 
   if (!user) return null;
@@ -49,7 +51,7 @@ export function ManageUserDialog({ user, onClose }: { user: AdminUser | null; on
   const chosenRole = role ?? user.role;
   const chosenSites = siteIds ?? user.sites.map((s) => s.id);
   const chosenProjects = projectIds ?? user.projects.map((p) => p.id);
-  const error = updateUser.error ?? assignSites.error ?? assignProjects.error ?? resetPassword.error;
+  const error = updateUser.error ?? assignSites.error ?? assignProjects.error ?? resetPassword.error ?? resetMfa.error;
 
   function close() {
     setRole(null);
@@ -61,6 +63,7 @@ export function ManageUserDialog({ user, onClose }: { user: AdminUser | null; on
     assignSites.reset();
     assignProjects.reset();
     resetPassword.reset();
+    resetMfa.reset();
     onClose();
   }
 
@@ -146,10 +149,21 @@ export function ManageUserDialog({ user, onClose }: { user: AdminUser | null; on
         {!isSelf ? (
           <Section title="Account">
             {confirming ? (
-              <Alert tone="warn" title={confirming === "reset" ? "Reset this password?" : "Deactivate this account?"}>
+              <Alert
+                tone="warn"
+                title={
+                  confirming === "reset"
+                    ? "Reset this password?"
+                    : confirming === "mfa"
+                      ? "Reset two-step sign-in?"
+                      : "Deactivate this account?"
+                }
+              >
                 {confirming === "reset"
                   ? "Their current password stops working and every device is signed out."
-                  : "They are signed out everywhere immediately and cannot sign in until reactivated."}
+                  : confirming === "mfa"
+                    ? "Only when they have lost their phone and their recovery codes. They are signed out everywhere and set it up again at their next sign-in. This is recorded in the audit log."
+                    : "They are signed out everywhere immediately and cannot sign in until reactivated."}
                 <div className="mt-3 flex gap-3">
                   <Button
                     onClick={() => {
@@ -167,12 +181,14 @@ export function ManageUserDialog({ user, onClose }: { user: AdminUser | null; on
                             setTemporary(r.temporary_password);
                           },
                         });
+                      } else if (confirming === "mfa") {
+                        resetMfa.mutate(user.id, { onSuccess: close });
                       } else {
                         updateUser.mutate({ id: user.id, is_active: false }, { onSuccess: close });
                       }
                     }}
                   >
-                    {confirming === "reset" ? "Reset password" : "Deactivate"}
+                    {confirming === "reset" ? "Reset password" : confirming === "mfa" ? "Reset two-step sign-in" : "Deactivate"}
                   </Button>
                 </div>
               </Alert>
@@ -186,6 +202,15 @@ export function ManageUserDialog({ user, onClose }: { user: AdminUser | null; on
                 >
                   Reset password
                 </Button>
+                {user.mfa_enabled ? (
+                  <Button
+                    onClick={() => {
+                      setConfirming("mfa");
+                    }}
+                  >
+                    Reset two-step sign-in
+                  </Button>
+                ) : null}
                 {user.is_active ? (
                   <Button
                     variant="ghost"

@@ -287,7 +287,9 @@ def seed_dev() -> int:
         password_hash = hash_password(password)
         created = 0
         for email, full_name, role, site_codes in DEMO_USERS:
-            if db.scalar(select(User).where(User.email == email)):
+            existing = db.scalar(select(User).where(User.email == email))
+            if existing is not None:
+                existing.is_demo = True  # in demo mode, skips two-step enforcement (Phase 13)
                 continue
             db.add(
                 User(
@@ -296,6 +298,7 @@ def seed_dev() -> int:
                     role=role.value,
                     password_hash=password_hash,
                     must_change_password=False,
+                    is_demo=True,
                     sites=[sites[c] for c in site_codes],
                 )
             )

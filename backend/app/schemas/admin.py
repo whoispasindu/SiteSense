@@ -88,6 +88,7 @@ class UserOut(BaseModel):
     created_at: datetime
     sites: list[SiteSummary]
     projects: list[ProjectRef] = Field(default_factory=list)  # clients only: the projects they may see
+    mfa_enabled: bool = False  # Phase 13: two-step sign-in is set up
 
 
 class UserCreated(BaseModel):

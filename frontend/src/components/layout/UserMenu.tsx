@@ -135,6 +135,15 @@ export function UserMenu({ onDark = false }: { onDark?: boolean }) {
             >
               Email settings
             </Link>
+            <Link
+              to="/settings/security"
+              onClick={() => {
+                setOpen(false);
+              }}
+              className="flex min-h-10 items-center rounded-lg px-3 text-sm text-ink hover:bg-paper-sunk"
+            >
+              Two-step sign-in
+            </Link>
             <button
               type="button"
               onClick={() => void signOut()}

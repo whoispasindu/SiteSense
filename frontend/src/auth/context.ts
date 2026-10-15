@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 
-import type { Me } from "../api/auth";
+import type { Me, SignInResult } from "../api/auth";
 
 export type AuthStatus = "loading" | "anonymous" | "authenticated";
 
@@ -9,7 +9,9 @@ export interface AuthContextValue {
   /** Why the user is signed out: a deliberate sign-out starts clean, an expiry keeps "next". */
   endedBy: "user" | "expiry" | null;
   user: Me | null;
-  signIn: (email: string, password: string) => Promise<Me>;
+  /** A session, or (with two-step sign-in on) a challenge to finish with ``completeSignIn``. */
+  signIn: (email: string, password: string) => Promise<SignInResult>;
+  completeSignIn: (token: string, second: { code: string } | { recovery_code: string }) => Promise<Me>;
   signOut: () => Promise<void>;
   /** Replace the signed-in user (after a password change, for example). */
   setUser: (user: Me) => void;
@@ -27,6 +29,6 @@ export function useAuth(): AuthContextValue {
 /** Only same-origin, absolute paths may be used as a post-sign-in destination (no open redirect). */
 export function safeNextPath(next: string | null | undefined): string {
   if (!next?.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return "/";
-  if (next.startsWith("/sign-in") || next.startsWith("/change-password")) return "/";
+  if (next.startsWith("/sign-in") || next.startsWith("/change-password") || next.startsWith("/two-step-setup")) return "/";
   return next;
 }

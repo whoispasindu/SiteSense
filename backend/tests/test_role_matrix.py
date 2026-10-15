@@ -78,6 +78,7 @@ ENDPOINTS = [
     Endpoint("PATCH", "/api/v1/admin/users/{user_id}", ADMIN_ONLY, {"full_name": "Renamed Person"}),
     Endpoint("POST", "/api/v1/admin/users/{user_id}/sites", ADMIN_ONLY, {"site_ids": ["{site_id}"]}),
     Endpoint("POST", "/api/v1/admin/users/{user_id}/reset-password", ADMIN_ONLY),
+    Endpoint("POST", "/api/v1/admin/users/{user_id}/mfa/reset", ADMIN_ONLY),
     Endpoint("POST", "/api/v1/admin/users/{user_id}/projects", ADMIN_ONLY, {"project_ids": ["{project_id}"]}),
     Endpoint("GET", "/api/v1/admin/projects", ADMIN_ONLY),
     Endpoint("GET", "/api/v1/admin/sites", ADMIN_ONLY),
@@ -367,6 +368,14 @@ OUTSIDE_THE_MATRIX: frozenset[tuple[str, str]] = frozenset(
         ("POST", "/api/v1/auth/refresh"),
         ("POST", "/api/v1/auth/logout"),
         ("POST", "/api/v1/auth/change-password"),
+        # Phase 13: the code step of sign-in (before any session) and the user's own set-up, which
+        # every role reaches; covered by test_mfa.py.
+        ("POST", "/api/v1/auth/mfa/verify"),
+        ("GET", "/api/v1/auth/mfa"),
+        ("POST", "/api/v1/auth/mfa/setup"),
+        ("POST", "/api/v1/auth/mfa/enable"),
+        ("POST", "/api/v1/auth/mfa/recovery-codes"),
+        ("POST", "/api/v1/auth/mfa/disable"),
     }
 )
 

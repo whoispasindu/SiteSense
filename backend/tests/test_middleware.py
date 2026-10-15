@@ -32,6 +32,8 @@ def test_hsts_is_sent_in_production() -> None:
     settings = make_settings(
         environment="production",
         app_base_url="https://app.sitesense.example",
+        mfa_key="a-real-production-mfa-key-value-0123456789abcdef",
+        mfa_enforced=True,
         cors_origins=["https://app.sitesense.example"],
         database_url="postgresql+psycopg://app:s3cure-pw@db:5432/sitesense",
     )

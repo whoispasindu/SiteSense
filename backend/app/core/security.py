@@ -156,6 +156,36 @@ def create_access_token(
 
 
 def decode_access_token(token: str, settings: Settings) -> AccessClaims:
+    return _decode(token, settings, "access")
+
+
+def create_mfa_token(
+    *, user_id: uuid.UUID, role: Role, session_version: int, settings: Settings
+) -> tuple[str, datetime]:
+    """Phase 13: proof that the password was right, good only for the code step and only for minutes."""
+    now = clock.utcnow()
+    expires_at = now + timedelta(minutes=settings.mfa_challenge_minutes)
+    payload = {
+        "sub": str(user_id),
+        "role": role.value,
+        "sv": session_version,
+        "typ": "mfa",
+        "iss": JWT_ISSUER,
+        "aud": JWT_AUDIENCE,
+        "iat": int(now.timestamp()),
+        "nbf": int(now.timestamp()),
+        "exp": int(expires_at.timestamp()),
+        "jti": uuid.uuid4().hex,
+    }
+    token = jwt.encode(payload, settings.jwt_secret.get_secret_value(), algorithm=JWT_ALGORITHM)
+    return token, expires_at
+
+
+def decode_mfa_token(token: str, settings: Settings) -> AccessClaims:
+    return _decode(token, settings, "mfa")
+
+
+def _decode(token: str, settings: Settings, typ: str) -> AccessClaims:
     try:
         payload = jwt.decode(
             token,
@@ -180,7 +210,7 @@ def decode_access_token(token: str, settings: Settings) -> AccessClaims:
             raise TokenError("invalid_token")
         if int(payload["exp"]) <= now - JWT_LEEWAY_SECONDS:
             raise TokenError("token_expired")
-        if payload.get("typ") != "access":
+        if payload.get("typ") != typ:  # an access token is never a challenge token, and back
             raise TokenError("invalid_token")
         return AccessClaims(
             user_id=uuid.UUID(payload["sub"]),

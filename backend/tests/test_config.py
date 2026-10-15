@@ -12,6 +12,8 @@ SAFE_PROD = {
     "allowed_hosts": ["api.sitesense.example"],
     "database_url": "postgresql+psycopg://app:s3cure-pw@db:5432/sitesense",
     "app_base_url": "https://app.sitesense.example",
+    "mfa_key": "a-real-production-mfa-key-value-0123456789abcdef",
+    "mfa_enforced": True,
 }
 
 
@@ -36,6 +38,11 @@ def test_safe_production_settings_are_accepted() -> None:
         ),
         ({"app_base_url": "http://app.sitesense.example"}, "app_base_url must use https"),
         ({"smtp_host": "mail.example", "smtp_security": "none"}, "SMTP must use TLS"),
+        (
+            {"mfa_key": "dev-only-insecure-mfa-key-change-me-000000000000000"},
+            "mfa_key is the development default",
+        ),
+        ({"mfa_enforced": False}, "two-step sign-in must be enforced"),
     ],
 )
 def test_unsafe_production_settings_are_rejected(override: dict[str, object], problem: str) -> None:

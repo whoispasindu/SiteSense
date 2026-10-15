@@ -24,6 +24,7 @@ from app.core.permissions import Permission, Role, has_permission
 from app.core.rate_limit import RateLimiter
 from app.core.security import TokenError, decode_access_token
 from app.models import User
+from app.services import mfa_service
 from app.services.audit import RequestMeta
 
 DbSession = Annotated[Session, Depends(get_db)]
@@ -72,10 +73,18 @@ def get_authenticated_user(request: Request, db: DbSession, settings: AppSetting
     return user
 
 
-def get_current_user(user: Annotated[User, Depends(get_authenticated_user)]) -> User:
-    """The default for protected endpoints: also blocks accounts with a temporary password."""
+class MfaSetupRequiredError(ForbiddenError):
+    code = "mfa_setup_required"
+    message = "Set up two-step sign-in before continuing."
+
+
+def get_current_user(user: Annotated[User, Depends(get_authenticated_user)], settings: AppSettings) -> User:
+    """The default for protected endpoints: also blocks accounts with a temporary password, and accounts
+    whose role needs two-step sign-in until they set it up (Phase 13)."""
     if user.must_change_password:
         raise PasswordChangeRequiredError()
+    if mfa_service.setup_required(user, settings):
+        raise MfaSetupRequiredError()
     return user
 
 

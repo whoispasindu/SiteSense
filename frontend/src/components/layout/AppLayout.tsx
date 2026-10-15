@@ -4,6 +4,7 @@ import { Outlet } from "react-router";
 import { useAuth } from "../../auth/context";
 import { Icon } from "../ui/icons";
 import { ClientLayout } from "./ClientLayout";
+import { DemoBanner } from "./DemoBanner";
 import { SidebarContent } from "./Sidebar";
 import { TopBar } from "./TopBar";
 
@@ -70,6 +71,7 @@ function StaffLayout() {
       </dialog>
 
       <div className="flex min-w-0 flex-col">
+        <DemoBanner />
         <TopBar
           onOpenMenu={() => {
             setMenuOpen(true);

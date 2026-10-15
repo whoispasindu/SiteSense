@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router";
 
 import { LogoMark } from "../ui/Logo";
+import { DemoBanner } from "./DemoBanner";
 import { NotificationBell } from "./NotificationBell";
 import { UserMenu } from "./UserMenu";
 
@@ -37,6 +38,7 @@ export function ClientLayout() {
       >
         Skip to content
       </a>
+      <DemoBanner />
       <header className="on-asphalt sticky top-0 z-20 bg-asphalt text-asphalt-text">
         <div aria-hidden="true" className="hazard-band h-1" />
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 sm:gap-8 sm:px-8">

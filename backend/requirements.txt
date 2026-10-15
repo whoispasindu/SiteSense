@@ -27,3 +27,7 @@ tokenizers==0.23.3
 anthropic==1.13.0
 # Weekly PDF report (Phase 11). BSD licence; draws with its own canvas, no browser or system fonts.
 reportlab==5.0.1
+# Two-step sign-in (Phase 13): AES-GCM for the TOTP secrets at rest, and QR codes for enrolment.
+# (The TOTP algorithm itself is ours, RFC 6238, tested against the RFC's vectors.)
+cryptography==50.0.1
+segno==1.6.6
