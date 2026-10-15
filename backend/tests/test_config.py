@@ -88,3 +88,14 @@ def test_api_docs_are_disabled_in_production() -> None:
 
 def test_api_docs_are_available_outside_production(client: TestClient) -> None:
     assert client.get("/api/openapi.json").status_code == 200
+
+
+def test_empty_variables_count_as_not_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Compose passes optional settings as empty strings: they must mean "not set", not "invalid"."""
+    monkeypatch.setenv("SITESENSE_MIGRATION_DATABASE_URL", "")
+    monkeypatch.setenv("SITESENSE_ANTHROPIC_API_KEY", "")
+    monkeypatch.setenv("SITESENSE_SMTP_HOST", "")
+    settings = Settings()
+    assert settings.migration_database_url is None
+    assert settings.anthropic_api_key is None
+    assert settings.smtp_host is None

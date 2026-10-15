@@ -38,7 +38,7 @@ class Task(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     # Optional link to the BOQ section the task delivers (used for weight hints and, later, costs).
     boq_section_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("boq_sections.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("boq_sections.id", ondelete="SET NULL"), nullable=True, index=True
     )
     code: Mapped[str | None] = mapped_column(String(16), nullable=True)
     name: Mapped[str] = mapped_column(String(160), nullable=False)

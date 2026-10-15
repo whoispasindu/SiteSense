@@ -15,6 +15,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     SmallInteger,
@@ -112,7 +113,7 @@ class ReportProgress(UUIDPrimaryKeyMixin, Base):
     )
     # Kept if the task is later deleted: the report is a record of what was said on the day.
     task_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True, index=True
     )
     task_name: Mapped[str] = mapped_column(String(160), nullable=False)
     percent_before: Mapped[Decimal] = mapped_column(PERCENT, nullable=False)
@@ -155,7 +156,7 @@ class Notification(UUIDPrimaryKeyMixin, Base):
     # In-app path only ("/..." but not "//host"), never an external URL.
     link: Mapped[str | None] = mapped_column(String(200), nullable=True)
     project_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("projects.id", ondelete="CASCADE"), nullable=True
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=True, index=True
     )
     # Makes scheduled notifications idempotent: the same reminder is never sent twice.
     dedupe_key: Mapped[str | None] = mapped_column(String(120), nullable=True)
@@ -164,5 +165,7 @@ class Notification(UUIDPrimaryKeyMixin, Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", "dedupe_key", name="uq_notifications_user_dedupe_key"),
+        # The bell and the notifications page: one person's newest first (Phase 13).
+        Index("ix_notifications_user_created", "user_id", "created_at"),
         CheckConstraint("link IS NULL OR (link LIKE '/%' AND link NOT LIKE '//%')", name="link_is_internal"),
     )

@@ -199,3 +199,22 @@ def test_strip_photo_metadata_command(
     )
     assert cli.main(["strip-photo-metadata"]) == 0
     assert "cleaned 0 files" in capsys.readouterr().out
+
+
+def test_run_scheduler_starts_the_jobs_and_stops_on_a_signal(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Phase 13: production runs the jobs in their own process; SIGTERM stops it cleanly."""
+    import signal
+    import threading
+
+    handlers: dict[int, object] = {}
+    monkeypatch.setattr(signal, "signal", lambda signum, handler: handlers.__setitem__(signum, handler))
+    monkeypatch.setattr(cli, "get_settings", lambda: make_settings(weather_enabled=False))
+    stop = threading.Event()
+    timer = threading.Timer(0.2, lambda: handlers[signal.SIGTERM](signal.SIGTERM, None))  # type: ignore[operator]
+    timer.start()
+    assert cli.run_scheduler(stop) == 0
+    assert stop.is_set()
+    assert set(handlers) == {signal.SIGINT, signal.SIGTERM}
+    assert "Scheduler running 8 jobs" in capsys.readouterr().out

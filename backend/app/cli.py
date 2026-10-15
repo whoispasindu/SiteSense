@@ -3,6 +3,7 @@
     python -m app.cli create-admin --email admin@company.lk --name "Nimal Perera"
     python -m app.cli seed-dev            # local development, or production in demo mode
     python -m app.cli reset-demo          # demo mode only: back to the seeded data
+    python -m app.cli run-scheduler       # the scheduled jobs on their own (production)
     python -m app.cli send-reminders      # missing daily report reminders now (BR-07)
     python -m app.cli refresh-weather     # fetch the 14-day forecast for every active site
     python -m app.cli score-risk          # score every open project's risk now
@@ -18,7 +19,9 @@ refuses to run in production unless SITESENSE_DEMO_MODE is on. ``reset-demo`` de
 import argparse
 import io
 import os
+import signal
 import sys
+import threading
 import uuid
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
@@ -33,6 +36,7 @@ from app.core.config import get_settings
 from app.core.database import Database
 from app.core.permissions import Role
 from app.core.scheduler import (
+    build_scheduler,
     refresh_weather,
     run_pour_check,
     run_report_reminders,
@@ -46,7 +50,7 @@ from app.core.security import (
     validate_password,
 )
 from app.integrations.storage import LocalStorage
-from app.integrations.weather import OpenMeteoClient
+from app.integrations.weather import DisabledWeatherClient, OpenMeteoClient, WeatherClient
 from app.models import (
     BoqItem,
     BoqSection,
@@ -934,6 +938,26 @@ def _seed_portal(db: Session, storage: LocalStorage) -> None:
         portal_service.set_shared(db, pm, project, PhotosShareIn(photo_ids=shared, shared=True), meta=meta)
 
 
+def run_scheduler(stop: threading.Event | None = None) -> int:
+    """Phase 13: the scheduled jobs in a process of their own, so the API can run several workers
+    (with ``SITESENSE_SCHEDULER_ENABLED=false``) without each one running every job."""
+    settings = get_settings()
+    database = Database(settings)
+    client: WeatherClient = DisabledWeatherClient()
+    if settings.weather_enabled:
+        client = OpenMeteoClient(settings.weather_timeout_seconds)
+    scheduler = build_scheduler(settings, database, client)
+    stop = stop or threading.Event()
+    for signum in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(signum, lambda *_: stop.set())
+    scheduler.start()
+    print(f"Scheduler running {len(scheduler.get_jobs())} jobs; stop with Ctrl+C or SIGTERM.", flush=True)
+    stop.wait()
+    scheduler.shutdown(wait=True)
+    database.dispose()
+    return 0
+
+
 def reset_demo() -> int:
     """Phase 13: the demo back to its seeded state (nightly in demo mode, or by hand)."""
     settings = get_settings()
@@ -1013,6 +1037,7 @@ def main(argv: list[str] | None = None) -> int:
     admin.add_argument("--name", required=True)
     sub.add_parser("seed-dev", help="create demo sites and one user per role (not in production)")
     sub.add_parser("reset-demo", help="demo mode only: delete everything and seed the demo again")
+    sub.add_parser("run-scheduler", help="run the scheduled jobs in this process until stopped")
     sub.add_parser("send-reminders", help="remind sites missing today's daily report")
     sub.add_parser("refresh-weather", help="fetch the 14-day forecast for every active site")
     sub.add_parser("score-risk", help="score every open project's risk now")
@@ -1030,6 +1055,8 @@ def main(argv: list[str] | None = None) -> int:
         return send_reminders()
     if args.command == "reset-demo":
         return reset_demo()
+    if args.command == "run-scheduler":
+        return run_scheduler()
     if args.command == "refresh-weather":
         return refresh_site_weather()
     if args.command == "score-risk":

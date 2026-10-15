@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select
+from sqlalchemy import Engine, event, func, select
 from sqlalchemy.orm import Session
 
 from app.core import clock
@@ -933,3 +933,37 @@ def test_pm_approved_requests_are_not_returned_for_the_same_excess(
 
     assert again.status_code == 201, again.text
     assert again.json()["returned"] == []
+
+
+def test_the_order_list_takes_the_same_queries_for_one_order_or_many(
+    api: TestClient, db_engine: Engine, boq: Boq, se: Who, qs: Who, buyer: Who, supplier: Supplier
+) -> None:
+    """Phase 13 (load test): each order's total came from one query per order. Now the lines load in
+    one batch, so the count stays flat however many orders the page shows."""
+
+    def ordered() -> None:
+        created = raise_request(api, boq, se, quantity="1")
+        decide(api, created["id"], qs, "approve", unit_price="2000")
+        assert order(api, buyer, supplier, created["id"]).status_code == 201
+
+    def queries_to_list() -> int:
+        count = 0
+
+        def counter(*_: object) -> None:
+            nonlocal count
+            count += 1
+
+        event.listen(db_engine, "before_cursor_execute", counter)
+        try:
+            response = api.get("/api/v1/purchase-orders", headers=buyer.headers)
+        finally:
+            event.remove(db_engine, "before_cursor_execute", counter)
+        assert response.status_code == 200
+        return count
+
+    ordered()
+    one = queries_to_list()
+    for _ in range(4):
+        ordered()
+    assert len(api.get("/api/v1/purchase-orders", headers=buyer.headers).json()) == 5
+    assert queries_to_list() == one

@@ -1,0 +1,36 @@
+{
+  "R": {
+    "requests": 14762,
+    "errors": 0,
+    "median_ms": 63.0,
+    "p95_ms": 280.2,
+    "p99_ms": 481.8,
+    "max_ms": 1026.4,
+    "target_p95_ms": 500,
+    "met": true
+  },
+  "W": {
+    "requests": 1800,
+    "errors": 0,
+    "median_ms": 72.9,
+    "p95_ms": 359.0,
+    "p99_ms": 560.6,
+    "max_ms": 895.1,
+    "target_p95_ms": 1000,
+    "met": true
+  },
+  "H": {
+    "requests": 602,
+    "errors": 0,
+    "median_ms": 277.9,
+    "p95_ms": 973.5,
+    "p99_ms": 1559.0,
+    "max_ms": 1978.0,
+    "target_p95_ms": 2000,
+    "met": true
+  },
+  "all": {
+    "requests": 17309,
+    "failures": 0
+  }
+}

@@ -21,6 +21,8 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         env_prefix="SITESENSE_",
         extra="ignore",
+        # An empty variable means "not set" (Compose passes optional settings as empty strings).
+        env_ignore_empty=True,
     )
 
     app_name: str = "SiteSense API"

@@ -12,7 +12,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, lazyload, selectinload
 
 from app.core import clock
 from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
@@ -198,8 +198,14 @@ def list_orders(
     if status:
         stmt = stmt.where(PurchaseOrder.status == status)
     total = db.scalar(stmt.with_only_columns(func.count(PurchaseOrder.id))) or 0
+    # The list shows each order's total: its lines in one batch, without each line's request (Phase 13:
+    # was one query per order, each joining the request, project, item and requester).
+    lines = selectinload(PurchaseOrder.lines).options(lazyload(PurchaseOrderLine.request))
     rows = db.scalars(
-        stmt.order_by(PurchaseOrder.issued_at.desc(), PurchaseOrder.id).limit(limit).offset(offset)
+        stmt.options(lines)
+        .order_by(PurchaseOrder.issued_at.desc(), PurchaseOrder.id)
+        .limit(limit)
+        .offset(offset)
     ).all()
     return list(rows), int(total)
 
