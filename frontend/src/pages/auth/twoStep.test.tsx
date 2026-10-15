@@ -230,6 +230,8 @@ describe("Demo mode", () => {
       "/api/v1/notifications": () => jsonResponse({ unread: 0, items: [] }),
     });
     renderRoute("/");
-    expect(await screen.findByRole("note")).toHaveTextContent("Demo data, not real projects.");
+    expect(await screen.findByRole("complementary", { name: "Demo notice" })).toHaveTextContent(
+      "Demo data, not real projects.",
+    );
   });
 });

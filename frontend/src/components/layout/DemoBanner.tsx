@@ -5,8 +5,8 @@ export function DemoBanner() {
   const { user } = useAuth();
   if (!user?.demo_mode) return null;
   return (
-    <div role="note" className="bg-hivis px-4 py-1.5 text-center text-sm font-medium text-asphalt">
+    <aside aria-label="Demo notice" className="bg-hivis px-4 py-1.5 text-center text-sm font-medium text-asphalt">
       Demo data, not real projects. The demo accounts sign in without two-step codes.
-    </div>
+    </aside>
   );
 }

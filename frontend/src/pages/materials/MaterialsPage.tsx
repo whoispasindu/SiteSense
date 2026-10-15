@@ -116,7 +116,7 @@ export function MaterialsPage() {
               setProjectId(e.target.value);
               setOffset(0);
             }}
-            className="mt-1.5 min-h-10 w-full rounded-lg border border-rule-strong bg-paper-raised px-3 text-sm text-ink focus:border-survey focus:ring-2 focus:ring-survey/25 focus:outline-none"
+            className="mt-1.5 min-h-10 w-full rounded-lg border border-field-line bg-paper-raised px-3 text-sm text-ink focus:border-survey focus:ring-2 focus:ring-survey/25 focus:outline-none"
           >
             <option value="">All projects</option>
             {(projects.data ?? []).map((p) => (

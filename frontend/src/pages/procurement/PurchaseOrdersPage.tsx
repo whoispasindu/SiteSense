@@ -171,7 +171,7 @@ function OrderDialog({ requests, onClose }: { requests: RequestSummary[]; onClos
                   onChange={(e) => {
                     setPrices((p) => ({ ...p, [r.id]: e.target.value }));
                   }}
-                  className="tabular min-h-9 w-28 rounded-lg border border-rule-strong bg-paper-raised px-2 text-right text-sm text-ink focus:border-survey focus:outline-none"
+                  className="tabular min-h-9 w-28 rounded-lg border border-field-line bg-paper-raised px-2 text-right text-sm text-ink focus:border-survey focus:outline-none"
                 />
               </label>
             </li>

@@ -24,7 +24,18 @@ function useDataUrl(blob: Blob): string | null {
 }
 
 /** A stored site photo. Fetched with the user's session; never a public link. */
-export function StoredPhoto({ photo, size, className = "" }: { photo: Photo; size: "full" | "thumb"; className?: string }) {
+export function StoredPhoto({
+  photo,
+  size,
+  className = "",
+  captionShown = false,
+}: {
+  photo: Photo;
+  size: "full" | "thumb";
+  className?: string;
+  /** The caption is shown right next to the photo: then the image itself needs no repeat of it. */
+  captionShown?: boolean;
+}) {
   const query = usePhotoUrl(photo.id, size);
   const url = query.data;
   const alt = photo.caption ?? "Site photo";
@@ -37,7 +48,7 @@ export function StoredPhoto({ photo, size, className = "" }: { photo: Photo; siz
     );
   }
   if (!url) return <div className={`animate-pulse bg-paper-sunk ${className}`} role="img" aria-label={`${alt} (loading)`} />;
-  return <img src={url} alt={alt} className={`object-cover ${className}`} />;
+  return <img src={url} alt={captionShown && photo.caption ? "" : alt} className={`object-cover ${className}`} />;
 }
 
 export function PhotoGrid({
@@ -65,7 +76,7 @@ export function PhotoGrid({
               className="block w-full text-left"
               aria-label={`Open photo ${String(index + 1)}${photo.caption ? `: ${photo.caption}` : ""}`}
             >
-              <StoredPhoto photo={photo} size="thumb" className="aspect-[4/3] w-full" />
+              <StoredPhoto photo={photo} size="thumb" captionShown className="aspect-[4/3] w-full" />
               {photo.caption ? <p className="truncate px-3 py-2 text-sm text-ink-soft">{photo.caption}</p> : null}
             </button>
             {onDelete ? (
@@ -94,8 +105,15 @@ export function PhotoGrid({
       >
         {current ? (
           <div className="space-y-3">
-            <StoredPhoto photo={current} size="full" className="max-h-[60dvh] w-full rounded-lg object-contain" />
-            {current.caption ? <p className="text-sm text-ink-soft">{current.caption}</p> : null}
+            <figure className="space-y-3">
+              <StoredPhoto
+                photo={current}
+                size="full"
+                captionShown
+                className="max-h-[60dvh] w-full rounded-lg object-contain"
+              />
+              {current.caption ? <figcaption className="text-sm text-ink-soft">{current.caption}</figcaption> : null}
+            </figure>
             <div className="flex justify-between gap-3">
               <Button
                 disabled={open === 0}

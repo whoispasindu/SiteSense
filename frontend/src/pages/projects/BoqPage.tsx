@@ -38,7 +38,7 @@ function BudgetEditor({ projectId, section, onDone }: { projectId: string; secti
         onChange={(e) => {
           setValue(e.target.value);
         }}
-        className="tabular min-h-9 w-44 rounded-lg border border-rule-strong bg-paper-raised px-2.5 text-right text-sm text-ink focus:border-survey focus:ring-2 focus:ring-survey/25 focus:outline-none aria-[invalid=true]:border-signal-high"
+        className="tabular min-h-9 w-44 rounded-lg border border-field-line bg-paper-raised px-2.5 text-right text-sm text-ink focus:border-survey focus:ring-2 focus:ring-survey/25 focus:outline-none aria-[invalid=true]:border-signal-high"
       />
       <Button type="submit" variant="primary" disabled={!valid || update.isPending} className="min-h-9">
         Save

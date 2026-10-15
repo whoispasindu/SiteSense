@@ -47,7 +47,8 @@ function StaffLayout() {
         Skip to content
       </a>
 
-      <aside className="sticky top-0 hidden h-dvh lg:block">
+      {/* Named, so it stays distinct from any other complementary area a page has. */}
+      <aside aria-label="Sidebar" className="sticky top-0 hidden h-dvh lg:block">
         <SidebarContent />
       </aside>
 

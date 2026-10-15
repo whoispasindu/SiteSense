@@ -241,7 +241,7 @@ export function ProjectFormDialog({ open, onClose, project }: ProjectFormDialogP
             rows={3}
             maxLength={2000}
             defaultValue={project?.description ?? ""}
-            className="w-full rounded-lg border border-rule-strong bg-paper-raised px-3 py-2 text-sm text-ink focus:border-survey focus:ring-2 focus:ring-survey/25 focus:outline-none"
+            className="w-full rounded-lg border border-field-line bg-paper-raised px-3 py-2 text-sm text-ink focus:border-survey focus:ring-2 focus:ring-survey/25 focus:outline-none"
           />
         </label>
 

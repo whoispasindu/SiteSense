@@ -74,7 +74,7 @@ export function DependencyEditor({ projectId, task }: { projectId: string; task:
             onChange={(e) => {
               setPredecessor(e.target.value);
             }}
-            className="w-full rounded-md border border-rule-strong bg-paper px-3 py-2 text-ink"
+            className="w-full rounded-md border border-field-line bg-paper px-3 py-2 text-ink"
           >
             <option value="">Choose a task…</option>
             {options.map((t) => (
@@ -93,7 +93,7 @@ export function DependencyEditor({ projectId, task }: { projectId: string; task:
             onChange={(e) => {
               setLag(e.target.value);
             }}
-            className="tabular w-full rounded-md border border-rule-strong bg-paper px-3 py-2 text-ink"
+            className="tabular w-full rounded-md border border-field-line bg-paper px-3 py-2 text-ink"
           />
         </label>
         <Button
