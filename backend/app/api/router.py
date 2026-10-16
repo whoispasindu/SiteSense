@@ -1,5 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.api.deps import limit_writes
 from app.api.v1 import (
     admin,
     auth,
@@ -17,7 +18,8 @@ from app.api.v1 import (
     sites,
 )
 
-api_router = APIRouter(prefix="/api/v1")
+# Every write shares a per-user budget (Phase 13); some routes add a tighter one of their own.
+api_router = APIRouter(prefix="/api/v1", dependencies=[Depends(limit_writes)])
 api_router.include_router(health.router)
 api_router.include_router(auth.router)
 api_router.include_router(sites.router)

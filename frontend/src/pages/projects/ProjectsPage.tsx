@@ -55,7 +55,7 @@ export function ProjectsPage() {
             onChange={(e) => {
               setQuery(e.target.value);
             }}
-            className="min-h-10 w-full rounded-lg border border-rule-strong bg-paper-raised px-3 text-sm text-ink placeholder:text-ink-faint focus:border-survey focus:ring-2 focus:ring-survey/25 focus:outline-none"
+            className="min-h-10 w-full rounded-lg border border-field-line bg-paper-raised px-3 text-sm text-ink placeholder:text-ink-faint focus:border-survey focus:ring-2 focus:ring-survey/25 focus:outline-none"
           />
         </label>
         <div role="group" aria-label="Filter by status" className="flex flex-wrap gap-1.5">

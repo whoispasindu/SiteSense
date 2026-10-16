@@ -68,4 +68,5 @@ def test_site_scoping_covers_field_roles_and_clients() -> None:
 
 
 def test_mfa_roles_match_the_guide() -> None:
-    assert {Role.PROJECT_MANAGER, Role.PROCUREMENT_OFFICER} <= MFA_ROLES
+    # Phase 13 decision: required for everyone who sees costs or runs the company; optional otherwise.
+    assert {Role.ADMIN, Role.PROJECT_MANAGER, Role.QUANTITY_SURVEYOR, Role.PROCUREMENT_OFFICER} == MFA_ROLES

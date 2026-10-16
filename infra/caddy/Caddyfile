@@ -1,0 +1,35 @@
+# Production front door (docker-compose.prod.yml): HTTPS on one origin, the built web app at /,
+# and the API under /api, so the refresh cookie stays same-site (SameSite=Strict).
+#
+# Locally, Caddy issues a certificate from its own CA ("tls internal"); the browser warns once
+# until you trust it. On a real server, set SITESENSE_DOMAIN to your domain and Caddy gets a
+# Let's Encrypt certificate instead (remove "tls internal" below).
+{
+	admin off
+	servers {
+		# Only Caddy talks to the API, so it is the one place that sets X-Forwarded-For.
+		trusted_proxies static private_ranges
+	}
+}
+
+{$SITESENSE_DOMAIN:localhost} {
+	tls internal
+	encode zstd gzip
+
+	# The largest accepted request is a 10 MB photo or a BOQ upload; refuse anything bigger here.
+	request_body {
+		max_size 12MB
+	}
+
+	handle /api/* {
+		reverse_proxy backend:8000 {
+			header_up X-Forwarded-Proto https
+		}
+	}
+
+	handle {
+		reverse_proxy frontend:8080
+	}
+
+	header -Server
+}

@@ -109,12 +109,15 @@ def test_seed_dev_creates_sites_and_one_user_per_role(
             PurchaseOrder.project_id == havelock.id, PurchaseOrder.expected_delivery < clock.site_today()
         )
     ).all()
-    assert len(overdue) == 2
+    assert len(overdue) == 2 + len(cli.DEMO_PRICE_RISE)  # two late, plus the spring orders (on time)
     statuses = sorted(
         r.status
         for r in cli_db.scalars(select(MaterialRequest).where(MaterialRequest.project_id == havelock.id))
     )
-    assert statuses == ["approved", "change_requested", "delivered", "ordered", "pm_approval", "requested"]
+    assert statuses == [
+        "approved", "change_requested", "delivered", "delivered", "delivered", "ordered", "pm_approval",
+        "requested",
+    ]  # fmt: skip
     assert cli_db.scalar(select(func.count(Supplier.id))) == 5
     # BR-12 (Phase 10): a finished job gives every supplier an on-time record, and is never risk-scored.
     finished = cli_db.scalar(select(Project).where(Project.code == cli.DEMO_HISTORY_PROJECT[0]))
@@ -167,6 +170,8 @@ def test_seed_dev_refuses_production(monkeypatch: pytest.MonkeyPatch) -> None:
     production = make_settings(
         environment="production",
         app_base_url="https://app.sitesense.example",
+        mfa_key="a-real-production-mfa-key-value-0123456789abcdef",
+        mfa_enforced=True,
         cors_origins=["https://app.sitesense.example"],
         database_url="postgresql+psycopg://app:s3cure-pw@db:5432/sitesense",
         jwt_secret="a-real-production-secret-value-0123456789abcd",
@@ -194,3 +199,22 @@ def test_strip_photo_metadata_command(
     )
     assert cli.main(["strip-photo-metadata"]) == 0
     assert "cleaned 0 files" in capsys.readouterr().out
+
+
+def test_run_scheduler_starts_the_jobs_and_stops_on_a_signal(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Phase 13: production runs the jobs in their own process; SIGTERM stops it cleanly."""
+    import signal
+    import threading
+
+    handlers: dict[int, object] = {}
+    monkeypatch.setattr(signal, "signal", lambda signum, handler: handlers.__setitem__(signum, handler))
+    monkeypatch.setattr(cli, "get_settings", lambda: make_settings(weather_enabled=False))
+    stop = threading.Event()
+    timer = threading.Timer(0.2, lambda: handlers[signal.SIGTERM](signal.SIGTERM, None))  # type: ignore[operator]
+    timer.start()
+    assert cli.run_scheduler(stop) == 0
+    assert stop.is_set()
+    assert set(handlers) == {signal.SIGINT, signal.SIGTERM}
+    assert "Scheduler running 8 jobs" in capsys.readouterr().out

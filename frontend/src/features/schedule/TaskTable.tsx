@@ -44,7 +44,7 @@ function ProgressCell({ task, projectId, editable }: { task: Task; projectId: st
         onChange={(e) => {
           setValue(e.target.value);
         }}
-        className="tabular min-h-9 w-20 rounded-lg border border-rule-strong bg-paper-raised px-2 text-right text-sm text-ink focus:border-survey focus:ring-2 focus:ring-survey/25 focus:outline-none aria-[invalid=true]:border-signal-high"
+        className="tabular min-h-9 w-20 rounded-lg border border-field-line bg-paper-raised px-2 text-right text-sm text-ink focus:border-survey focus:ring-2 focus:ring-survey/25 focus:outline-none aria-[invalid=true]:border-signal-high"
       />
       <span className="text-xs text-ink-faint">%</span>
       {dirty ? (

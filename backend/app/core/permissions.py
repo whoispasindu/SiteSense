@@ -157,8 +157,11 @@ SITE_SCOPED_ROLES: frozenset[Role] = frozenset(
     {Role.PROJECT_MANAGER, Role.QUANTITY_SURVEYOR, Role.SITE_ENGINEER, Role.CLIENT}
 )
 
-# Roles that will require two-step verification (Phase 13).
-MFA_ROLES: frozenset[Role] = frozenset({Role.ADMIN, Role.PROJECT_MANAGER, Role.PROCUREMENT_OFFICER})
+# Roles that must use two-step sign-in (Phase 13): everyone who sees costs or runs the company.
+# Site engineers and clients may turn it on themselves.
+MFA_ROLES: frozenset[Role] = frozenset(
+    {Role.ADMIN, Role.PROJECT_MANAGER, Role.QUANTITY_SURVEYOR, Role.PROCUREMENT_OFFICER}
+)
 
 
 def permissions_for(role: Role) -> frozenset[Permission]:

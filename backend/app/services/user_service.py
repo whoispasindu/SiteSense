@@ -43,6 +43,7 @@ def to_user_out(user: User) -> UserOut:
         created_at=user.created_at,
         sites=[SiteSummary.model_validate(site) for site in user.sites],
         projects=[ProjectRef(id=p.id, code=p.code, name=p.name) for p in user.client_projects],
+        mfa_enabled=user.mfa_enabled,
     )
 
 

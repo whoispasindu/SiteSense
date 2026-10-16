@@ -60,6 +60,8 @@ def make_settings(**overrides: object) -> Settings:
         # No network calls and no background threads in tests.
         "weather_enabled": False,
         "scheduler_enabled": False,
+        # Two-step sign-in is tested on its own (test_mfa.py turns enforcement on).
+        "mfa_enforced": False,
     }
     values.update(overrides)
     return Settings.model_validate(values)

@@ -33,6 +33,7 @@ function makeUser(overrides: Partial<AdminUser>): AdminUser {
     created_at: "2026-10-01T08:00:00+00:00",
     sites: [{ id: SITE_A.id, code: SITE_A.code, name: SITE_A.name }],
     projects: [],
+    mfa_enabled: false,
     ...overrides,
   };
 }

@@ -29,7 +29,7 @@ import { StopScopeFields } from "./StopScopeFields";
 
 const SEVERITY_TONES: Record<IssueSeverity, Tone> = { low: "idle", medium: "warn", high: "down" };
 const selectClass =
-  "min-h-9 rounded-lg border border-rule-strong bg-paper-raised px-2 text-sm text-ink focus:border-survey focus:ring-2 focus:ring-survey/25 focus:outline-none";
+  "min-h-9 rounded-lg border border-field-line bg-paper-raised px-2 text-sm text-ink focus:border-survey focus:ring-2 focus:ring-survey/25 focus:outline-none";
 
 interface Row {
   key: string;
@@ -190,7 +190,7 @@ function Editor({ data, reportId, projectId }: { data: ReportIssues; reportId: s
               setAdding((a) => ({ ...a, snippet: e.target.value }));
             }}
             placeholder="e.g. two masons absent"
-            className="min-h-9 w-full rounded-lg border border-rule-strong bg-paper-raised px-2 text-sm text-ink focus:border-survey focus:outline-none"
+            className="min-h-9 w-full rounded-lg border border-field-line bg-paper-raised px-2 text-sm text-ink focus:border-survey focus:outline-none"
           />
         </label>
         <select aria-label="Category for the new tag" value={adding.category} onChange={(e) => { setAdding((a) => ({ ...a, category: e.target.value as IssueCategory })); }} className={selectClass}>

@@ -190,7 +190,7 @@ function SuggestionRow({ name, tasks, guess, projectId }: { name: string; tasks:
         onChange={(event) => {
           setTaskId(event.target.value);
         }}
-        className="min-h-10 rounded-lg border border-rule-strong bg-paper-raised px-3 text-sm text-ink"
+        className="min-h-10 rounded-lg border border-field-line bg-paper-raised px-3 text-sm text-ink"
       >
         <option value="">Choose the task that ends it…</option>
         {tasks.map((t) => (

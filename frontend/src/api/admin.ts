@@ -21,6 +21,7 @@ export const userSchema = z.object({
   sites: z.array(siteSummarySchema),
   // Clients only (Phase 12): the projects they may see.
   projects: z.array(z.object({ id: z.uuid(), code: z.string(), name: z.string() })).default([]),
+  mfa_enabled: z.boolean().default(false), // Phase 13: two-step sign-in is set up
 });
 export type AdminUser = z.infer<typeof userSchema>;
 
@@ -144,6 +145,16 @@ export function useAssignProjects() {
       await invalidate();
       await queryClient.invalidateQueries({ queryKey: ["admin", "projects"] });
     },
+  });
+}
+
+/** Phase 13: clear someone's two-step sign-in (a lost phone). Audited; signs them out. Never your own. */
+export function useResetMfa() {
+  const invalidate = useInvalidateUsers();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiRequest(`/admin/users/${encodeURIComponent(id)}/mfa/reset`, userSchema, { method: "POST" }).then((r) => r.data),
+    onSuccess: invalidate,
   });
 }
 

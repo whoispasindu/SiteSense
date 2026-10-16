@@ -1,7 +1,9 @@
 import "@testing-library/jest-dom/vitest";
 
 import { cleanup, configure, getRoles, queryAllByRole } from "@testing-library/react";
-import { afterEach, beforeAll } from "vitest";
+import { afterEach, beforeAll, expect } from "vitest";
+
+import { axeViolations } from "./axe";
 
 // jsdom has no layout engine: give Recharts' ResponsiveContainer an observer to attach to.
 class ResizeObserverStub {
@@ -52,6 +54,10 @@ beforeAll(() => {
   container.remove();
 });
 
-afterEach(() => {
+// Phase 13: every screen the tests leave behind must pass axe (WCAG 2.2 A and AA) before it is cleaned
+// up, so a new page, dialog or state that breaks accessibility fails the test that renders it.
+afterEach(async () => {
+  const problems = document.body.textContent.trim() ? await axeViolations() : [];
   cleanup();
+  expect(problems, "axe found accessibility problems on this screen").toEqual([]);
 });

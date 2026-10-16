@@ -37,6 +37,9 @@ services:
       # Photos land in backend/var/media on your machine (git-ignored).
       SITESENSE_MEDIA_ROOT: /app/var/media
       SITESENSE_WEATHER_ENABLED: ${SITESENSE_WEATHER_ENABLED:-true}
+      # Local demo: the seeded demo accounts skip two-step sign-in (anyone can try the app); real
+      # accounts you create still have to set it up. Turn off to try enforcement on the demo accounts.
+      SITESENSE_DEMO_MODE: ${SITESENSE_DEMO_MODE:-true}
       WATCHFILES_FORCE_POLLING: "true"
     volumes:
       - ./backend:/app

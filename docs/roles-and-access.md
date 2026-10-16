@@ -112,6 +112,26 @@ answers `404`, exactly like a missing record.
 
 Scores are written only by the scheduler, after daily reports and by the CLI; no endpoint writes them.
 
+## Phase 13 endpoints
+
+**Two-step sign-in.** Required for the Company Admin, Project Manager, Quantity Surveyor and
+Procurement Officer (`MFA_ROLES` in `permissions.py`); optional for Site Engineers and Clients.
+Until a required role has set it up, every endpoint except the ones below and `GET /api/v1/me`
+answers 403 `mfa_setup_required`. In demo mode, only the accounts the demo seed created skip it.
+
+**Request budgets.** Every write has a budget per signed-in user (120 a minute; per IP before
+sign-in). What-if and the weekly PDF have 20 a minute, report analysis 30.
+
+| Method and path | Who | Notes |
+| --- | --- | --- |
+| `POST /api/v1/auth/login` | Anyone | With two-step sign-in on: a 5-minute challenge instead of a session |
+| `POST /api/v1/auth/mfa/verify` | Holder of a challenge | A code from the app or a recovery code. Wrong codes count towards lockout |
+| `GET /api/v1/auth/mfa` | Signed-in user, for themselves | On or off, required or optional, recovery codes left |
+| `POST /api/v1/auth/mfa/setup`, `.../enable` | Signed-in user, for themselves | QR code and key; enabling needs a valid code and returns 10 recovery codes once. Audited |
+| `POST /api/v1/auth/mfa/recovery-codes` | Signed-in user with two-step on | New codes (old ones stop working), needs a current code. Audited |
+| `POST /api/v1/auth/mfa/disable` | Site Engineer or Client with two-step on | Needs a current code; refused for required roles. Audited |
+| `POST /api/v1/admin/users/{id}/mfa/reset` | Company Admin | **Never their own account.** Clears the enrolment and signs the person out everywhere. Audited |
+
 ## Phase 12 endpoints
 
 **Clients are linked to projects, not sites.** The Company Admin links each client account to the

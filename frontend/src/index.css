@@ -19,6 +19,8 @@
   --c-paper-sunk: #f0efea;
   --c-rule: #e4e2db;
   --c-rule-strong: #cdcac0;
+  /* Form field borders: 3:1 against the surfaces they sit on (WCAG 1.4.11), unlike decorative rules. */
+  --c-field-line: #8a867a;
   --c-ink: #1b1a17;
   --c-ink-soft: #4b4943;
   --c-ink-faint: #6c695f;
@@ -52,6 +54,7 @@
   --c-paper-sunk: #222220;
   --c-rule: #2d2c29;
   --c-rule-strong: #403f3a;
+  --c-field-line: #726f66;
   --c-ink: #edece6;
   --c-ink-soft: #c2bfb5;
   --c-ink-faint: #94918a;
@@ -87,6 +90,7 @@
   --color-paper-sunk: var(--c-paper-sunk);
   --color-rule: var(--c-rule);
   --color-rule-strong: var(--c-rule-strong);
+  --color-field-line: var(--c-field-line);
   --color-ink: var(--c-ink);
   --color-ink-soft: var(--c-ink-soft);
   --color-ink-faint: var(--c-ink-faint);

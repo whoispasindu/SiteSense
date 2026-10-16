@@ -6,8 +6,11 @@ Python process, which keeps deployment simple. PostgreSQL stores relational data
 live behind a storage adapter (a local folder today, S3-compatible storage later). External
 services (weather, storage, and later LLM and email) sit behind adapter classes in
 `backend/app/integrations` so they can be mocked in tests and swapped later. Scheduled jobs
-(missing-report reminders at 18:00, weather refresh at 05:30) run in the API process with
-APScheduler and are safe to run more than once ([ADR 0007](adr/0007-daily-reports-photos-weather.md)).
+(missing-report reminders at 18:00, weather refresh at 05:30 and the rest) use APScheduler and are
+safe to run more than once ([ADR 0007](adr/0007-daily-reports-photos-weather.md)). In development
+they run in the API process; in production they run in a process of their own
+(`python -m app.cli run-scheduler`), so the API can run several workers
+([ADR 0016](adr/0016-hardening-and-deployment.md), [deployment](deployment.md)).
 
 ```
  Browser (React + TS)  --/api/v1-->  FastAPI

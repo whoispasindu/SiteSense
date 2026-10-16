@@ -36,7 +36,15 @@ from app.models.project import BoqItem, BoqSection, BudgetLine, Project, Project
 from app.models.report import DailyReport, Notification, ReportPhoto, ReportProgress, WeatherForecast
 from app.models.risk import RiskScore
 from app.models.schedule import Holiday, ProgressSnapshot, Task, TaskDependency
-from app.models.user import RefreshToken, RoleRecord, Site, User, project_clients, user_site_assignments
+from app.models.user import (
+    MfaRecoveryCode,
+    RefreshToken,
+    RoleRecord,
+    Site,
+    User,
+    project_clients,
+    user_site_assignments,
+)
 
 __all__ = [
     "ActionKind",
@@ -59,6 +67,7 @@ __all__ = [
     "IssueSeverity",
     "IssueStatus",
     "MaterialRequest",
+    "MfaRecoveryCode",
     "Notification",
     "NotificationPreference",
     "ProgressClaim",

@@ -115,7 +115,7 @@ class ReportAction(UUIDPrimaryKeyMixin, Base):
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # The material request raised from a material_request action.
     request_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("material_requests.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("material_requests.id", ondelete="SET NULL"), nullable=True, index=True
     )
     # BR-11 (Phase 9): what a stop-work flag stops: chosen tasks, or the whole project.
     stop_scope: Mapped[str | None] = mapped_column(String(8), nullable=True)

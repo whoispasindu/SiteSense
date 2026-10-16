@@ -351,7 +351,7 @@ export function ReportFormPage() {
                     onChange={(e) => {
                       setProgress((p) => ({ ...p, [task.id]: e.target.value }));
                     }}
-                    className="tabular min-h-10 w-20 rounded-lg border border-rule-strong bg-paper-raised px-2 text-right text-sm text-ink placeholder:text-ink-faint focus:border-survey focus:ring-2 focus:ring-survey/25 focus:outline-none"
+                    className="tabular min-h-10 w-20 rounded-lg border border-field-line bg-paper-raised px-2 text-right text-sm text-ink placeholder:text-ink-faint focus:border-survey focus:ring-2 focus:ring-survey/25 focus:outline-none"
                   />
                   <span className="text-sm text-ink-faint">%</span>
                 </div>

@@ -12,7 +12,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response
 
-from app.api.deps import CurrentUser, DbSession, Meta, require_permission
+from app.api.deps import CurrentUser, DbSession, Meta, rate_limit, require_permission
 from app.core import clock
 from app.core.permissions import Permission
 from app.integrations.llm import BriefingLLM
@@ -53,6 +53,7 @@ def briefing_today(
 @router.get(
     "/reports/weekly.pdf",
     response_class=Response,
+    dependencies=[Depends(rate_limit("heavy", "heavy_rate_per_minute", per_user=True))],
     responses={200: {"content": {"application/pdf": {}}, "description": "The weekly report as a PDF."}},
 )
 def weekly_pdf(user: CostReader, db: DbSession, meta: Meta) -> Response:

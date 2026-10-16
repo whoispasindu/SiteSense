@@ -97,7 +97,7 @@ def update_report(
     "/reports/{report_id}/photos",
     response_model=PhotoOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(rate_limit("photo-upload", "photo_upload_rate_per_minute"))],
+    dependencies=[Depends(rate_limit("photo-upload", "photo_upload_rate_per_minute", per_user=True))],
 )
 def upload_photo(
     report_id: uuid.UUID,

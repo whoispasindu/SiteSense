@@ -29,7 +29,7 @@ def report_issues(report_id: uuid.UUID, user: Reader, db: DbSession) -> ReportIs
 @router.post(
     "/reports/{report_id}/analyze",
     response_model=ReportIssues,
-    dependencies=[Depends(rate_limit("analyze", "analyze_rate_per_minute"))],
+    dependencies=[Depends(rate_limit("analyze", "analyze_rate_per_minute", per_user=True))],
 )
 def analyze_report(report_id: uuid.UUID, user: Reader, db: DbSession) -> ReportIssues:
     """Tag the report's problems. Suggestions only: nothing changes until the author confirms."""

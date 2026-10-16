@@ -114,7 +114,7 @@ function NewClaim({ projectId, sections, onDone }: { projectId: string; sections
                             onChange={(e) => {
                               setPcts((p) => ({ ...p, [s.section_id]: e.target.value }));
                             }}
-                            className={`tabular w-20 rounded-md border bg-paper px-2 py-1.5 text-right text-ink ${bad ? "border-signal-high" : "border-rule-strong"}`}
+                            className={`tabular w-20 rounded-md border bg-paper px-2 py-1.5 text-right text-ink ${bad ? "border-signal-high" : "border-field-line"}`}
                           />
                           <span className="text-ink-faint">%</span>
                         </span>

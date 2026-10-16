@@ -1,5 +1,9 @@
 """Sign-in, session refresh, sign-out and password changes.
 
+Phase 13: accounts with two-step sign-in get a short-lived challenge after the password instead of a
+session, and the session only after a code (``verify_second_factor``). A right password does not reset
+the failure count while a code is still due, so wrong codes add up to the same lockout as passwords.
+
 Sessions are a short-lived access token plus a rotating refresh token. Each sign-in starts a
 refresh-token *family*; every refresh revokes the presented token and issues its successor.
 If an already-rotated token is presented again (outside a short grace window for parallel
@@ -19,7 +23,10 @@ from app.core.errors import AppError, BusinessRuleError, UnauthorizedError
 from app.core.permissions import Role
 from app.core.security import (
     PasswordPolicyError,
+    TokenError,
     create_access_token,
+    create_mfa_token,
+    decode_mfa_token,
     generate_refresh_token,
     hash_password,
     hash_refresh_token,
@@ -28,7 +35,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models import RefreshToken, User
-from app.services import audit
+from app.services import audit, mfa_service
 from app.services.audit import AuditAction, RequestMeta
 
 # Two tabs refreshing at the same moment both present the same token; the slower one gets a
@@ -75,6 +82,19 @@ class IssuedSession:
     refresh_expires_at: datetime
 
 
+@dataclass(frozen=True, slots=True)
+class MfaChallenge:
+    """The password was right; a second factor is due before any session is issued."""
+
+    token: str
+    expires_at: datetime
+
+
+class ChallengeExpiredError(UnauthorizedError):
+    code = "mfa_challenge_expired"
+    message = "Too slow, or the sign-in changed. Enter your email and password again."
+
+
 def normalize_email(email: str) -> str:
     return email.strip().lower()
 
@@ -116,7 +136,30 @@ def _minutes_left(until: datetime, now: datetime) -> int:
     return max(1, int((until - now).total_seconds() + 59) // 60)
 
 
-def login(db: Session, settings: Settings, *, email: str, password: str, meta: RequestMeta) -> IssuedSession:
+def _record_failure(
+    db: Session, settings: Settings, user: User, now: datetime, meta: RequestMeta, reason: str
+) -> bool:
+    """Count a failed attempt (password or code); lock the account at the limit. Returns True if locked."""
+    user.failed_login_count += 1
+    locked = user.failed_login_count >= settings.login_max_failures
+    if locked:
+        user.locked_until = now + timedelta(minutes=settings.lockout_minutes)
+        user.failed_login_count = 0
+    audit.record(
+        db, AuditAction.LOGIN_FAILED, meta=meta, actor_id=user.id, target_type="user", target_id=user.id,
+        details={"reason": reason},
+    )  # fmt: skip
+    if locked:
+        audit.record(
+            db, AuditAction.ACCOUNT_LOCKED, meta=meta, actor_id=user.id, target_type="user",
+            target_id=user.id, details={"minutes": settings.lockout_minutes},
+        )  # fmt: skip
+    return locked
+
+
+def login(
+    db: Session, settings: Settings, *, email: str, password: str, meta: RequestMeta
+) -> IssuedSession | MfaChallenge:
     now = clock.utcnow()
     normalized = normalize_email(email)
     # Row lock: concurrent attempts cannot race past the failure counter.
@@ -160,6 +203,16 @@ def login(db: Session, settings: Settings, *, email: str, password: str, meta: R
 
     if password_needs_rehash(user.password_hash):
         user.password_hash = hash_password(password)
+    if user.mfa_enabled:
+        # Not signed in yet: no session, and the failure count stands until the code is right.
+        token, expires = create_mfa_token(
+            user_id=user.id, role=Role(user.role), session_version=user.session_version, settings=settings
+        )
+        audit.record(
+            db, AuditAction.MFA_CHALLENGED, meta=meta, actor_id=user.id, target_type="user", target_id=user.id
+        )
+        db.commit()
+        return MfaChallenge(token, expires)
     user.failed_login_count = 0
     user.locked_until = None
     user.last_login_at = now
@@ -168,6 +221,46 @@ def login(db: Session, settings: Settings, *, email: str, password: str, meta: R
     audit.record(
         db, AuditAction.LOGIN_SUCCEEDED, meta=meta, actor_id=user.id, target_type="user", target_id=user.id
     )
+    db.commit()
+    return session
+
+
+def verify_second_factor(
+    db: Session,
+    settings: Settings,
+    *,
+    challenge: str,
+    code: str | None,
+    recovery_code: str | None,
+    meta: RequestMeta,
+) -> IssuedSession:
+    """The code step of sign-in: a valid challenge plus an app code or a recovery code."""
+    try:
+        claims = decode_mfa_token(challenge, settings)
+    except TokenError as exc:
+        raise ChallengeExpiredError() from exc
+    now = clock.utcnow()
+    user = db.scalar(select(User).where(User.id == claims.user_id).with_for_update())
+    if user is None or not user.is_active or user.session_version != claims.session_version:
+        raise ChallengeExpiredError()
+    if user.locked_until is not None and user.locked_until > now:
+        raise AccountLockedError(_minutes_left(user.locked_until, now))
+    try:
+        method = mfa_service.check(db, settings, user, code=code, recovery_code=recovery_code)
+    except mfa_service.InvalidCodeError:
+        locked = _record_failure(db, settings, user, now, meta, "bad_mfa_code")
+        db.commit()
+        if locked:
+            raise AccountLockedError(settings.lockout_minutes) from None
+        raise
+    user.failed_login_count = 0
+    user.locked_until = None
+    user.last_login_at = now
+    session, _ = _issue_session(db, settings, user, meta, family_id=uuid.uuid4(), family_started_at=now)
+    audit.record(
+        db, AuditAction.LOGIN_SUCCEEDED, meta=meta, actor_id=user.id, target_type="user", target_id=user.id,
+        details={"second_factor": method},
+    )  # fmt: skip
     db.commit()
     return session
 

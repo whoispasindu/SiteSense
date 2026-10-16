@@ -1,0 +1,150 @@
+# Production stack, runnable on your machine:
+#
+#   cp .env.prod.example .env.prod     # then fill in every secret (see the comments in the file)
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#   open https://localhost             # Caddy's local certificate: accept the warning once
+#
+# What differs from docker-compose.yml (development):
+# - production images: no bind mounts, no reload, read-only code owned by root, unprivileged users
+# - SITESENSE_ENVIRONMENT=production: the API refuses to start with weak or development settings
+# - one HTTPS origin (Caddy) for the web app and the API; only Caddy publishes ports
+# - migrations run once, as the schema owner, before the API starts
+# - the API runs several workers; scheduled jobs run in their own process (one copy only)
+# - Postgres is not reachable from the host
+name: sitesense-prod
+
+x-backend-env: &backend-env
+  SITESENSE_ENVIRONMENT: production
+  SITESENSE_DATABASE_URL: postgresql+psycopg://sitesense_app:${SITESENSE_APP_PASSWORD:?set in .env.prod}@db:5432/sitesense
+  SITESENSE_CORS_ORIGINS: https://${SITESENSE_DOMAIN:-localhost}
+  SITESENSE_ALLOWED_HOSTS: ${SITESENSE_DOMAIN:-localhost},backend
+  SITESENSE_APP_BASE_URL: https://${SITESENSE_DOMAIN:-localhost}
+  SITESENSE_JWT_SECRET: ${SITESENSE_JWT_SECRET:?set in .env.prod}
+  SITESENSE_MFA_KEY: ${SITESENSE_MFA_KEY:?set in .env.prod}
+  SITESENSE_DEMO_MODE: ${SITESENSE_DEMO_MODE:-false}
+  SITESENSE_DEMO_PASSWORD: ${SITESENSE_DEMO_PASSWORD:-}
+  SITESENSE_WEATHER_ENABLED: ${SITESENSE_WEATHER_ENABLED:-true}
+  SITESENSE_ANTHROPIC_API_KEY: ${SITESENSE_ANTHROPIC_API_KEY:-}
+  SITESENSE_SMTP_HOST: ${SITESENSE_SMTP_HOST:-}
+  SITESENSE_SMTP_USERNAME: ${SITESENSE_SMTP_USERNAME:-}
+  SITESENSE_SMTP_PASSWORD: ${SITESENSE_SMTP_PASSWORD:-}
+  SITESENSE_EMAIL_FROM: ${SITESENSE_EMAIL_FROM:-SiteSense <no-reply@sitesense.example>}
+  SITESENSE_LOG_LEVEL: ${SITESENSE_LOG_LEVEL:-INFO}
+  # Request budgets (per minute): sign-in per IP; writes and heavy requests per user. The load test
+  # raises them, because its 50 simulated people share one IP and six demo accounts.
+  SITESENSE_LOGIN_RATE_PER_MINUTE: ${SITESENSE_LOGIN_RATE_PER_MINUTE:-10}
+  SITESENSE_WRITE_RATE_PER_MINUTE: ${SITESENSE_WRITE_RATE_PER_MINUTE:-120}
+  SITESENSE_HEAVY_RATE_PER_MINUTE: ${SITESENSE_HEAVY_RATE_PER_MINUTE:-20}
+  SITESENSE_ANALYZE_RATE_PER_MINUTE: ${SITESENSE_ANALYZE_RATE_PER_MINUTE:-30}
+
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env.prod}
+      SITESENSE_OWNER_PASSWORD: ${SITESENSE_OWNER_PASSWORD:?set in .env.prod}
+      SITESENSE_APP_PASSWORD: ${SITESENSE_APP_PASSWORD:?set in .env.prod}
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d sitesense"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Runs the migrations as the schema owner, then exits. The API never holds the owner password,
+  # except in demo mode, where the nightly reset needs it (see the scheduler below).
+  migrate:
+    build:
+      context: ./backend
+      target: prod
+    image: sitesense-backend:prod
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      <<: *backend-env
+      SITESENSE_MIGRATION_DATABASE_URL: postgresql+psycopg://sitesense_owner:${SITESENSE_OWNER_PASSWORD}@db:5432/sitesense
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    image: sitesense-backend:prod
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      SITESENSE_SCHEDULER_ENABLED: "false"
+      # Uvicorn worker processes. Each has its own rate-limit counters (see docs/deployment.md).
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-4}
+      # Only Caddy can reach the API (no published port), so its X-Forwarded-For is trusted.
+      FORWARDED_ALLOW_IPS: "*"
+    volumes:
+      - media:/data/media
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      # Host "backend": the API only answers to its allowed host names.
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8000/api/v1/health/ready', headers={'Host': 'backend'}), timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # The scheduled jobs (reminders, weather, risk scoring, emails, and in demo mode the nightly
+  # reset), one copy, in their own process.
+  scheduler:
+    image: sitesense-backend:prod
+    restart: unless-stopped
+    command: ["python", "-m", "app.cli", "run-scheduler"]
+    environment:
+      <<: *backend-env
+      # Demo only: the nightly reset deletes everything as the schema owner. Empty: no reset.
+      SITESENSE_MIGRATION_DATABASE_URL: ${SITESENSE_DEMO_RESET_DATABASE_URL:-}
+    volumes:
+      - media:/data/media
+    read_only: true
+    tmpfs:
+      - /tmp
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  frontend:
+    build:
+      context: ./frontend
+      target: prod
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  proxy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    environment:
+      SITESENSE_DOMAIN: ${SITESENSE_DOMAIN:-localhost}
+    ports:
+      - "127.0.0.1:443:443"
+      - "127.0.0.1:80:80"
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+
+volumes:
+  pgdata:
+  media:
+  caddy-data:
+  caddy-config:

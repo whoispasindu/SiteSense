@@ -1,7 +1,13 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { resumeSession, signIn as apiSignIn, signOut as apiSignOut, type Me } from "../api/auth";
+import {
+  completeSignIn as apiCompleteSignIn,
+  resumeSession,
+  signIn as apiSignIn,
+  signOut as apiSignOut,
+  type Me,
+} from "../api/auth";
 import { configureSession, refreshSession, setAccessToken } from "../api/client";
 import { AuthContext, type AuthContextValue, type AuthStatus } from "./context";
 
@@ -57,11 +63,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(
     async (email: string, password: string) => {
       queryClient.clear();
-      const me = await apiSignIn(email, password);
+      const result = await apiSignIn(email, password);
+      if (result.kind === "session") setUser(result.user);
+      return result;
+    },
+    [queryClient, setUser],
+  );
+
+  const completeSignIn = useCallback(
+    async (token: string, second: { code: string } | { recovery_code: string }) => {
+      const me = await apiCompleteSignIn(token, second);
       setUser(me);
       return me;
     },
-    [queryClient, setUser],
+    [setUser],
   );
 
   const signOut = useCallback(async () => {
@@ -79,11 +94,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       endedBy,
       user,
       signIn,
+      completeSignIn,
       signOut,
       setUser,
       can: (permission: string) => user?.permissions.includes(permission) ?? false,
     }),
-    [status, endedBy, user, signIn, signOut, setUser],
+    [status, endedBy, user, signIn, completeSignIn, signOut, setUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

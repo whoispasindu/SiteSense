@@ -22,7 +22,7 @@ from app.schemas.admin import (
     UserOut,
     UserUpdate,
 )
-from app.services import user_service
+from app.services import mfa_service, user_service
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -91,6 +91,14 @@ def assign_projects(
 def projects(_admin: UserAdmin, db: DbSession) -> list[AdminProjectOut]:
     """Every project, to link client accounts to: codes, names, sites and statuses, no figures."""
     return user_service.list_projects(db)
+
+
+@router.post("/users/{user_id}/mfa/reset", response_model=UserOut)
+def reset_mfa(user_id: uuid.UUID, admin: UserAdmin, db: DbSession, meta: Meta) -> UserOut:
+    """Phase 13: clear someone's two-step sign-in (a lost phone). Audited; signs them out. Never your own."""
+    user = user_service.get_user(db, user_id)
+    mfa_service.admin_reset(db, admin, user, meta=meta)
+    return user_service.to_user_out(user)
 
 
 @router.post("/users/{user_id}/reset-password", response_model=PasswordReset)

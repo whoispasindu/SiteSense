@@ -105,7 +105,7 @@ class ProgressClaimLine(UUIDPrimaryKeyMixin, Base):
     claim_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("progress_claims.id", ondelete="CASCADE"), nullable=False
     )
-    section_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("boq_sections.id"), nullable=False)
+    section_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("boq_sections.id"), nullable=False, index=True)
     section_value: Mapped[Decimal] = mapped_column(MONEY, nullable=False)
     certified_pct: Mapped[Decimal] = mapped_column(PERCENT, nullable=False)
     previous_pct: Mapped[Decimal] = mapped_column(PERCENT, nullable=False)
@@ -131,13 +131,13 @@ class VariationOrder(UUIDPrimaryKeyMixin, Base):
     )
     title: Mapped[str] = mapped_column(String(160), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    section_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("boq_sections.id"), nullable=False)
+    section_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("boq_sections.id"), nullable=False, index=True)
     # Extra quantity on one BOQ item (it raises that item's BR-02 allowance once approved).
     boq_item_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("boq_items.id"), nullable=True)
     quantity_change: Mapped[Decimal | None] = mapped_column(QUANTITY, nullable=True)
     # The programme task the time impact extends.
     task_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True, index=True
     )
     time_impact_days: Mapped[int] = mapped_column(Integer, nullable=False)
     # Set by the QS: the change to the contract value (client-facing) and to the section's cost budget.

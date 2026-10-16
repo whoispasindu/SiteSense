@@ -9,6 +9,10 @@ export function signInErrorMessage(error: unknown): { tone: "error" | "warn"; te
         return { tone: "warn", text: "Too many attempts from this device. Wait a minute, then try again." };
       case "invalid_credentials":
         return { tone: "error", text: "Email or password is incorrect." };
+      case "invalid_mfa_code":
+        return { tone: "error", text: "That code is not right. Use the newest code from your authenticator app." };
+      case "mfa_challenge_expired":
+        return { tone: "warn", text: "That took too long. Enter your email and password again." };
       case "network_error":
       case "timeout":
         return { tone: "error", text: "SiteSense can't be reached. Check your connection and try again." };

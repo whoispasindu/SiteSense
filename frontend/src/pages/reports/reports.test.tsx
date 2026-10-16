@@ -273,7 +273,12 @@ describe("Report detail", () => {
     const progress = screen.getByRole("table", { name: "Task progress reported" });
     expect(within(progress).getByRole("row", { name: /Frame/ })).toHaveTextContent("71.2%74%+2.8 pts");
     expect(screen.getByText("19.7 mm")).toBeInTheDocument();
-    expect(await screen.findByRole("img", { name: "Level 4 rebar" })).toHaveAttribute("src", expect.stringMatching(/^data:image\/jpeg/));
+    // The caption shows under the photo, so the image does not repeat it (Phase 13, axe).
+    const thumb = await screen.findByRole("button", { name: "Open photo 1: Level 4 rebar" });
+    await waitFor(() => {
+      expect(thumb.querySelector("img")).toHaveAttribute("src", expect.stringMatching(/^data:image\/jpeg/));
+    });
+    expect(thumb.querySelector("img")).toHaveAttribute("alt", "");
     expect(screen.queryByRole("button", { name: /Correct report/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Remove photo/ })).not.toBeInTheDocument();
   });

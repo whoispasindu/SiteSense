@@ -48,7 +48,7 @@ export function BriefingCard({ projectIds }: { projectIds: Map<string, string> }
 
       <div className="py-4 pr-5 pl-6">
         {briefing.isPending ? (
-          <div aria-busy="true" aria-label="Writing today's briefing" className="space-y-3">
+          <div role="status" aria-busy="true" aria-label="Writing today's briefing" className="space-y-3">
             {[0, 1, 2].map((i) => (
               <div key={i} className="h-4 animate-pulse rounded bg-paper-sunk" style={{ width: `${String(88 - i * 14)}%` }} />
             ))}

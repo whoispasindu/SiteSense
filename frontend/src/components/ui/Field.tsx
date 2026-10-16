@@ -7,7 +7,7 @@ import {
 } from "react";
 
 const CONTROL =
-  "w-full min-h-10 rounded-lg border border-rule-strong bg-paper-raised px-3 text-[0.9375rem] text-ink placeholder:text-ink-faint transition-[border-color,box-shadow] focus:border-survey focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--c-survey)_18%,transparent)] focus:outline-none aria-[invalid=true]:border-signal-high disabled:opacity-60";
+  "w-full min-h-10 rounded-lg border border-field-line bg-paper-raised px-3 text-[0.9375rem] text-ink placeholder:text-ink-faint transition-[border-color,box-shadow] focus:border-survey focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--c-survey)_18%,transparent)] focus:outline-none aria-[invalid=true]:border-signal-high disabled:opacity-60";
 
 interface FieldShellProps {
   label: string;

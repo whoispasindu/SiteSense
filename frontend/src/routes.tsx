@@ -11,6 +11,7 @@ import { CostPage } from "./pages/cost/CostPage";
 import { SitesPage } from "./pages/admin/SitesPage";
 import { UsersPage } from "./pages/admin/UsersPage";
 import { ChangePasswordPage } from "./pages/auth/ChangePasswordPage";
+import { TwoStepSetupPage } from "./pages/auth/TwoStepSetupPage";
 import { SignInPage } from "./pages/auth/SignInPage";
 import { HomePage } from "./pages/HomePage";
 import { NotFoundPage } from "./pages/NotFoundPage";
@@ -37,6 +38,7 @@ import { SuppliersPage } from "./pages/procurement/SuppliersPage";
 import { RiskPage } from "./pages/risk/RiskPage";
 import { SchedulePage } from "./pages/schedule/SchedulePage";
 import { NotificationSettingsPage } from "./pages/settings/NotificationSettingsPage";
+import { SecuritySettingsPage } from "./pages/settings/SecuritySettingsPage";
 import { RouteErrorPage } from "./pages/RouteErrorPage";
 import { VariationDetailPage } from "./pages/variations/VariationDetailPage";
 
@@ -47,6 +49,15 @@ export const routes: RouteObject[] = [
       <AnonymousOnly>
         <SignInPage />
       </AnonymousOnly>
+    ),
+    errorElement: <RouteErrorPage />,
+  },
+  {
+    path: "/two-step-setup",
+    element: (
+      <RequireAuth>
+        <TwoStepSetupPage />
+      </RequireAuth>
     ),
     errorElement: <RouteErrorPage />,
   },
@@ -159,6 +170,7 @@ export const routes: RouteObject[] = [
       },
       // Every signed-in user, for their own email choices (linked from every alert email).
       { path: "settings/notifications", element: <NotificationSettingsPage /> },
+      { path: "settings/security", element: <SecuritySettingsPage /> },
       {
         path: "variations/:variationId",
         element: (

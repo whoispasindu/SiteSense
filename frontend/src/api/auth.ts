@@ -40,6 +40,10 @@ export const meSchema = z.object({
   site_scoped: z.boolean(),
   sites: z.array(siteSummarySchema),
   must_change_password: z.boolean(),
+  // Phase 13: two-step sign-in, and whether the server runs the demo (shows the banner).
+  mfa_enabled: z.boolean().default(false),
+  mfa_setup_required: z.boolean().default(false),
+  demo_mode: z.boolean().default(false),
 });
 export type Me = z.infer<typeof meSchema>;
 
@@ -58,8 +62,69 @@ async function startSession(path: string, body?: unknown): Promise<Me> {
   return data.user;
 }
 
-export function signIn(email: string, password: string): Promise<Me> {
-  return startSession("/auth/login", { email, password });
+/** The password was right and a code is due: no session until ``completeSignIn``. */
+const challengeSchema = z.object({
+  mfa_required: z.literal(true),
+  mfa_token: z.string().min(20),
+  expires_in: z.number().int().positive(),
+});
+const loginSchema = z.union([tokenSchema.extend({ mfa_required: z.literal(false).optional() }), challengeSchema]);
+
+export type SignInResult = { kind: "session"; user: Me } | { kind: "challenge"; token: string };
+
+export async function signIn(email: string, password: string): Promise<SignInResult> {
+  const { data } = await apiRequest("/auth/login", loginSchema, { method: "POST", body: { email, password }, auth: false });
+  if ("mfa_token" in data) return { kind: "challenge", token: data.mfa_token };
+  setAccessToken(data.access_token);
+  return { kind: "session", user: data.user };
+}
+
+/** The code step: an authenticator code, or one recovery code. */
+export function completeSignIn(token: string, second: { code: string } | { recovery_code: string }): Promise<Me> {
+  return startSession("/auth/mfa/verify", { mfa_token: token, ...second });
+}
+
+// --- Two-step sign-in: the user's own set-up -----------------------------------------------------------
+
+const mfaStatusSchema = z.object({
+  enabled: z.boolean(),
+  required: z.boolean(),
+  enabled_at: z.iso.datetime({ offset: true }).nullable(),
+  recovery_codes_left: z.number().int(),
+});
+export type MfaStatus = z.infer<typeof mfaStatusSchema>;
+
+const mfaSetupSchema = z.object({
+  secret: z.string().regex(/^[A-Z2-7]+$/),
+  otpauth_uri: z.string().startsWith("otpauth://totp/"),
+  qr_png: z.string().startsWith("data:image/png;base64,"),
+});
+export type MfaSetup = z.infer<typeof mfaSetupSchema>;
+
+const codesSchema = z.object({ codes: z.array(z.string()) });
+
+export function getMfaStatus(signal?: AbortSignal): Promise<MfaStatus> {
+  return apiRequest("/auth/mfa", mfaStatusSchema, { signal }).then((r) => r.data);
+}
+
+export function startMfaSetup(): Promise<MfaSetup> {
+  return apiRequest("/auth/mfa/setup", mfaSetupSchema, { method: "POST" }).then((r) => r.data);
+}
+
+export function enableMfa(code: string): Promise<string[]> {
+  return apiRequest("/auth/mfa/enable", codesSchema, { method: "POST", body: { code } }).then((r) => r.data.codes);
+}
+
+export function renewRecoveryCodes(code: string): Promise<string[]> {
+  return apiRequest("/auth/mfa/recovery-codes", codesSchema, { method: "POST", body: { code } }).then((r) => r.data.codes);
+}
+
+export function disableMfa(code: string): Promise<void> {
+  return apiRequest("/auth/mfa/disable", empty, { method: "POST", body: { code } }).then(() => undefined);
+}
+
+export function fetchMe(): Promise<Me> {
+  return apiRequest("/me", meSchema).then((r) => r.data);
 }
 
 const SUPERSEDED_RETRY_MS = 250;

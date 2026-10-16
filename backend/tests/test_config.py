@@ -12,6 +12,8 @@ SAFE_PROD = {
     "allowed_hosts": ["api.sitesense.example"],
     "database_url": "postgresql+psycopg://app:s3cure-pw@db:5432/sitesense",
     "app_base_url": "https://app.sitesense.example",
+    "mfa_key": "a-real-production-mfa-key-value-0123456789abcdef",
+    "mfa_enforced": True,
 }
 
 
@@ -36,6 +38,13 @@ def test_safe_production_settings_are_accepted() -> None:
         ),
         ({"app_base_url": "http://app.sitesense.example"}, "app_base_url must use https"),
         ({"smtp_host": "mail.example", "smtp_security": "none"}, "SMTP must use TLS"),
+        (
+            {"mfa_key": "dev-only-insecure-mfa-key-change-me-000000000000000"},
+            "mfa_key is the development default",
+        ),
+        ({"mfa_enforced": False}, "two-step sign-in must be enforced"),
+        # The test JWT secret (make_settings): one leaked key must not unlock both.
+        ({"mfa_key": "test-jwt-secret-that-is-long-enough-0123456789"}, "mfa_key must differ"),
     ],
 )
 def test_unsafe_production_settings_are_rejected(override: dict[str, object], problem: str) -> None:
@@ -81,3 +90,14 @@ def test_api_docs_are_disabled_in_production() -> None:
 
 def test_api_docs_are_available_outside_production(client: TestClient) -> None:
     assert client.get("/api/openapi.json").status_code == 200
+
+
+def test_empty_variables_count_as_not_set(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Compose passes optional settings as empty strings: they must mean "not set", not "invalid"."""
+    monkeypatch.setenv("SITESENSE_MIGRATION_DATABASE_URL", "")
+    monkeypatch.setenv("SITESENSE_ANTHROPIC_API_KEY", "")
+    monkeypatch.setenv("SITESENSE_SMTP_HOST", "")
+    settings = Settings()
+    assert settings.migration_database_url is None
+    assert settings.anthropic_api_key is None
+    assert settings.smtp_host is None

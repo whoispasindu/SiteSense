@@ -11,7 +11,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from app.api.deps import DbSession, require_permission
+from app.api.deps import DbSession, rate_limit, require_permission
 from app.core.permissions import Permission
 from app.models import User
 from app.schemas.risk import ProjectRisk, RiskRanking, WhatIfIn, WhatIfOut
@@ -34,7 +34,11 @@ def risk_ranking(user: RiskReader, db: DbSession) -> list[RiskRanking]:
     return risk_service.ranking(db, user)
 
 
-@router.post("/projects/{project_id}/risk/what-if", response_model=WhatIfOut)
+@router.post(
+    "/projects/{project_id}/risk/what-if",
+    response_model=WhatIfOut,
+    dependencies=[Depends(rate_limit("heavy", "heavy_rate_per_minute", per_user=True))],
+)
 def what_if(project_id: uuid.UUID, data: WhatIfIn, user: WhatIfUser, db: DbSession) -> WhatIfOut:
     """Today's forecast, each recovery action's effect, and the chosen actions together. Stores nothing."""
     return risk_service.what_if(db, user, project_id, data)

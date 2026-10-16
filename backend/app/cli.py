@@ -1,7 +1,9 @@
 """Operator commands.
 
     python -m app.cli create-admin --email admin@company.lk --name "Nimal Perera"
-    python -m app.cli seed-dev            # local development only
+    python -m app.cli seed-dev            # local development, or production in demo mode
+    python -m app.cli reset-demo          # demo mode only: back to the seeded data
+    python -m app.cli run-scheduler       # the scheduled jobs on their own (production)
     python -m app.cli send-reminders      # missing daily report reminders now (BR-07)
     python -m app.cli refresh-weather     # fetch the 14-day forecast for every active site
     python -m app.cli score-risk          # score every open project's risk now
@@ -10,13 +12,16 @@
 
 ``create-admin`` prints a one-time temporary password; the admin must change it at first sign-in.
 ``seed-dev`` creates demo sites and one account per role using SITESENSE_DEMO_PASSWORD, and
-refuses to run in production.
+refuses to run in production unless SITESENSE_DEMO_MODE is on. ``reset-demo`` deletes everything
+(as the schema owner) and seeds again; it refuses outside demo mode.
 """
 
 import argparse
 import io
 import os
+import signal
 import sys
+import threading
 import uuid
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
@@ -31,6 +36,7 @@ from app.core.config import get_settings
 from app.core.database import Database
 from app.core.permissions import Role
 from app.core.scheduler import (
+    build_scheduler,
     refresh_weather,
     run_pour_check,
     run_report_reminders,
@@ -44,7 +50,7 @@ from app.core.security import (
     validate_password,
 )
 from app.integrations.storage import LocalStorage
-from app.integrations.weather import OpenMeteoClient
+from app.integrations.weather import DisabledWeatherClient, OpenMeteoClient, WeatherClient
 from app.models import (
     BoqItem,
     BoqSection,
@@ -79,6 +85,7 @@ from app.services import (
     audit,
     claim_service,
     cost_service,
+    demo_service,
     handover_service,
     materials_service,
     photos,
@@ -129,6 +136,15 @@ DEMO_SUPPLIER_HISTORY = [
     ("Colombo Ready-Mix", ("B.03", "Ready-mix concrete, grade 25", "m3", "28500"), 12, 11),
     ("Ceylon Formwork Hire", ("B.04", "Formwork hire", "m2", "950"), 9, 3),
     ("Hill Country Hardware", ("B.05", "Waterproofing membrane", "m2", "1850"), 3, 2),
+]
+
+# Havelock's substructure concrete and steel, bought in the spring after a price rise at about the
+# full BOQ rates, so none of the budget's margin is left (about 10% over budget on what is committed).
+# With the slow frame this makes Havelock the demo's high-risk project; Fort View is medium and
+# Peradeniya low (Phase 13). (item, quantity, unit price, delivered days ago, supplier)
+DEMO_PRICE_RISE = [
+    ("B.03", "640", "38900", 150, "Colombo Ready-Mix"),
+    ("B.04", "58000", "389", 170, "Southern Steel Traders"),
 ]
 
 # Havelock material requests and how far each gets:
@@ -265,8 +281,8 @@ def create_admin(email: str, name: str) -> int:
 
 def seed_dev() -> int:
     settings = get_settings()
-    if settings.is_production:
-        print("seed-dev refuses to run in production.", file=sys.stderr)
+    if settings.is_production and not settings.demo_mode:
+        print("seed-dev refuses to run in production unless SITESENSE_DEMO_MODE is on.", file=sys.stderr)
         return 1
     password = os.environ.get("SITESENSE_DEMO_PASSWORD", "")
     try:
@@ -287,7 +303,9 @@ def seed_dev() -> int:
         password_hash = hash_password(password)
         created = 0
         for email, full_name, role, site_codes in DEMO_USERS:
-            if db.scalar(select(User).where(User.email == email)):
+            existing = db.scalar(select(User).where(User.email == email))
+            if existing is not None:
+                existing.is_demo = True  # in demo mode, skips two-step enforcement (Phase 13)
                 continue
             db.add(
                 User(
@@ -296,6 +314,7 @@ def seed_dev() -> int:
                     role=role.value,
                     password_hash=password_hash,
                     must_change_password=False,
+                    is_demo=True,
                     sites=[sites[c] for c in site_codes],
                 )
             )
@@ -651,10 +670,54 @@ def _seed_risk_inputs(db: Session) -> None:
             po.expected_delivery = today - timedelta(days=4 if line.deliveries else 9)
             for delivery in line.deliveries:
                 delivery.delivered_on = today - timedelta(days=1)
+    buyer = db.scalar(select(User).where(User.email == "procurement@sitesense.example"))
+    if havelock is not None and engineer is not None and buyer is not None:
+        _seed_price_rise(db, havelock, engineer, buyer)
     if peradeniya is not None and pm is not None:
         for days_ago in range(14):
             file(peradeniya, pm, days_ago, 41 + days_ago % 4)
     db.commit()
+
+
+def _seed_price_rise(db: Session, project: Project, engineer: User, buyer: User) -> None:
+    """Havelock's spring orders at the higher prices (``DEMO_PRICE_RISE``). Skipped if already there."""
+    today = clock.site_today()
+    for item_code, quantity, price, days_ago, supplier_name in DEMO_PRICE_RISE:
+        item = db.scalar(
+            select(BoqItem).where(BoqItem.project_id == project.id, BoqItem.item_code == item_code)
+        )
+        supplier = db.scalar(select(Supplier).where(Supplier.name == supplier_name))
+        if item is None or supplier is None:
+            continue
+        if db.scalar(select(MaterialRequest.id).where(MaterialRequest.boq_item_id == item.id)):
+            continue
+        arrived = today - timedelta(days=days_ago)
+        submitted = datetime.combine(arrived - timedelta(days=21), time(9), clock.SITE_TIME_ZONE)
+        qty, unit_price = Decimal(quantity), Decimal(price)
+        request = MaterialRequest(
+            number=materials_service.next_number(db, "MR"), project_id=project.id, boq_item_id=item.id,
+            requested_by=engineer.id, quantity=qty, unit_price=unit_price, needed_by=arrived,
+            status="delivered", approval_level="pm", submitted_at=submitted,
+        )  # fmt: skip
+        order = PurchaseOrder(
+            number=materials_service.next_number(db, "PO"), project_id=project.id, supplier_id=supplier.id,
+            issued_by=buyer.id, issued_at=submitted + timedelta(days=7), expected_delivery=arrived,
+            status="delivered",
+        )  # fmt: skip
+        db.add_all([request, order])
+        db.flush()
+        line = PurchaseOrderLine(
+            purchase_order_id=order.id, request_id=request.id, quantity=qty, unit_price=unit_price,
+            amount=qty * unit_price, position=1,
+        )  # fmt: skip
+        db.add(line)
+        db.flush()
+        db.add(
+            Delivery(
+                line_id=line.id, quantity=qty, delivered_on=arrived, received_by=buyer.id,
+                created_at=datetime.combine(arrived, time(15), clock.SITE_TIME_ZONE),
+            )
+        )  # fmt: skip
 
 
 def _seed_issues(db: Session) -> None:
@@ -875,6 +938,44 @@ def _seed_portal(db: Session, storage: LocalStorage) -> None:
         portal_service.set_shared(db, pm, project, PhotosShareIn(photo_ids=shared, shared=True), meta=meta)
 
 
+def run_scheduler(stop: threading.Event | None = None) -> int:
+    """Phase 13: the scheduled jobs in a process of their own, so the API can run several workers
+    (with ``SITESENSE_SCHEDULER_ENABLED=false``) without each one running every job."""
+    settings = get_settings()
+    database = Database(settings)
+    client: WeatherClient = DisabledWeatherClient()
+    if settings.weather_enabled:
+        client = OpenMeteoClient(settings.weather_timeout_seconds)
+    scheduler = build_scheduler(settings, database, client)
+    stop = stop or threading.Event()
+    for signum in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(signum, lambda *_: stop.set())
+    scheduler.start()
+    print(f"Scheduler running {len(scheduler.get_jobs())} jobs; stop with Ctrl+C or SIGTERM.", flush=True)
+    stop.wait()
+    scheduler.shutdown(wait=True)
+    database.dispose()
+    return 0
+
+
+def reset_demo() -> int:
+    """Phase 13: the demo back to its seeded state (nightly in demo mode, or by hand)."""
+    settings = get_settings()
+    try:
+        result = demo_service.reset_as_owner(settings, LocalStorage(settings.media_root))
+    except demo_service.DemoResetRefusedError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    print(f"Removed {result.rows} rows and {result.photo_files} photo files.")
+    status = seed_dev()
+    if status != 0:
+        return status
+    if settings.weather_enabled:
+        refresh_site_weather()
+    check_pours()
+    return score_risk()
+
+
 def send_reminders() -> int:
     database = Database(get_settings())
     created = run_report_reminders(database.session_factory)
@@ -935,6 +1036,8 @@ def main(argv: list[str] | None = None) -> int:
     admin.add_argument("--email", required=True)
     admin.add_argument("--name", required=True)
     sub.add_parser("seed-dev", help="create demo sites and one user per role (not in production)")
+    sub.add_parser("reset-demo", help="demo mode only: delete everything and seed the demo again")
+    sub.add_parser("run-scheduler", help="run the scheduled jobs in this process until stopped")
     sub.add_parser("send-reminders", help="remind sites missing today's daily report")
     sub.add_parser("refresh-weather", help="fetch the 14-day forecast for every active site")
     sub.add_parser("score-risk", help="score every open project's risk now")
@@ -950,6 +1053,10 @@ def main(argv: list[str] | None = None) -> int:
         return create_admin(args.email, args.name)
     if args.command == "send-reminders":
         return send_reminders()
+    if args.command == "reset-demo":
+        return reset_demo()
+    if args.command == "run-scheduler":
+        return run_scheduler()
     if args.command == "refresh-weather":
         return refresh_site_weather()
     if args.command == "score-risk":

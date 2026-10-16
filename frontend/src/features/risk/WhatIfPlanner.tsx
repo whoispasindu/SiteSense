@@ -117,7 +117,7 @@ export function WhatIfPlanner({ projectId }: { projectId: string }) {
                             onKeyDown={(e) => {
                               if (e.key === "Enter") commitCost(a.id);
                             }}
-                            className="tabular w-48 rounded-md border border-rule-strong bg-paper px-3 py-2 text-ink"
+                            className="tabular w-48 rounded-md border border-field-line bg-paper px-3 py-2 text-ink"
                           />
                         </label>
                         <p className="pb-2 text-xs text-ink-faint">
