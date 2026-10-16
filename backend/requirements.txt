@@ -1,7 +1,7 @@
 # Runtime dependencies (pinned; Dependabot proposes upgrades).
 fastapi==0.143.0
 uvicorn[standard]==0.54.0
-pydantic==2.14.0
+pydantic==2.14.1
 pydantic-settings==2.15.0
 SQLAlchemy==2.1.4
 alembic==1.20.0
@@ -29,5 +29,5 @@ anthropic==1.13.0
 reportlab==5.0.1
 # Two-step sign-in (Phase 13): AES-GCM for the TOTP secrets at rest, and QR codes for enrolment.
 # (The TOTP algorithm itself is ours, RFC 6238, tested against the RFC's vectors.)
-cryptography==50.0.1
+cryptography==50.0.2
 segno==1.6.6
