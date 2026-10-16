@@ -43,6 +43,8 @@ def test_safe_production_settings_are_accepted() -> None:
             "mfa_key is the development default",
         ),
         ({"mfa_enforced": False}, "two-step sign-in must be enforced"),
+        # The test JWT secret (make_settings): one leaked key must not unlock both.
+        ({"mfa_key": "test-jwt-secret-that-is-long-enough-0123456789"}, "mfa_key must differ"),
     ],
 )
 def test_unsafe_production_settings_are_rejected(override: dict[str, object], problem: str) -> None:

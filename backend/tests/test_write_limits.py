@@ -79,6 +79,10 @@ def test_a_forged_token_counts_against_the_ip_not_a_user(
     statuses = [tight_api.post(READ_ALL, headers=forged).status_code for _ in range(4)]
     assert statuses == [401, 401, 401, 429]
 
+    # A new forged token each time does not open a fresh budget: they all count against the IP.
+    other = {"Authorization": "Bearer another-made-up-token"}
+    assert tight_api.post(READ_ALL, headers=other).status_code == 429
+
     real = bearer(login(tight_api, make_user().email))
     assert tight_api.post(READ_ALL, headers=real).status_code == 204
 

@@ -14,9 +14,10 @@ SiteSense tells a construction company which site will slip before it does, and 
 
 ![The project manager's dashboard ranks projects by risk; the project page shows the forecast and what moved it](docs/media/pm-risk-dashboard.gif)
 
-> **Status: v0.1 MVP (Phases 0 to 6 of 14).** Projects, BOQ and budgets, schedules, daily site
-> reports, materials and approvals, and the first AI feature: a daily delay and cost-overrun risk
-> score. More arrives phase by phase (see [Roadmap](#roadmap)). Not production-ready yet. The risk
+> **Status: Phases 0 to 12 done, 13 (hardening and deployment) in review, of 14.** Every module is
+> built: projects and budgets, schedules, daily reports, materials, cost control, the risk models
+> and what-if planner, the dashboard and AI briefing, and the client portal. Phase 14 (user
+> acceptance testing and evaluation) leads to v1.0 (see [Roadmap](#roadmap)). The risk
 > model is trained on simulated projects (see the [model card](docs/model-card-risk.md)). The report
 > issue classifier (Phase 7) is trained on synthetic sentences and tested on sentences
 > written by the project, not real site reports, so its scores are not yet evidence about real sites
@@ -239,7 +240,16 @@ migrate the `sitesense_test` database and run each test in a transaction that is
 Override the location with `SITESENSE_TEST_DATABASE_URL` and `SITESENSE_TEST_MIGRATION_DATABASE_URL`. Every pull request also runs dependency audits, a secret scan and
 CodeQL; see [docs/security.md](docs/security.md).
 
+Every frontend test also runs axe on whatever it left on screen, and fails on any WCAG 2.2 A or AA
+problem; a separate test checks the colour contrast of the design tokens in both themes
+([docs/accessibility.md](docs/accessibility.md)). The load test (50 people at once, with targets for
+reads, writes and the heavy endpoints) is in `loadtest/`, with its latest results in
+[docs/performance.md](docs/performance.md).
+
 ### Upgrading an existing install
+
+Before upgrading to Phase 13, set `SITESENSE_MFA_KEY` (below). On a demo or development database,
+run `python -m app.cli seed-dev` once afterwards, to mark the demo accounts.
 
 After upgrading to Phase 12, link each client account to its projects (Users → the client), then
 clean photos uploaded before this release:
@@ -348,6 +358,31 @@ title, one fixed sentence and a link into SiteSense; comments, report text and a
 app. Without `SITESENSE_SMTP_HOST`, emails are written to the backend log instead of sent, which is
 how local development and the demo run.
 
+## Production
+
+`docker-compose.prod.yml` runs the production setup on your own machine: HTTPS through Caddy on one
+origin, 4 API workers, background jobs in their own process, the database hidden, read-only
+containers. It refuses weak settings.
+
+```bash
+cp .env.prod.example .env.prod
+```
+
+Fill in every secret in `.env.prod` (the file says how), then:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+```
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm backend python -m app.cli seed-dev
+```
+
+Open <https://localhost> (accept the local certificate once) and sign in with a demo account.
+
+To host it (the API on Render or Railway, the web app on Vercel, managed PostgreSQL, and what the
+free tiers allow), follow [docs/deployment.md](docs/deployment.md). There is no public demo yet.
+
 ## Tech stack
 
 | Layer | Technology |
@@ -356,7 +391,8 @@ how local development and the demo run.
 | API | Python 3.13, FastAPI, Pydantic, SQLAlchemy 2, Alembic, structlog |
 | Data | PostgreSQL 18 |
 | AI | LightGBM (risk), scikit-learn (TF-IDF baseline), DistilBERT fine-tuned with PyTorch (report issues); served as JSON (pure Python) and ONNX Runtime, no pickles |
-| Quality | pytest, Ruff, mypy, Vitest, Testing Library, ESLint, CodeQL, Gitleaks |
+| Quality | pytest, Ruff, mypy, Vitest, Testing Library, axe-core, ESLint, Locust, CodeQL, Gitleaks |
+| Running it | Docker, Caddy (HTTPS), Uvicorn, nginx (static files) |
 
 Architecture notes, the [roles and access matrix](docs/roles-and-access.md) and decision records live in [docs/](docs/).
 
@@ -366,8 +402,10 @@ Architecture notes, the [roles and access matrix](docs/roles-and-access.md) and 
 backend/        FastAPI app (api, models, schemas, services, ai, integrations, core) + Alembic
 frontend/       React + TypeScript web app
 ml/             synthetic project simulator, training, notebooks, model metrics (see ml/README.md)
-infra/          database bootstrap scripts
-docs/           architecture, decision records, security reviews, model cards
+infra/          database bootstrap scripts, Caddy configuration
+loadtest/       Locust load test and its results
+docs/           architecture, decision records, security reviews, model cards, performance,
+                accessibility, deployment
 .github/        CI, CodeQL, Dependabot, issue and PR templates
 ```
 

@@ -8,6 +8,15 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Upgrading
 
+- **Two-step sign-in (Phase 13).** Company Admins, project managers, quantity surveyors and
+  procurement officers are asked to set it up at their next sign-in, before anything else. Each
+  needs an authenticator app. Set `SITESENSE_MFA_KEY` (32+ characters, different from the JWT
+  secret, kept safe: it decrypts every enrolment) before upgrading; production refuses to start
+  without it.
+- **Mark the demo accounts** on an existing demo or development database: run `python -m app.cli
+  seed-dev` once. Demo mode only skips two-step codes, and the nightly reset only runs, for
+  accounts the seed has marked.
+- Migrations 0017 and 0018 add two-step sign-in and eight indexes.
 - **Link existing client accounts to their projects.** From Phase 12, clients see only the projects
   the Company Admin links them to (Users → the client → *Projects this client can see*), not every
   project on their sites. Until linked, an existing client account sees no projects. There is no
@@ -20,6 +29,28 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Phase 13, hardening and deployment ([ADR 0016](docs/adr/0016-hardening-and-deployment.md)):
+  - **Two-step sign-in** with an authenticator app (time-based codes) and ten single-use recovery
+    codes. Required for Company Admins, project managers, quantity surveyors and procurement
+    officers; optional for site engineers and clients, under **Two-step sign-in** in the account
+    menu. A Company Admin can reset someone's (audited, and never their own). Codes work once, and
+    wrong codes count towards the account lockout.
+  - **Request budgets for every write:** 120 a minute per signed-in user (per IP before sign-in),
+    and smaller ones for what-if and the weekly PDF (20) and report analysis (30, now per user).
+  - **Demo mode** (`SITESENSE_DEMO_MODE`): a "Demo data" notice, emails only logged, the demo
+    accounts skip two-step codes, and a reset to the seeded data every night at 03:00
+    (`python -m app.cli reset-demo` by hand). The demo company now has one project at each risk
+    level.
+  - **A production setup that runs locally:** `docker-compose.prod.yml` with Caddy (HTTPS, one
+    origin), migrations as the schema owner, 4 API workers, and scheduled jobs in their own process
+    (`python -m app.cli run-scheduler`). Step-by-step hosting guide for Render or Railway, Vercel and
+    managed PostgreSQL in [docs/deployment.md](docs/deployment.md).
+  - **A load test** (Locust, `loadtest/`): 50 concurrent users, 0 errors. 95th percentiles: reads
+    280 ms, writes 359 ms, heavy endpoints 974 ms. Results and machine specs in
+    [docs/performance.md](docs/performance.md).
+  - **Accessibility checks on every change:** axe runs on every screen the frontend tests reach, and
+    a test checks the colour contrast of every design-token pair in both themes
+    ([docs/accessibility.md](docs/accessibility.md)).
 - Phase 12, the client portal ([ADR 0015](docs/adr/0015-client-portal.md)):
   - **The portal**, under a simpler top navigation:
     - progress and the S-curve;
@@ -168,11 +199,19 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The purchase-order list loaded each order's lines in a separate query (found by the load test);
+  they now load in one batch.
+- Accessibility: form field borders now meet 3:1 contrast in both themes; error pages have a main
+  landmark; the sidebar and the demo notice are named landmarks; photo alt text no longer repeats
+  the caption shown beside it.
 - Photo uploads kept a JPEG comment from the original file. The re-encode now drops it with every
   other piece of metadata, and copies shown to clients are checked again on the way out.
 
 ### Changed
 
+- The rate limits on BOQ import, photo upload and report analysis count per signed-in user, not
+  per IP, so people sharing an office connection no longer share one budget.
+- Empty environment variables count as not set.
 - BR-06's heavy-rain threshold is now 10 mm or more (it was "over 10 mm"), in the weather strip,
   the risk model's input and the simulator alike.
 - A task's "critical" tick is gone: the critical path is calculated. Tasks can be marked as concrete

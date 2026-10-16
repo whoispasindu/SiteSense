@@ -18,10 +18,13 @@ here, newest first. The baseline design is in [ADR 0003](adr/0003-security-basel
 | IDs | Random UUID primary keys | `models/base.py` | review |
 | API docs | `/api/docs` and OpenAPI disabled in production | `main.py` | `test_api_docs_are_disabled_in_production` |
 | Frontend | `dangerouslySetInnerHTML`, `innerHTML`, `eval` banned by lint; every response Zod-validated; same-origin paths only; `redirect: "error"`; crash page shows no details | `eslint.config.js`, `api/client.ts`, `RouteErrorPage.tsx` | ESLint in CI, `client.test.ts`, `RouteErrorPage.test.tsx` |
-| Containers | Non-root users (API uid 10001, node, nginx-unprivileged); dev ports bound to 127.0.0.1 | Dockerfiles, `docker-compose.yml` | review |
+| Containers | Non-root users (API uid 10001, node, nginx-unprivileged); dev ports bound to 127.0.0.1; production: read-only file systems, only the HTTPS proxy publishes ports, the database unreachable from the host, migrations as the owner in a one-shot container | Dockerfiles, `docker-compose.yml`, `docker-compose.prod.yml` | production stack run locally (Phase 13) |
 | Passwords | argon2id, 12–128 chars, deny-list, no email name; admin-issued one-time passwords must be changed | `core/security.py` | `test_security_unit.py`, `test_temporary_password_must_be_changed_before_anything_else` |
 | Sessions | 15-min JWT in memory; rotating refresh token (hashed, httpOnly, Secure, SameSite=Strict, path-scoped); reuse detection; 30-day cap; `session_version` revocation | `services/auth_service.py`, `api/v1/auth.py` | `test_auth_api.py`, browser check: tokens invisible to scripts, nothing in web storage |
 | Brute force | Lockout after 5 failures (15 min), per-IP rate limits on sign-in, refresh and password change, uniform error and timing | `auth_service.login`, `core/rate_limit.py` | TC-09 test, rate-limit tests |
+| Two-step sign-in | TOTP (RFC 6238) required for Company Admin, PM, QS and Procurement, optional for Site Engineer and Client; a code works once (last step stored); wrong codes count towards the lockout; challenge tokens (5 min, own type) never act as access tokens; secrets AES-GCM-encrypted and bound to the user; 10 recovery codes as keyed hashes, single use; admin reset audited and never for oneself; production refuses enforcement off, the development key or a key equal to the JWT secret | `core/totp.py`, `core/secretbox.py`, `services/mfa_service.py`, `auth_service.verify_second_factor` | `test_mfa.py` (RFC vectors, replay, lockout, reset), `test_config.py`, browser check |
+| Request budgets | Every write: 120 a minute per signed-in user (per IP before sign-in or with a forged token); what-if and weekly PDF 20, report analysis 30, BOQ import 20, photo upload 60 per user; sign-in steps per IP | `api/deps.py: limit_writes, rate_limit`, `api/router.py` | `test_write_limits.py` (every write route in the schema, forged tokens, sign-in not blocked) |
+| Demo mode | Only accounts the seed created skip two-step codes; emails only logged; nightly reset as the schema owner, refused outside demo mode and on a database without seeded demo accounts | `services/demo_service.py`, `integrations/email.py`, `core/scheduler.py` | `test_demo.py` |
 | Authorisation | Permission table; `require_permission` on every endpoint; site scoping returns 404 | `core/permissions.py`, `api/deps.py` | `test_role_matrix.py` (every endpoint × every role), `test_site_scoping.py` |
 | CSRF | SameSite=Strict cookie read only by auth endpoints, plus Origin / Sec-Fetch-Site checks | `require_trusted_origin` | `test_cross_site_login_is_blocked` |
 | Audit | Sign-ins, failures, lockouts, logouts, password changes, admin actions; append-only by grants | `services/audit.py`, migration 0002 | `test_database_guards.py` |
@@ -43,6 +46,146 @@ here, newest first. The baseline design is in [ADR 0003](adr/0003-security-basel
 | AI briefing (LLM) | The model receives only allow-listed facts (`extra="forbid"` models of numbers, enumerated words, project codes and names, rule IDs), built per reader with their own visibility; a fixed instruction; JSON-schema output with codes limited to the reader's projects; answers validated and source counts made by the server; optional key held as `SecretStr` and never logged; one retry, 20 s timeout, rule-based fallback; at most one new answer per reader every 15 minutes | `ai/briefing`, `integrations/llm.py`, `services/briefing_service.py` | `test_briefing_leaks.py` (real SDK request captured for every role), `test_briefing.py`, `test_outbound_calls.py` |
 | Email | Bodies built from the alert's title, a fixed sentence and links only, never its text; subject stripped of line breaks; TLS required in production and an https app link; transactional outbox, five attempts, errors recorded by type only; per-user choices audited; stop-work always sent; the weekly PDF only to cost roles; without SMTP, logged not sent | `services/alerts.py`, `services/channels.py`, `integrations/email.py`, `services/weekly_report.py` | `test_alerts_email.py`, `test_config.py` |
 | Supply chain | Pinned deps, Dependabot (pip, npm, actions, docker), pip-audit, npm audit, dependency review, CodeQL `security-extended`, actions pinned to SHAs, `permissions: contents: read`, `persist-credentials: false` | `.github/` | CI |
+
+## Phase 13 review: 2026-10-16
+
+Scope:
+
+- two-step sign-in (migration 0017) and its screens;
+- request budgets on every write;
+- demo mode and the nightly reset;
+- the production setup (`docker-compose.prod.yml`, Caddy, the scheduler process);
+- indexes (migration 0018) and the purchase-order list;
+- the accessibility checks;
+- the deployment guide.
+
+This review also consolidates the OWASP Top 10 for the whole app, as Phase 13 asks.
+
+### OWASP Top 10 (2021): the whole app
+
+| Risk | What SiteSense does | Verified by |
+| --- | --- | --- |
+| **A01 Broken access control** | A permission on every endpoint, never a role name in a route. Site scoping answers 404, not 403. Clients reach only linked projects, and another client's records answer like missing ones. Segregation of duties (BR-04). The client portal uses separate schemas. Only the PM changes stop-work, handover and photo sharing. Users reach only their own notifications and two-step settings. The admin's two-step reset is never for their own account | `test_role_matrix.py` (every endpoint × every role), `test_site_scoping.py`, `test_client_portal.py` (two clients on one site, schema walk), mutation checks each phase |
+| **A02 Cryptographic failures** | argon2id passwords. Refresh tokens and recovery codes stored only as hashes. Authenticator secrets AES-GCM-encrypted under a key derived per purpose and bound to the user's ID. HSTS and HTTPS-only origins, cookies and email links in production. No secrets in the repository | `test_security_unit.py`, `test_mfa.py` (secretbox, wrong owner), `test_config.py`, Gitleaks in CI |
+| **A03 Injection** | SQLAlchemy with bound parameters only. Pydantic on every input (`extra="forbid"`, lengths, patterns, strict numbers). React text rendering, with `innerHTML` banned by lint. BOQ files parsed without formulas or macros. Email subjects stripped of line breaks. The LLM gets structured facts only | Schema tests per phase, `test_boq_import.py`, `test_briefing_leaks.py`, ESLint in CI |
+| **A04 Insecure design** | Business rules (BR-01 to BR-14) in pure, tested functions. State machines refuse invalid steps (409). Row locks where two people can act at once. Contract changes only through approved variations. The what-if planner stores nothing. Demo mode cannot delete real data (the reset refuses a database without the seeded demo accounts) | `test_rules_*.py`, `test_contract_api.py`, `test_demo.py` |
+| **A05 Security misconfiguration** | Production refuses to start with:<br>• debug on;<br>• wildcard or plain-HTTP origins;<br>• example passwords;<br>• development JWT or MFA keys, or an MFA key equal to the JWT secret;<br>• two-step enforcement off;<br>• insecure cookies;<br>• SMTP without TLS.<br>API docs are off in production. Strict security headers on the API and the web app. Production containers are read-only, and only the proxy is reachable | `test_config.py`, `test_middleware.py`, production stack run locally |
+| **A06 Vulnerable and outdated components** | Pinned dependencies, Dependabot, pip-audit and npm audit on every pull request, dependency review, CodeQL | Final audit results below |
+| **A07 Identification and authentication failures** | 15-minute access tokens held in memory, and rotating refresh tokens with reuse detection. Lockout after 5 failures, counting wrong second-factor codes too. Two-step sign-in for the roles that see costs or run the company: each code works once, and recovery codes are single use. Temporary passwords must be changed. Sessions end on password change, deactivation, role change or a two-step reset | `test_auth_api.py`, `test_mfa.py`, browser check of sign-in, the code step and a recovery code |
+| **A08 Software and data integrity failures** | CI actions pinned to SHAs. Models are JSON data validated before use; the ONNX weights are pinned by SHA-256 and checked twice; no pickle. The audit log is append-only by database grants, and the demo reset needs the schema owner for exactly that reason | `test_risk_model.py`, `test_report_transformer.py`, `test_database_guards.py` |
+| **A09 Security logging and monitoring failures** | JSON logs with request IDs and sensitive keys redacted. The audit log records sign-ins, failures, lockouts, two-step set-up, renewal, removal, resets and challenges, and every approval and admin action, with before and after. Scheduled-job failures are logged without stopping the scheduler | `test_logging.py`, audit assertions across the suites |
+| **A10 Server-side request forgery** | Only three modules may call out: the weather client (fixed host, no redirects, size cap), the Claude SDK (fixed host) and SMTP (configured host). No user-supplied URL is ever fetched | `test_outbound_calls.py`, `test_weather.py` |
+
+### What Phase 13 adds, by risk
+
+- **A01.** The admin reset is in the role matrix (Company Admin only). The six `/auth/mfa`
+  endpoints act only on the caller's own account (`test_mfa.py`): enrolment, renewal and removal
+  are for one's own account only. Removal is refused for required roles. The admin reset is admin-only and never
+  for oneself.
+- **A04 / DoS.** Every write now has a budget per signed-in user. A test calls every write endpoint
+  in the API schema with a budget of one and checks that the second call is refused. Forged tokens
+  count against the IP, and each new forged token gets no fresh budget. The CPU-heavy budgets moved
+  from per IP to per user. Sign-in keeps its own per-IP budgets and is not blocked by an office's
+  other writes.
+- **A07.** Two-step sign-in, as above. A right password with a code still due does not reset the
+  failure count, so alternating the right password with guessed codes still locks the account.
+- **A05.** The production setup runs read-only, with one HTTPS origin and the database hidden. It
+  starts only with real secrets. Empty variables count as unset, so an optional setting left blank
+  cannot fail validation.
+- **Privacy.** Demo mode never sends email, even with a mail server configured. The demo addresses
+  are not real mailboxes.
+
+### Final audit results (16 October 2026)
+
+| Check | Result |
+| --- | --- |
+| pip-audit: backend runtime and dev requirements | No known vulnerabilities |
+| pip-audit: ML pipeline (`ml/requirements.txt`) | No known vulnerabilities |
+| pip-audit: transformer training (`ml/requirements-transformer.txt`) | No known vulnerabilities; `torch` (CPU build from the PyTorch index) cannot be looked up on PyPI, as before |
+| pip-audit: load test (`loadtest/requirements.txt`, Locust 2.46.5) | No known vulnerabilities |
+| npm audit: frontend, with `axe-core` 4.13.0 added | 0 vulnerabilities |
+| Secret patterns (Claude, AWS, GitHub keys, private keys) over tracked files and history | None found; `.env.prod` is git-ignored |
+| Gitleaks over the full history, CodeQL `security-extended` | Run in CI on the pull request |
+
+### Verification beyond unit tests
+
+- **Mutation checks: 22 of 22** deliberate faults fail a test:
+  - a TOTP code accepted twice;
+  - the demo skip applied to every account;
+  - required roles not made to enrol;
+  - an admin resetting their own;
+  - a recovery code reusable;
+  - wrong codes not counted towards lockout;
+  - the password alone signing an enrolled user in;
+  - a challenge token accepted as an access token;
+  - production allowing enforcement off, or an MFA key equal to the JWT secret;
+  - demo mode sending real email;
+  - the demo reset running outside demo mode or on a database without demo accounts;
+  - the nightly reset scheduled outside demo mode;
+  - writes unlimited;
+  - the write budget removed from the API router;
+  - a forged token getting a budget of its own;
+  - sign-in counted in the write budget;
+  - the weekly PDF's heavy budget removed;
+  - the purchase-order list back to one query per order;
+  - an image without alt text (axe);
+  - faint text lightened below 4.5:1 (contrast test).
+
+  The first backend run caught 13 of the 16 then written: one had a pattern that did not match the
+  file and was rerun, and the two survivors showed missing tests:
+  - nothing tried an MFA key equal to the JWT secret;
+  - the forged-token test sent the same token every time.
+
+  Both now have tests.
+- **In the browser** (dev stack, demo mode off for the check):
+  - the demo PM is sent to set-up before anything else;
+  - the QR code and key show;
+  - a code from the key enables two-step sign-in and shows ten recovery codes once;
+  - the security page says it is required and offers no switch-off;
+  - signing out and in asks for a code, and a recovery code signs in;
+  - the audit log records the set-up, the challenge and the sign-in with `second_factor:
+    recovery_code`.
+
+  The dev data was then reset with `reset-demo`.
+- **The production setup** (`docker-compose.prod.yml`), run locally:
+  - with real secrets, the health check answers through Caddy over HTTPS, with HSTS and the strict
+    CSP;
+  - sign-in works on one origin;
+  - `reset-demo` runs from the scheduler container as the owner (7,058 rows and 8 photo files
+    removed, then reseeded);
+  - the 5-minute, 50-user load test ran against it with 0 errors ([performance.md](performance.md)).
+- **Accessibility:** axe on every tested screen, the contrast test and a keyboard pass
+  ([accessibility.md](accessibility.md)).
+
+### Findings fixed during the review
+
+1. **The CPU-heavy budgets were per IP.** An office sharing one connection would have shared one
+   report-analysis budget. They are now per signed-in user.
+2. **The purchase-order list ran one query per order**, each also joining the request, project,
+   item and requester. Found by the load test (95th percentile 1.1 s). The lines now load in one
+   batch, with a test on the query count.
+3. **Form field borders were about 1.6:1**, below WCAG 1.4.11's 3:1, in both themes. Fields now have
+   a border colour of their own.
+4. **Smaller accessibility findings from axe:**
+   - error pages without a main landmark;
+   - two unnamed complementary landmarks;
+   - the demo banner outside any landmark;
+   - an `aria-label` on a plain `div`;
+   - photo alt text repeating the caption.
+5. **The production health check was refused by the API's own host check.** It now sends an
+   allowed host name.
+6. **Optional settings left empty failed validation**, as Compose passes them as empty strings. They
+   now count as unset.
+7. **Two mutation survivors**, now covered by tests (above).
+
+### Open items
+
+- **No public demo yet** (no hosting budget). The deployment guide is ready.
+- **Rate-limit counters are per API process.** With 4 workers, the per-IP sign-in budget is up to 4
+  times looser. Behind two proxies (Vercel, then Render), the per-IP budgets rely on forwarded
+  headers a client can pad. Lockout (in the database) and the per-user budgets are not affected. A
+  shared store such as Redis is the fix if several API machines are needed.
+- **A screen-reader session** belongs in Phase 14's user acceptance tests.
 
 ## Phase 12 review: 2026-10-13
 

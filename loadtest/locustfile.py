@@ -202,7 +202,12 @@ class QuantitySurveyor(SiteSenseUser):
     def price_check(self) -> None:
         self.client.post(
             "/api/v1/material-requests/check",
-            json={"project_id": self.project, "boq_item_id": self.item, "quantity": "500", "unit_price": "402"},
+            json={
+                "project_id": self.project,
+                "boq_item_id": self.item,
+                "quantity": "500",
+                "unit_price": "402",
+            },
             name="W /material-requests/check",
         )
         self.client.put(
@@ -234,7 +239,8 @@ class SiteEngineer(SiteSenseUser):
                 "report_date": SITE_TODAY().isoformat(),
                 "crew_count": 44,
                 "work_done": "Formwork and rebar for the level 4 slab; blockwork on level 2.",
-                "problems": "Cement delivery late again, the mixer stood idle until noon. Rain stopped the pour.",
+                "problems": "Cement delivery late again, the mixer stood idle until noon. Rain stopped the "
+                "pour.",
             },
             name="setup",
             catch_response=True,
