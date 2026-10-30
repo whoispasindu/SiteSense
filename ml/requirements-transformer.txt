@@ -2,10 +2,10 @@
 # Install on top of requirements.txt. Not needed for the risk model, the TF-IDF baseline or the tests.
 # The backend only needs onnxruntime and tokenizers (backend/requirements.txt). CPU-only PyTorch:
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.14.1+cpu
-transformers==5.19.0
+torch==2.15.0+cpu
+transformers==5.21.0
 safetensors==0.8.0
 tokenizers==0.23.3
 onnx==1.23.2
-onnxruntime==1.31.0
+onnxruntime==1.31.1
 onnxscript==0.7.2
