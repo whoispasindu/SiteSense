@@ -19,7 +19,9 @@ Please give us a reasonable time to fix the issue before disclosing it publicly.
 
 ## Supported versions
 
-Until v1.0, only the latest commit on `main` receives security fixes.
+Security fixes go into the latest minor release (for example 1.0.x while 1.0 is the newest, 1.1.x
+after 1.1 is released). Upgrade within a few days of a security release; see
+[docs/self-hosting.md](docs/self-hosting.md#upgrade).
 
 ## What is in place
 

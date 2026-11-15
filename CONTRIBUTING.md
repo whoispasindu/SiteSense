@@ -42,3 +42,11 @@ layer as pure, separately tested functions.
 - [ ] New dependencies are necessary, maintained, and pass `pip-audit` / `npm audit`
 
 Report vulnerabilities privately; see [SECURITY.md](SECURITY.md).
+
+## Licence and the CLA
+
+SiteSense is licensed under the [AGPL-3.0](LICENSE). Before your first pull request is merged, a bot
+asks you to sign the [Contributor Licence Agreement](CLA.md) by leaving a comment; it takes a
+minute and covers all your later contributions. You keep the copyright in your work. The CLA lets
+the project also offer SiteSense as a hosted service, while every published version stays open
+source under the AGPL.

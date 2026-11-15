@@ -68,7 +68,12 @@ everything below for you. By hand:
   the server ([self-hosting.md](self-hosting.md#back-up)). Photos live in the `media` volume, not
   in the database.
 
-## 2. Hosted: API on Render or Railway, web app on Vercel, managed PostgreSQL
+## 2. Other ways to host: API on Render or Railway, web app on Vercel, managed PostgreSQL
+
+The recommended way to run SiteSense for a company is one server of your own, with the release
+images and the setup script: [self-hosting.md](self-hosting.md). This section is an alternative for
+those who prefer managed services; it builds from git, and its images do not include the report
+classifier's transformer model.
 
 ```
 browser ──https──> Vercel (web app, and /api/* rewritten) ──https──> API on Render or Railway ──> managed PostgreSQL

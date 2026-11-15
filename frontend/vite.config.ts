@@ -8,6 +8,7 @@ import { defineConfig, loadEnv, transformWithOxc, type Plugin } from "vite";
 
 const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf-8")) as {
   version: string;
+  repository: { url: string };
 };
 
 // Mirrors the production nginx headers so problems show up in development too.
@@ -74,6 +75,9 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), tailwindcss(), serviceWorker()],
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version),
+      // AGPL-3.0 section 13: people using SiteSense over a network are offered its source. A
+      // company running a changed version sets VITE_SOURCE_URL to where its own source is.
+      __SOURCE_URL__: JSON.stringify(env.VITE_SOURCE_URL || pkg.repository.url),
     },
     server: {
       host: "0.0.0.0",
