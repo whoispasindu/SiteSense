@@ -10,8 +10,8 @@ import { PageHeader } from "../../components/ui/PageHeader";
 import { Sheet } from "../../components/ui/Sheet";
 import { errorText } from "../../features/admin/adminUtils";
 import { VariationStatusBadge, VariationTimeline } from "../../features/contract/ContractBits";
-import { daysText, signedLKR } from "../../features/contract/format";
-import { formatAmount } from "../../lib/money";
+import { daysText, signedMoney } from "../../features/contract/format";
+import { formatMoney } from "../../lib/money";
 import { formatSiteDateTime } from "../../lib/time";
 import { NotFoundPage } from "../NotFoundPage";
 
@@ -44,7 +44,7 @@ export function ClientVariationsPage() {
                 </Link>
               </div>
               <div className="tabular text-right text-sm">
-                <p className="text-ink">{signedLKR(v.contract_change)}</p>
+                <p className="text-ink">{signedMoney(v.contract_change)}</p>
                 <p className="text-ink-faint">{daysText(v.time_impact_days)}</p>
               </div>
               <VariationStatusBadge status={v.status} forClient />
@@ -98,7 +98,7 @@ export function ClientVariationPage() {
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <div className="rounded-lg border border-rule p-4">
                 <p className="text-sm text-ink-faint">Change to your contract</p>
-                <p className="tabular mt-1 text-xl font-semibold text-ink">{signedLKR(v.contract_change)}</p>
+                <p className="tabular mt-1 text-xl font-semibold text-ink">{signedMoney(v.contract_change)}</p>
               </div>
               <div className="rounded-lg border border-rule p-4">
                 <p className="text-sm text-ink-faint">Completion date</p>
@@ -107,7 +107,7 @@ export function ClientVariationPage() {
             </div>
             <p className="mt-4 rounded-md bg-paper-sunk px-3 py-2 text-sm text-ink-soft">
               <span className="font-medium text-ink">Why you are asked: </span>
-              {v.reason_for_client} Changes above LKR {formatAmount(v.limit)}, or to the completion date, need your
+              {v.reason_for_client} Changes above {formatMoney(v.limit)}, or to the completion date, need your
               approval before the work starts.
             </p>
           </Sheet>

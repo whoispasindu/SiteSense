@@ -12,10 +12,11 @@ import { Sheet } from "../../components/ui/Sheet";
 import { errorText } from "../../features/admin/adminUtils";
 import { formatDate } from "../../features/projects/dates";
 import { PriceText, RequestStatusBadge, RuleChecks } from "../../features/materials/MaterialBits";
-import { formatAmount, formatQuantity } from "../../lib/money";
+import { formatMoney, formatQuantity } from "../../lib/money";
 import { formatSiteTime, siteTodayIso } from "../../lib/time";
 import { NotFoundPage } from "../NotFoundPage";
 import { SupplierPanel } from "../../features/materials/SupplierPanel";
+import { currencyCode } from "../../lib/locale";
 
 const ACTION_TEXT: Record<string, string> = {
   submit: "Submitted",
@@ -111,13 +112,13 @@ function DecisionDialog({ request, decision, onClose }: { request: RequestDetail
         ) : null}
         <p className="text-sm text-ink-soft">
           {request.number}: {formatQuantity(request.quantity)} {request.boq_item.unit} of {request.boq_item.description}
-          {request.amount ? `, LKR ${formatAmount(request.amount)}` : ""}
+          {request.amount ? `, ${formatMoney(request.amount)}` : ""}
           {pricePending ? ", price pending" : ""}.
         </p>
         {pricing ? (
           <div className="grid items-start gap-3 sm:grid-cols-[1fr_auto]">
             <TextField
-              label={`Quoted unit price (LKR / ${request.boq_item.unit})`}
+              label={`Quoted unit price (${currencyCode()} / ${request.boq_item.unit})`}
               inputMode="decimal"
               required
               value={price}
@@ -130,7 +131,7 @@ function DecisionDialog({ request, decision, onClose }: { request: RequestDetail
               <div className="rounded-lg border border-dashed border-rule-strong bg-paper-sunk/60 px-3 py-2 sm:mt-6" aria-label="Reference">
                 <p className="text-xs text-ink-faint">Budgeted rate</p>
                 <p className="tabular text-sm font-medium text-ink">
-                  LKR {formatAmount(request.rules.budget_rate)} / {request.boq_item.unit}
+                  {formatMoney(request.rules.budget_rate)} / {request.boq_item.unit}
                 </p>
                 <p className="text-xs text-ink-faint">More than 5% above: PM approves</p>
               </div>
@@ -201,7 +202,7 @@ function EditDialog({ request, onClose }: { request: RequestDetail; onClose: () 
         <div className="grid gap-4 sm:grid-cols-3">
           <TextField label={`Quantity (${request.boq_item.unit})`} inputMode="decimal" value={quantity} onChange={(e) => { setQuantity(e.target.value); }} />
           {pricing ? (
-            <TextField label="Unit price (LKR)" inputMode="decimal" value={price} onChange={(e) => { setPrice(e.target.value); }} />
+            <TextField label={`Unit price (${currencyCode()})`} inputMode="decimal" value={price} onChange={(e) => { setPrice(e.target.value); }} />
           ) : null}
           <TextField label="Needed by" type="date" value={neededBy} onChange={(e) => { setNeededBy(e.target.value); }} />
         </div>
@@ -337,7 +338,7 @@ export function RequestDetailPage() {
               </SectionHeading>
               <p className="text-sm text-ink-soft">
                 {r.order.supplier_name}
-                {r.order.unit_price !== undefined ? ` · LKR ${formatAmount(r.order.unit_price)} / ${r.boq_item.unit}` : ""} · expected{" "}
+                {r.order.unit_price !== undefined ? ` · ${formatMoney(r.order.unit_price)} / ${r.boq_item.unit}` : ""} · expected{" "}
                 {formatDate(r.order.expected_delivery)}
               </p>
               <div aria-hidden="true" className="mt-3 h-2 rounded-full bg-paper-sunk">

@@ -37,12 +37,12 @@ simulator. When the app has no data for an input it takes a neutral value and th
 | `progress_gap_pct`, `progress_rate_trend` | Programme tasks and progress snapshots | 0 (no programme) |
 | `late_deliveries_count`, `avg_lateness_days` | Purchase orders and deliveries | 0 |
 | `rain_days_next_14` | 14-day forecast cache (heavy rain is 10 mm or more, BR-06) | 0 (scaled if fewer days are cached) |
-| `wet_days_ahead` (1.2) | The site's rain climate: for the nearest of seven towns, the share of heavy-rain days in each month (Open-Meteo, 2012 to 2025, `backend/app/ai/risk/rain_climate.json`), summed over the working days from tomorrow to the planned end, at least the next 28 days. Computed locally; nothing is fetched | Sri Lanka's average climate (site without coordinates) |
+| `wet_days_ahead` (1.2) | The site's rain climate: the share of heavy-rain days in each month (Open-Meteo, 2012 to 2025), summed over the working days from tomorrow to the planned end, at least the next 28 days. In Sri Lanka, the nearest of seven towns (`backend/app/ai/risk/rain_climate.json`). Elsewhere, the site's own history, worked out the same way and fetched once with the morning weather refresh (stored on the site; moving the site fetches it again). Scoring itself fetches nothing | The seven towns' average, with a note (site without coordinates, or a site abroad whose history is not fetched yet) |
 | `budget_variance_pct` | Committed requests against the budgeted value of the same quantities | 0 (nothing committed) |
 | `crew_vs_plan_pct` | Daily report crews against the project's planned crew | 0 (no planned crew set) |
 | `missing_reports_14` | Daily reports (BR-07) | |
 | `issues_material_14`, `issues_safety_14`, `issues_design_14` | Issues confirmed by the author in daily reports filed in the last 14 days ([report classifier](model-card-report-issues.md)). Suggestions that were not confirmed never count | 0 |
-| `contract_value_m`, `type_*` | Project | |
+| `contract_value_m`, `type_*` | Project. The contract value in LKR millions: in another currency it is converted with `SITESENSE_RISK_LKR_PER_UNIT` (required unless the currency is LKR), and the driver is shown in the company's own currency | |
 
 **Not used, on purpose: schedule features from the programme** (the critical-path slip of Phase 9).
 The guide suggests them, but the simulator has no task network, so it cannot produce the slip the way
@@ -183,6 +183,14 @@ a site records first, and real issues may carry more than simulated ones.
   (see [Rain](#rain-an-assumption-not-measured-data) for how much it matters). The climate comes from
   the nearest of seven towns, which is coarse for sites far from all of them (the hill country east
   of Kandy, the north-west).
+- **Outside Sri Lanka the model is even less proven.** It was trained on simulated Sri Lankan
+  projects: Sri Lankan rainfall, a six-day working week, and contract values in rupees. A site abroad
+  gets its own rain climate, worked out exactly as the towns' were, but how much rain slows work, and
+  what a large project is, were set for Sri Lanka. The contract value is converted at a fixed rate
+  that the company sets and must keep roughly current; a wrong rate makes projects look bigger or
+  smaller to the model (it is about 7% of the delay forecast's SHAP share, 4.5% of the overrun's).
+  Retraining on a size measure that does not depend on currency would remove the rate (planned in
+  [the release plan](plans/open-source-release.md)).
 
 ## Responsible use
 

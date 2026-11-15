@@ -141,7 +141,7 @@ export type WhatIf = z.infer<typeof whatIfSchema>;
 
 export interface PlannedAction {
   id: ActionId;
-  cost: string | null; // LKR as a decimal string; null when the PM left it blank
+  cost: string | null; // the company's currency, as a decimal string; null when the PM left it blank
 }
 
 /** The planner calculates only (nothing is saved), so it is fetched like any read, keyed by the plan. */

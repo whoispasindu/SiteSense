@@ -16,6 +16,7 @@ import { Button } from "../../components/ui/Button";
 import { Dialog } from "../../components/ui/Dialog";
 import { SelectField, TextField } from "../../components/ui/Field";
 import { errorText } from "../admin/adminUtils";
+import { currencyCode } from "../../lib/locale";
 
 const baseSchema = z.object({
   name: z.string().trim().min(2, "Enter the project name.").max(160),
@@ -26,7 +27,7 @@ const baseSchema = z.object({
     .string()
     .trim()
     .transform((v) => v.replace(/,/g, ""))
-    .refine((v) => /^\d{1,14}(\.\d{1,2})?$/.test(v) && Number(v) > 0, "Enter an amount in LKR, e.g. 1114000000.00"),
+    .refine((v) => /^\d{1,14}(\.\d{1,2})?$/.test(v) && Number(v) > 0, "Enter an amount, e.g. 1114000000.00"),
   start_date: z.iso.date("Choose a start date."),
   planned_end: z.iso.date("Choose a planned end date."),
   description: z
@@ -167,7 +168,7 @@ export function ProjectFormDialog({ open, onClose, project }: ProjectFormDialogP
         </div>
 
         <TextField
-          label="Contract value (LKR)"
+          label={`Contract value (${currencyCode()})`}
           name="contract_value"
           inputMode="decimal"
           defaultValue={project?.contract_value}

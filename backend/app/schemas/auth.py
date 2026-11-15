@@ -33,6 +33,16 @@ class SiteSummary(BaseModel):
     name: str
 
 
+class CompanyLocaleOut(BaseModel):
+    """How the web app writes dates, times and amounts (server settings, the same for everyone)."""
+
+    time_zone: str
+    country: str
+    currency: str
+    currency_decimals: int
+    number_locale: str
+
+
 class MeResponse(BaseModel):
     id: uuid.UUID
     email: str
@@ -47,6 +57,7 @@ class MeResponse(BaseModel):
     mfa_enabled: bool = False
     mfa_setup_required: bool = False  # signed in with the password; must set up two-step sign-in first
     demo_mode: bool = False  # the server runs the demo: show the "Demo data" banner
+    company: CompanyLocaleOut
 
 
 class TokenResponse(BaseModel):

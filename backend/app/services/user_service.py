@@ -299,8 +299,13 @@ def update_site(db: Session, site_id: uuid.UUID, data: SiteUpdate, *, actor: Use
     if site is None:
         raise NotFoundError("Site not found.")
     changes = data.model_dump(exclude_unset=True)
+    moved = any(f in changes and changes[f] != getattr(site, f) for f in ("latitude", "longitude"))
     for field, value in changes.items():
         setattr(site, field, value)
+    if moved:
+        # The rain history belongs to the old coordinates: fetched again by the next weather refresh.
+        site.rain_climate = None
+        site.rain_climate_at = None
     if changes:
         audit.record(
             db, AuditAction.SITE_UPDATED, meta=meta, actor_id=actor.id, target_type="site", target_id=site.id,

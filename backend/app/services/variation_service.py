@@ -27,7 +27,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core import clock
+from app.core import clock, company
 from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from app.core.permissions import Permission, Role, has_permission
 from app.models import BoqItem, BoqSection, BudgetLine, Project, Task, User, VariationEvent, VariationOrder
@@ -209,7 +209,7 @@ def _reason_for_client(variation: VariationOrder) -> str:
     if variation.time_impact_days > 0:
         return f"It changes the completion date by {variation.time_impact_days} days."
     if variation.contract_change is not None and abs(variation.contract_change) > limit:
-        return f"It changes the contract by more than the agreed limit of LKR {limit:,.2f}."
+        return f"It changes the contract by more than the agreed limit of {company.money(limit)}."
     if variation.raised_by_role == "pm":
         return "It was raised by the project manager, so it is approved by you rather than by them."
     return "It was sent to you for approval."

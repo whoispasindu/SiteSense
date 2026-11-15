@@ -1,9 +1,9 @@
 import { useState, type SubmitEvent } from "react";
 
-import { useAddHoliday, useHolidays, useRemoveHoliday } from "../../api/schedule";
+import { useAddHoliday, useHolidayCountries, useHolidays, useImportHolidays, useRemoveHoliday } from "../../api/schedule";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { TextField } from "../../components/ui/Field";
+import { SelectField, TextField } from "../../components/ui/Field";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { Sheet } from "../../components/ui/Sheet";
 import { errorText } from "../../features/admin/adminUtils";
@@ -12,9 +12,18 @@ import { siteTodayIso } from "../../lib/time";
 
 const weekday = new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: "UTC" });
 
+function countryName(code: string): string {
+  try {
+    return new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
 /**
- * Company Admin: the holidays every project's working calendar skips (Poya days, public holidays).
- * Critical path, forecasts and slip count working days, so a missing year makes them optimistic.
+ * Company Admin: the holidays every project's working calendar skips (public holidays and other days
+ * off, such as Poya days in Sri Lanka). Critical path, forecasts and slip count working days, so a
+ * missing year makes them optimistic. A country's public holidays can be imported, then edited.
  */
 export function HolidaysPage() {
   const holidays = useHolidays();
@@ -23,6 +32,19 @@ export function HolidaysPage() {
   const [date, setDate] = useState("");
   const [name, setName] = useState("");
   const nextYear = Number(siteTodayIso().slice(0, 4)) + 1;
+  const countries = useHolidayCountries();
+  const importHolidays = useImportHolidays();
+  const [country, setCountry] = useState<string | null>(null);
+  const [importYear, setImportYear] = useState(String(nextYear));
+  const chosenCountry = country ?? countries.data?.default ?? "";
+  const yearNumber = Number(importYear);
+  const yearValid = Number.isInteger(yearNumber) && yearNumber >= 2000 && yearNumber <= 2100;
+
+  function onImport(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!chosenCountry || !yearValid) return;
+    importHolidays.mutate({ country: chosenCountry, year: yearNumber });
+  }
 
   function onSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -48,15 +70,63 @@ export function HolidaysPage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader
         title="Holidays"
-        description="Days no site works: Poya days and public holidays. Each project's critical path, forecasts and slip skip them, along with the days outside its working week."
+        description="Days no site works: public holidays and any other company days off. Each project's critical path, forecasts and slip skip them, along with the days outside its working week."
       />
       {holidays.data?.missing_next_year ? (
         <Alert tone="warn" title={`No holidays entered for ${String(nextYear)} yet`}>
-          Programmes running into {nextYear} count its Poya days and public holidays as working days until you add them from
-          the official calendar.
+          Programmes running into {nextYear} count its public holidays as working days until you add them: import them below,
+          or add them from the official calendar.
         </Alert>
       ) : null}
       {holidays.isError ? <Alert tone="error">{errorText(holidays.error)}</Alert> : null}
+
+      <Sheet className="p-5">
+        <form onSubmit={onImport} className="flex flex-wrap items-end gap-3" aria-label="Import public holidays">
+          <div className="min-w-48 flex-1">
+            <SelectField
+              label="Country"
+              value={chosenCountry}
+              disabled={!countries.data}
+              onChange={(e) => {
+                setCountry(e.target.value);
+              }}
+            >
+              {(countries.data?.countries ?? []).map((code) => (
+                <option key={code} value={code}>
+                  {countryName(code)}
+                </option>
+              ))}
+            </SelectField>
+          </div>
+          <div className="w-28">
+            <TextField
+              label="Year"
+              inputMode="numeric"
+              value={importYear}
+              onChange={(e) => {
+                setImportYear(e.target.value);
+              }}
+            />
+          </div>
+          <Button type="submit" variant="primary" disabled={!chosenCountry || !yearValid || importHolidays.isPending}>
+            Import public holidays
+          </Button>
+        </form>
+        <p className="mt-2 text-xs text-ink-faint">
+          Adds the country&apos;s published public holidays. Dates you already entered stay as they are; check the list and
+          add any other days your sites do not work.
+        </p>
+        {importHolidays.data ? (
+          <div className="mt-3">
+            <Alert tone={importHolidays.data.added.length ? "success" : "info"}>{importHolidays.data.message}</Alert>
+          </div>
+        ) : null}
+        {importHolidays.isError ? (
+          <div className="mt-3">
+            <Alert tone="error">{errorText(importHolidays.error)}</Alert>
+          </div>
+        ) : null}
+      </Sheet>
 
       <Sheet className="p-5">
         <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3" aria-label="Add a holiday">

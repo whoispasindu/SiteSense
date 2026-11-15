@@ -25,8 +25,9 @@ import { StatusBadge, type Tone } from "../../components/ui/StatusBadge";
 import { errorText } from "../../features/admin/adminUtils";
 import { Br12Notice, SupplierChance } from "../../features/materials/Br12";
 import { formatDate } from "../../features/projects/dates";
-import { formatAmount, formatCompactLKR, formatQuantity } from "../../lib/money";
+import { formatCompactMoney, formatMoney, formatQuantity } from "../../lib/money";
 import { addDaysIso, siteTodayIso } from "../../lib/time";
+import { currencyCode } from "../../lib/locale";
 
 const PO_TONES: Record<PoStatus, Tone> = { issued: "idle", part_delivered: "warn", delivered: "ok" };
 
@@ -43,7 +44,7 @@ function PriceDrift({ approved, quoted }: { approved: string | null; quoted: str
   const tooHigh = pct > 5;
   return (
     <p className={`text-xs ${tooHigh ? "font-medium text-signal-medium" : "text-ink-faint"}`}>
-      Approved LKR {formatAmount(approved)} · {pct > 0 ? "+" : ""}
+      Approved {formatMoney(approved)} · {pct > 0 ? "+" : ""}
       {pct.toFixed(1)}%{tooHigh ? ": over 5%, goes back to the PM (BR-14)" : ""}
     </p>
   );
@@ -63,7 +64,7 @@ function OrderOutcome({ result, onClose }: { result: OrderResult; onClose: () =>
                 <Link to={`/materials/${line.request_id}`} className="hover:underline">
                   {line.number}
                 </Link>{" "}
-                <span className="tabular font-normal text-ink-faint">at LKR {formatAmount(line.unit_price)}</span>
+                <span className="tabular font-normal text-ink-faint">at {formatMoney(line.unit_price)}</span>
               </p>
               {line.rules.map((rule) => (
                 <p key={rule.rule} className="text-ink-soft">
@@ -163,7 +164,7 @@ function OrderDialog({ requests, onClose }: { requests: RequestSummary[]; onClos
                 <PriceDrift approved={r.unit_price ?? null} quoted={prices[r.id] ?? ""} />
               </div>
               <label className="flex items-center gap-2 text-sm">
-                <span className="text-ink-faint">LKR / {r.boq_item.unit}</span>
+                <span className="text-ink-faint">{currencyCode()} / {r.boq_item.unit}</span>
                 <input
                   aria-label={`Unit price for ${r.number}`}
                   inputMode="decimal"
@@ -184,7 +185,7 @@ function OrderDialog({ requests, onClose }: { requests: RequestSummary[]; onClos
         <TextField label="Expected delivery" type="date" min={siteTodayIso()} value={expected} onChange={(e) => { setExpected(e.target.value); }} />
         <TextAreaField label="Notes for the supplier (optional)" rows={2} maxLength={2000} value={notes} onChange={(e) => { setNotes(e.target.value); }} />
         <div className="flex items-center justify-between gap-3 border-t border-rule pt-4">
-          <p className="tabular text-sm font-medium text-ink">Total LKR {formatAmount(total.toFixed(2))}</p>
+          <p className="tabular text-sm font-medium text-ink">Total {formatMoney(total.toFixed(2))}</p>
           <div className="flex gap-3">
             <Button onClick={onClose}>Back</Button>
             <Button type="submit" variant="primary" disabled={create.isPending}>
@@ -261,7 +262,7 @@ function ReadyToOrder() {
                       <p className="tabular text-xs text-ink-faint">{formatQuantity(r.quantity)} {r.boq_item.unit}</p>
                     </td>
                     <td className="tabular px-4 py-3 text-right font-medium whitespace-nowrap text-ink">
-                      {r.amount ? formatCompactLKR(r.amount) : "—"}
+                      {r.amount ? formatCompactMoney(r.amount) : "—"}
                     </td>
                     <td className="tabular px-4 py-3 whitespace-nowrap text-ink-soft">{formatDate(r.needed_by)}</td>
                   </tr>
@@ -332,7 +333,7 @@ export function PurchaseOrdersPage() {
                     {po.project.name} · expected {formatDate(po.expected_delivery)}
                   </span>
                 </span>
-                {po.total !== undefined ? <span className="tabular font-medium text-ink">{formatCompactLKR(po.total)}</span> : null}
+                {po.total !== undefined ? <span className="tabular font-medium text-ink">{formatCompactMoney(po.total)}</span> : null}
                 <PoStatusBadge status={po.status} />
               </Link>
             </li>

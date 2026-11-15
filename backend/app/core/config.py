@@ -5,8 +5,10 @@ Secrets are typed as ``SecretStr`` so they never appear in logs or reprs. Unsafe
 silently accepted.
 """
 
+from decimal import Decimal
 from functools import lru_cache
 from typing import Annotated, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import Request
 from pydantic import Field, PostgresDsn, SecretStr, field_validator, model_validator
@@ -119,6 +121,22 @@ class Settings(BaseSettings):
     digest_hour: int = Field(default=18, ge=0, le=23)
     digest_minute: int = Field(default=30, ge=0, le=59)
 
+    # --- The company's country, time zone and currency ----------------------------------------
+    # Set once when SiteSense is installed (the setup script asks). "Today" on site, every scheduled
+    # job and the weather follow the time zone; changing it needs a restart of the API and scheduler.
+    time_zone: str = "Asia/Colombo"
+    # ISO 3166 country code: the default for importing public holidays.
+    country: str = Field(default="LK", pattern=r"^[A-Z]{2}$")
+    # ISO 4217 currency code. Amounts are never converted: set it before the first project.
+    currency: str = Field(default="LKR", pattern=r"^[A-Z]{3}$")
+    # How numbers are written (a BCP 47 locale such as en-GB or de-DE).
+    number_locale: str = Field(default="en-LK", pattern=r"^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$")
+    # The risk model was trained on contract values in Sri Lankan rupees: how many LKR one unit of
+    # the currency is worth, for the model's contract-size input only. Required unless LKR.
+    risk_lkr_per_unit: Decimal | None = Field(default=None, gt=0, le=Decimal("1000000"))
+    # The rain history fetched once per site outside Sri Lanka (Open-Meteo archive, about 14 years).
+    climate_timeout_seconds: float = Field(default=30.0, gt=0, le=120)
+
     @field_validator("cors_origins", "allowed_hosts", mode="before")
     @classmethod
     def _split_csv(cls, value: object) -> object:
@@ -139,6 +157,31 @@ class Settings(BaseSettings):
         if value is not None:
             PostgresDsn(value.get_secret_value())
         return value
+
+    @field_validator("time_zone")
+    @classmethod
+    def _validate_time_zone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError(f"unknown time zone {value!r} (use an IANA name such as Europe/London)") from exc
+        return value
+
+    @model_validator(mode="after")
+    def _check_risk_rate(self) -> "Settings":
+        if self.currency == "LKR":
+            if self.risk_lkr_per_unit not in (None, Decimal(1)):
+                raise ValueError("risk_lkr_per_unit must be 1 (or unset) when the currency is LKR")
+        elif self.risk_lkr_per_unit is None:
+            raise ValueError(
+                f"set SITESENSE_RISK_LKR_PER_UNIT: how many Sri Lankan rupees one {self.currency} is worth "
+                "(the risk model was trained on contract values in LKR)"
+            )
+        return self
+
+    @property
+    def lkr_per_unit(self) -> Decimal:
+        return self.risk_lkr_per_unit or Decimal(1)
 
     @model_validator(mode="after")
     def _reject_unsafe_production_config(self) -> "Settings":

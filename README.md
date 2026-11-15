@@ -31,8 +31,8 @@ them, and clients see honest progress without internal costs.
 
 - Six roles with their own permissions: Admin, Project Manager, Quantity Surveyor, Site Engineer, Procurement Officer, Client
 - Projects, BOQ import and budget lines, with planned against actual progress
-- A programme with a critical path, forecast handover and slip, worked out in working days (Poya
-  days and public holidays off), plus heavy-rain warnings for concrete pours and stop-work flags
+- A programme with a critical path, forecast handover and slip, worked out in working days (public
+  holidays off, imported for the company's country; Poya days in Sri Lanka), plus heavy-rain warnings for concrete pours and stop-work flags
   that hold back the tasks they stop
 - Daily site reports with photos and weather filled in automatically
 - Materials workflow from request to delivery, driven by 12 business rules
@@ -128,7 +128,7 @@ company's data.
 | Quantity Surveyor | `qs@sitesense.example` | Enter the quoted price at the QS check and watch BR-01 and BR-13 decide who approves; price variation VO-0003; make a progress claim and see BR-08 calculate it; budget forecast |
 | Site Engineer | `engineer@sitesense.example` | File today's daily report for Havelock and write a problem or two: the AI check tags them for you to confirm (a safety issue can flag stop-work on chosen tasks); raise a material request |
 | Procurement Officer | `procurement@sitesense.example` | Order approved requests (choose Ceylon Formwork Hire for MR-0003 and BR-12 suggests a more reliable supplier), record deliveries, manage suppliers |
-| Company Admin | `admin@sitesense.example` | Users (link client accounts to their projects), sites, holidays, each project's variation limit (BR-09) and the audit log |
+| Company Admin | `admin@sitesense.example` | Users (link client accounts to their projects), sites, holidays (import next year's public holidays), each project's variation limit (BR-09) and the audit log |
 | Client | `client@sitesense.example` | The portal for Havelock Residences (the only project linked to this account): progress, the published handover date and why it moved, milestones, shared photos and payments; approve or query VO-0002, a roof plant room with a 10-day time impact (TC-10) |
 
 <p>
@@ -298,6 +298,10 @@ Backend settings are environment variables prefixed with `SITESENSE_`
 | `SITESENSE_EMAIL_FROM` | Sender of alert emails | `SiteSense <no-reply@sitesense.example>` |
 | `SITESENSE_APP_BASE_URL` | Where links in emails point (https in production) | `http://localhost:5173` |
 | `SITESENSE_DIGEST_HOUR` / `SITESENSE_DIGEST_MINUTE` | Evening digest time, site time | `18` / `30` |
+| `SITESENSE_COUNTRY` | ISO country code: the default for importing public holidays | `LK` |
+| `SITESENSE_TIME_ZONE` | The company's time zone: "today" on site and every scheduled job (restart to change) | `Asia/Colombo` |
+| `SITESENSE_CURRENCY` / `SITESENSE_NUMBER_LOCALE` | Currency code on every amount, and how numbers are written. Amounts are never converted: set before the first project | `LKR` / `en-LK` |
+| `SITESENSE_RISK_LKR_PER_UNIT` | Required unless the currency is LKR: Sri Lankan rupees per unit of your currency, for the risk model's contract-size input (it was trained in LKR) | unset |
 
 In production the API refuses to start with debug on, wildcard or plain-HTTP origins, the
 example database password, a plain-HTTP `SITESENSE_APP_BASE_URL`, a mail server without TLS, the
@@ -428,6 +432,7 @@ docs/           architecture, decision records, security reviews, model cards, p
 | 12 | Client portal | Done |
 | 13 | Hardening and deployment | In review |
 | 14 | Testing, UAT and evaluation → **v1.0** | Planned |
+| After 14 | Open-source release for self-hosting, then a hosted cloud service ([plan](docs/plans/open-source-release.md)) | Planned |
 | Later | Public demo: a hosted instance with seeded data | Planned |
 
 After v1.0: an offline-first mobile app for site engineers, voice input in Sinhala, Tamil

@@ -93,10 +93,11 @@ def records(db: Session, today: date) -> tuple[dict[uuid.UUID, Record], Record]:
 
 
 def _wet_share(project: Project | None, expected: date) -> float:
-    if project is None or project.site.latitude is None or project.site.longitude is None:
+    if project is None:
         town = climate.national_average()
     else:
-        town = climate.nearest(project.site.latitude, project.site.longitude).town
+        site = project.site
+        town = climate.for_site(site.latitude, site.longitude, site.rain_climate).town
     return town.heavy_day_share[expected.month - 1]
 
 

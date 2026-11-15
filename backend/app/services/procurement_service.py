@@ -475,7 +475,7 @@ def record_delivery(
         raise BusinessRuleError("That request is not on this purchase order.")
     if data.delivered_on > clock.site_today():
         raise BusinessRuleError("A delivery cannot be dated in the future.")
-    if data.delivered_on < po.issued_at.astimezone(clock.SITE_TIME_ZONE).date():
+    if data.delivered_on < po.issued_at.astimezone(clock.site_zone()).date():
         raise BusinessRuleError("A delivery cannot be dated before the order was issued.")
     remaining = line.quantity - _delivered(line)
     if data.quantity > remaining:

@@ -11,6 +11,7 @@ import { errorText } from "../../features/admin/adminUtils";
 import { BudgetPanel } from "../../features/materials/BudgetPanel";
 import { formatAmount, formatQuantity, toNumber } from "../../lib/money";
 import { useCurrentProject } from "./projectContext";
+import { currencyCode } from "../../lib/locale";
 
 type Section = Boq["sections"][number];
 
@@ -28,7 +29,7 @@ function BudgetEditor({ projectId, section, onDone }: { projectId: string; secti
   return (
     <form onSubmit={onSubmit} className="flex flex-wrap items-center justify-end gap-2">
       <label className="sr-only" htmlFor={`budget-${section.id}`}>
-        Budget for section {section.code}, LKR
+        Budget for section {section.code}, {currencyCode()}
       </label>
       <input
         id={`budget-${section.id}`}
@@ -199,9 +200,9 @@ export function BoqPage() {
     data.boq_total !== undefined && data.budget_total !== undefined
       ? [
           ["Items", String(data.item_count)],
-          ["BOQ value (LKR)", formatAmount(data.boq_total)],
-          ...(varied !== 0 ? ([["Approved variations (LKR)", formatAmount(varied)]] as [string, string][]) : []),
-          ["Cost budget (LKR)", formatAmount(data.budget_total)],
+          [`BOQ value (${currencyCode()})`, formatAmount(data.boq_total)],
+          ...(varied !== 0 ? ([[`Approved variations (${currencyCode()})`, formatAmount(varied)]] as [string, string][]) : []),
+          [`Cost budget (${currencyCode()})`, formatAmount(data.budget_total)],
           ["Margin", `${margin.toFixed(1)}%`],
         ]
       : [

@@ -8,7 +8,7 @@ import {
   type VariationStatus,
 } from "../../api/contract";
 import { StatusBadge, type Tone } from "../../components/ui/StatusBadge";
-import { formatAmount, toNumber } from "../../lib/money";
+import { formatMoney, toNumber } from "../../lib/money";
 import { formatSiteDateTime } from "../../lib/time";
 
 const CLAIM_TONES: Record<ClaimStatus, Tone> = { submitted: "warn", approved: "ok", returned: "idle", paid: "ok" };
@@ -43,7 +43,7 @@ export function ClaimCalculation({ figures, caption }: { figures: ClaimFigures; 
     {
       label: "Certified to date",
       value: figures.certified_value,
-      sub: `${figures.certified_pct}% of the contract value, LKR ${formatAmount(figures.contract_value)}`,
+      sub: `${figures.certified_pct}% of the contract value, ${formatMoney(figures.contract_value)}`,
     },
     { label: `Less retention (${retentionPct})`, value: figures.retention, minus: true, sub: "Held until the defects period ends" },
     { label: "Less previous claims", value: figures.previous_claims, minus: true, sub: "Approved claims so far" },
@@ -59,7 +59,7 @@ export function ClaimCalculation({ figures, caption }: { figures: ClaimFigures; 
               {row.sub ? <span className="block text-xs text-ink-faint">{row.sub}</span> : null}
             </th>
             <td className="tabular py-2 text-right whitespace-nowrap text-ink">
-              {row.minus ? "− " : ""}LKR {formatAmount(row.value)}
+              {row.minus ? "− " : ""}{formatMoney(row.value)}
             </td>
           </tr>
         ))}
@@ -69,7 +69,7 @@ export function ClaimCalculation({ figures, caption }: { figures: ClaimFigures; 
             <span className="block text-xs font-normal text-ink-faint">BR-08: never more than certified progress less retention and previous claims</span>
           </th>
           <td className="tabular border-t-2 border-ink pt-3 text-right text-lg font-semibold whitespace-nowrap text-ink">
-            LKR {formatAmount(figures.amount)}
+            {formatMoney(figures.amount)}
           </td>
         </tr>
       </tbody>

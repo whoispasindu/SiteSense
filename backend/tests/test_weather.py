@@ -183,7 +183,7 @@ def opener(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
             raise state["error"]
         return _FakeResponse(state["body"])
 
-    monkeypatch.setattr(provider._OPENER, "open", fake_open)
+    monkeypatch.setattr(provider.NO_REDIRECT_OPENER, "open", fake_open)
     return state
 
 

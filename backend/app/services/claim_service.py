@@ -21,7 +21,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core import clock
+from app.core import clock, company
 from app.core.errors import BusinessRuleError, ConflictError, ForbiddenError, NotFoundError
 from app.core.permissions import Permission, Role, has_permission
 from app.models import BoqSection, ClaimStatus, ProgressClaim, ProgressClaimLine, Project, User
@@ -299,7 +299,7 @@ def create(
                 user_id=pm.id,
                 kind="claim_submitted",
                 title=f"{claim.number} waiting for approval",
-                body=f"{project.code}: LKR {claim.amount:,.2f} after retention, certified "
+                body=f"{project.code}: {company.money(claim.amount)} after retention, certified "
                 f"{figures.certified_pct.quantize(Decimal('0.1'))}% by {user.full_name}.",
                 link=f"/projects/{project.id}/claims",
                 project_id=project.id,
@@ -370,7 +370,7 @@ def record_payment(
     if claim.status != ClaimStatus.APPROVED.value:
         raise ConflictError("Only an approved, unpaid claim can be marked paid.")
     today = clock.site_today()
-    approved_on = claim.decided_at.astimezone(clock.SITE_TIME_ZONE).date() if claim.decided_at else today
+    approved_on = claim.decided_at.astimezone(clock.site_zone()).date() if claim.decided_at else today
     if not approved_on <= data.paid_on <= today:
         raise BusinessRuleError(
             f"The payment date must be between the approval ({approved_on:%d %b %Y}) and today."

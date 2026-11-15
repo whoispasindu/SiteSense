@@ -326,7 +326,7 @@ def test_a_year_without_holidays_is_warned_about(
 def stop(
     db: Session, project: Project, author: User, scope: str, tasks: list[Task], since: date
 ) -> ReportAction:
-    at = datetime.combine(since, datetime.min.time(), clock.SITE_TIME_ZONE)
+    at = datetime.combine(since, datetime.min.time(), clock.site_zone())
     report = DailyReport(
         project_id=project.id, author_id=author.id, report_date=since, crew_count=5,
         work_done="Work on site today.", submitted_at=at,
@@ -416,7 +416,7 @@ def test_br11_a_cleared_flag_stops_counting_from_the_day_it_is_cleared(
     a = task(db, project, "A", date(2026, 1, 5), date(2026, 1, 16), pct="40", actual_start=date(2026, 1, 5))
     flag = stop(db, project, engineer_user, "tasks", [a], date(2026, 1, 13))  # Tuesday
     flag.status = "done"
-    flag.closed_at = datetime.combine(date(2026, 1, 15), datetime.min.time(), clock.SITE_TIME_ZONE)  # Thu
+    flag.closed_at = datetime.combine(date(2026, 1, 15), datetime.min.time(), clock.site_zone())  # Thu
     db.commit()
 
     monday = network_service.analyse(db, project, today=date(2026, 1, 19))

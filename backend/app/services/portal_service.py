@@ -263,7 +263,7 @@ def claims_view(db: Session, user: User, project_id: uuid.UUID) -> ClientClaims:
             retention=c.retention,
             previous_claims=c.previous_claims,
             amount=c.amount,
-            approved_on=(c.decided_at or c.submitted_at).astimezone(clock.SITE_TIME_ZONE).date(),
+            approved_on=(c.decided_at or c.submitted_at).astimezone(clock.site_zone()).date(),
             paid_on=c.paid_on,
         )
         for c in claims

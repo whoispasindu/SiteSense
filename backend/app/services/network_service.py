@@ -58,7 +58,7 @@ MAX_LINKS_PER_PROJECT = 2000  # four per task at the 500-task limit
 
 
 def _site_date(moment: object) -> date:
-    return moment.astimezone(clock.SITE_TIME_ZONE).date()  # type: ignore[attr-defined, no-any-return]
+    return moment.astimezone(clock.site_zone()).date()  # type: ignore[attr-defined, no-any-return]
 
 
 # --- BR-11: what stop-work flags stop ------------------------------------------------------------------
@@ -280,7 +280,7 @@ def analyse(db: Session, project: Project, today: date | None = None) -> Network
     last = max([d for d in (forecast_end, project.planned_end, planned.finish) if d is not None])
     first = min([project.start_date, *(t.planned_start for t in tasks)])
     warnings = [
-        f"No holidays are entered for {year}: its Poya days and public holidays count as working days. "
+        f"No holidays are entered for {year}: its public holidays count as working days. "
         "The Company Admin can add them."
         for year in calendar_service.missing_years(db, first, last)
     ]

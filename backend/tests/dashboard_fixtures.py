@@ -87,7 +87,7 @@ class World:
 
 
 def at(day: date, hour: int = 9) -> datetime:
-    return datetime(day.year, day.month, day.day, hour, tzinfo=clock.SITE_TIME_ZONE).astimezone(UTC)
+    return datetime(day.year, day.month, day.day, hour, tzinfo=clock.site_zone()).astimezone(UTC)
 
 
 @pytest.fixture

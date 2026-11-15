@@ -19,7 +19,7 @@ import { errorText } from "../../features/admin/adminUtils";
 import { ClaimCalculation, ClaimStatusBadge } from "../../features/contract/ContractBits";
 import { paidText } from "../../features/contract/format";
 import { KpiTile } from "../../features/projects/ProjectBits";
-import { formatAmount, formatCompactLKR, toNumber } from "../../lib/money";
+import { formatCompactMoney, formatMoney, toNumber } from "../../lib/money";
 import { formatSiteDateTime, siteTodayIso } from "../../lib/time";
 import { useDebounced } from "../../lib/useDebounced";
 import { useCurrentProject } from "./projectContext";
@@ -98,7 +98,7 @@ function NewClaim({ projectId, sections, onDone }: { projectId: string; sections
                         {s.name}
                       </th>
                       <td className="tabular hidden py-2 pr-3 text-right text-ink-soft sm:table-cell">
-                        {formatCompactLKR(s.section_value)}
+                        {formatCompactMoney(s.section_value)}
                       </td>
                       <td className="tabular py-2 pr-3 text-right text-ink-soft">{s.previous_pct}%</td>
                       <td className="py-2 text-right">
@@ -262,8 +262,8 @@ function ClaimCard({ projectId, claim }: { projectId: string; claim: Claim }) {
             {claim.status === "paid" || claim.status === "approved" ? paidText(claim.paid_on) : "not yet approved"}
           </p>
         </div>
-        <p className="tabular text-right text-xl font-semibold text-ink" title={`LKR ${formatAmount(claim.figures.amount)}`}>
-          {formatCompactLKR(claim.figures.amount)}
+        <p className="tabular text-right text-xl font-semibold text-ink" title={formatMoney(claim.figures.amount)}>
+          {formatCompactMoney(claim.figures.amount)}
           <span className="block text-xs font-normal text-ink-faint">after retention</span>
         </p>
       </div>
@@ -329,9 +329,9 @@ export function ProjectClaims() {
   return (
     <div className="space-y-8">
       <div className="grid gap-4 sm:grid-cols-3">
-        <KpiTile icon="cost" label="Claimed to date" value={formatCompactLKR(data.claimed_to_date)} note="Approved claims, after retention" />
-        <KpiTile icon="materials" label="Retention held" value={formatCompactLKR(data.retention_held)} note="5% of certified work (BR-08)" />
-        <KpiTile icon="reports" label="Paid to date" value={formatCompactLKR(data.paid_to_date)} note="Claims marked paid by the QS" />
+        <KpiTile icon="cost" label="Claimed to date" value={formatCompactMoney(data.claimed_to_date)} note="Approved claims, after retention" />
+        <KpiTile icon="materials" label="Retention held" value={formatCompactMoney(data.retention_held)} note="5% of certified work (BR-08)" />
+        <KpiTile icon="reports" label="Paid to date" value={formatCompactMoney(data.paid_to_date)} note="Claims marked paid by the QS" />
       </div>
 
       <section aria-labelledby="claims-heading" className="space-y-4">

@@ -25,6 +25,8 @@ from typing import Literal
 
 from openpyxl import load_workbook
 
+from app.core import company
+
 MAX_FILE_BYTES = 5 * 1024 * 1024
 MAX_DATA_ROWS = 5000
 MAX_COLUMNS = 30
@@ -40,7 +42,8 @@ Column = Literal[
     "section_code", "section_name", "item_code", "description", "unit", "quantity", "rate", "budget_rate"
 ]
 
-# Accepted header spellings, compared after lower-casing and dropping punctuation and "(LKR)".
+# Accepted header spellings, compared after lower-casing and dropping punctuation and the currency
+# ("(LKR)", or the company's own currency code).
 HEADER_ALIASES: dict[Column, tuple[str, ...]] = {
     "section_code": ("section code", "section", "section no", "section ref", "sec"),
     "section_name": ("section name", "section title", "section description"),
@@ -197,7 +200,9 @@ def _csv_rows(content: bytes) -> Iterator[tuple[int, list[object]]]:
 
 
 def _normalise_header(value: object) -> str:
-    text = str(value or "").lower().replace("(lkr)", "").replace("lkr", "")
+    text = str(value or "").lower()
+    for code in {"lkr", company.current().currency.lower()}:
+        text = text.replace(f"({code})", "").replace(code, "")
     return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", text)).strip()
 
 
@@ -224,7 +229,7 @@ def _text(value: object) -> str:
 
 
 def _number(value: object, *, places: int, maximum: Decimal) -> tuple[Decimal | None, str | None]:
-    """Return (value, error). Accepts numbers and text like "1,250.50" or "LKR 1,250"."""
+    """Return (value, error). Accepts numbers and text like "1,250.50", "LKR 1,250" or the company's code."""
     if value is None or (isinstance(value, str) and not value.strip()):
         return None, "Required."
     if isinstance(value, bool):
@@ -232,7 +237,8 @@ def _number(value: object, *, places: int, maximum: Decimal) -> tuple[Decimal | 
     if isinstance(value, int | float | Decimal):
         raw = str(value)
     else:
-        raw = re.sub(r"(?i)^\s*(lkr|rs\.?)\s*", "", str(value)).replace(",", "").strip()
+        code = re.escape(company.current().currency)
+        raw = re.sub(rf"(?i)^\s*(lkr|rs\.?|{code})\s*", "", str(value)).replace(",", "").strip()
         if raw.startswith("="):
             return None, "Formula without a saved value. Open the file in Excel and save it again."
     try:

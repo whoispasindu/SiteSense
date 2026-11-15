@@ -8,9 +8,10 @@ import { errorText } from "../admin/adminUtils";
 import { formatDate } from "../projects/dates";
 import { RiskBadge } from "./RiskBits";
 import { delayRangeText, delayText, overrunRangeText, overrunText, savedCostText, savedDaysText, scoreRangeText } from "./risk";
+import { formatMoneyWhole } from "../../lib/money";
+import { currencyCode } from "../../lib/locale";
 
 const MONEY = /^\d{1,13}(\.\d{1,2})?$/;
-const lkr = new Intl.NumberFormat("en-LK", { maximumFractionDigits: 0 });
 
 function ForecastBlock({ title, forecast }: { title: string; forecast: Forecast }) {
   return (
@@ -101,7 +102,7 @@ export function WhatIfPlanner({ projectId }: { projectId: string }) {
                     {selected.includes(a.id) ? (
                       <div className="mt-3 flex flex-wrap items-end gap-3 pl-7">
                         <label htmlFor={inputId} className="text-sm">
-                          <span className="mb-1 block font-medium text-ink">Estimated cost (LKR)</span>
+                          <span className="mb-1 block font-medium text-ink">Estimated cost ({currencyCode()})</span>
                           <input
                             id={inputId}
                             inputMode="decimal"
@@ -126,8 +127,8 @@ export function WhatIfPlanner({ projectId }: { projectId: string }) {
                             : a.cost === null
                               ? "Cost not entered: not counted in the cost forecast."
                               : a.cost_pct === null
-                                ? `LKR ${lkr.format(Number(a.cost))}: no cost budget to compare with.`
-                                : `LKR ${lkr.format(Number(a.cost))}, ${a.cost_pct.toFixed(1)}% of the cost budget.`}
+                                ? `${formatMoneyWhole(a.cost)}: no cost budget to compare with.`
+                                : `${formatMoneyWhole(a.cost)}, ${a.cost_pct.toFixed(1)}% of the cost budget.`}
                         </p>
                       </div>
                     ) : null}

@@ -75,6 +75,9 @@ model if it earns it.
 - **Company-wide records.** A supplier's record pools every site's orders. Users see only the rate,
   never another site's orders.
 - **The 80% starting rate** for a company with no history is an assumption.
+- **Wet-season effect outside Sri Lanka.** The month's rain comes from the same climate as the risk
+  model's (the nearest Sri Lankan town, or a site abroad's own history), but the effect's size was
+  set for Sri Lankan monsoons.
 
 ## Data
 

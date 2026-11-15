@@ -15,6 +15,8 @@ from typing import Protocol
 
 from pydantic import BaseModel, Field, ValidationError
 
+from app.core import clock
+
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 MAX_RESPONSE_BYTES = 64 * 1024
 
@@ -64,7 +66,7 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-_OPENER = urllib.request.build_opener(_NoRedirect)
+NO_REDIRECT_OPENER = urllib.request.build_opener(_NoRedirect)
 
 
 class OpenMeteoClient:
@@ -78,7 +80,7 @@ class OpenMeteoClient:
                 "longitude": f"{longitude:.4f}",
                 "daily": "weather_code,temperature_2m_max,temperature_2m_min,"
                 "precipitation_sum,precipitation_probability_max",
-                "timezone": "Asia/Colombo",
+                "timezone": clock.site_zone().key,
                 "forecast_days": str(days),
             }
         )
@@ -87,7 +89,7 @@ class OpenMeteoClient:
             f"{OPEN_METEO_URL}?{query}", headers={"User-Agent": "SiteSense"}
         )
         try:
-            with _OPENER.open(request, timeout=self.timeout) as response:
+            with NO_REDIRECT_OPENER.open(request, timeout=self.timeout) as response:
                 raw = response.read(MAX_RESPONSE_BYTES + 1)
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             raise WeatherUnavailableError(str(exc)) from exc

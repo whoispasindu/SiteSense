@@ -206,6 +206,13 @@ class HolidayIn(BaseModel):
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=80)]
 
 
+class HolidayImportIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    country: Annotated[str, StringConstraints(pattern=r"^[A-Z]{2}$")]
+    year: Annotated[int, Field(ge=2000, le=2100)]
+
+
 class HolidayOut(BaseModel):
     id: uuid.UUID
     holiday_date: date
@@ -216,3 +223,16 @@ class HolidayList(BaseModel):
     holidays: list[HolidayOut]
     years: list[int]  # years that have at least one holiday
     missing_next_year: bool  # warn the Company Admin when next year's list is not entered
+
+
+class HolidayImportOut(BaseModel):
+    country: str
+    year: int
+    added: list[HolidayOut]
+    already_entered: int  # dates that were already holidays, left as they were
+    message: str
+
+
+class HolidayCountries(BaseModel):
+    countries: list[str]  # ISO 3166 codes with public-holiday data, for the import
+    default: str  # the company's country (SITESENSE_COUNTRY)

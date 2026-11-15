@@ -90,7 +90,9 @@ class WhatIfActionIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: ActionId
-    cost: Money | None = None  # the PM's estimate of what the action costs (LKR); None: not entered
+    cost: Money | None = (
+        None  # the PM's estimate of what the action costs (company currency); None: not entered
+    )
 
 
 class WhatIfIn(BaseModel):

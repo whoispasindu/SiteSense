@@ -25,6 +25,7 @@ from app.core import clock
 from app.core.config import Settings
 from app.core.database import Database
 from app.core.logging import get_logger
+from app.integrations.climate import ClimateClient, OpenMeteoArchiveClient
 from app.integrations.weather import WeatherClient, WeatherUnavailableError
 from app.models import Site
 from app.services import (
@@ -32,6 +33,7 @@ from app.services import (
     channels,
     cost_service,
     network_service,
+    rain_climate,
     report_service,
     risk_service,
     weather,
@@ -48,8 +50,13 @@ def run_report_reminders(session_factory: Callable[[], Session]) -> int:
     return created
 
 
-def refresh_weather(session_factory: Callable[[], Session], client: WeatherClient) -> int:
+def refresh_weather(
+    session_factory: Callable[[], Session], client: WeatherClient, climate_client: ClimateClient | None = None
+) -> int:
+    """The 14-day forecast for every located site, and the rain history of sites that need one."""
     refreshed = 0
+    if climate_client is not None:
+        refresh_rain_climates(session_factory, climate_client)
     with session_factory() as db:
         located = (Site.is_active.is_(True), Site.latitude.is_not(None), Site.longitude.is_not(None))
         sites = db.scalars(select(Site).where(*located)).all()
@@ -62,6 +69,21 @@ def refresh_weather(session_factory: Callable[[], Session], client: WeatherClien
                 log.warning("weather_refresh_failed", site=site.code, reason=str(exc)[:200])
     log.info("weather_refreshed", sites=refreshed)
     return refreshed
+
+
+def refresh_rain_climates(session_factory: Callable[[], Session], client: ClimateClient) -> int:
+    fetched = 0
+    with session_factory() as db:
+        for site in rain_climate.sites_needing_climate(db):
+            try:
+                rain_climate.refresh(db, site, client)
+                fetched += 1
+            except WeatherUnavailableError as exc:
+                db.rollback()
+                log.warning("rain_climate_failed", site=site.code, reason=str(exc)[:200])
+    if fetched:
+        log.info("rain_climates_fetched", sites=fetched)
+    return fetched
 
 
 def run_risk_scoring(session_factory: Callable[[], Session]) -> int:
@@ -117,60 +139,65 @@ def _guarded(name: str, job: Callable[[], object]) -> Callable[[], None]:
 
 
 def build_scheduler(settings: Settings, database: Database, client: WeatherClient) -> BackgroundScheduler:
-    scheduler = BackgroundScheduler(timezone=clock.SITE_TIME_ZONE)
+    scheduler = BackgroundScheduler(timezone=clock.site_zone())
+    climate_client = (
+        OpenMeteoArchiveClient(settings.climate_timeout_seconds) if settings.weather_enabled else None
+    )
     common = {"coalesce": True, "max_instances": 1, "misfire_grace_time": 3600, "replace_existing": True}
     scheduler.add_job(
         _guarded("report_reminders", lambda: run_report_reminders(database.session_factory)),
-        CronTrigger(hour=settings.report_deadline_hour, minute=0, timezone=clock.SITE_TIME_ZONE),
+        CronTrigger(hour=settings.report_deadline_hour, minute=0, timezone=clock.site_zone()),
         id="report_reminders",
         **common,
     )
     scheduler.add_job(
-        _guarded("weather_refresh", lambda: refresh_weather(database.session_factory, client)),
-        CronTrigger(hour=5, minute=30, timezone=clock.SITE_TIME_ZONE),
+        _guarded(
+            "weather_refresh", lambda: refresh_weather(database.session_factory, client, climate_client)
+        ),
+        CronTrigger(hour=5, minute=30, timezone=clock.site_zone()),
         id="weather_refresh",
         **common,
     )
     scheduler.add_job(
         _guarded("pour_check", lambda: run_pour_check(database.session_factory)),
-        CronTrigger(hour=5, minute=45, timezone=clock.SITE_TIME_ZONE),  # BR-06, after the weather
+        CronTrigger(hour=5, minute=45, timezone=clock.site_zone()),  # BR-06, after the weather
         id="pour_check",
         **common,
     )
     scheduler.add_job(
         _guarded("risk_scoring", lambda: run_risk_scoring(database.session_factory)),
-        CronTrigger(hour=6, minute=0, timezone=clock.SITE_TIME_ZONE),
+        CronTrigger(hour=6, minute=0, timezone=clock.site_zone()),
         id="risk_scoring",
         **common,
     )
     scheduler.add_job(
         _guarded("variance_check", lambda: run_variance_check(database.session_factory)),
-        CronTrigger(hour=6, minute=10, timezone=clock.SITE_TIME_ZONE),
+        CronTrigger(hour=6, minute=10, timezone=clock.site_zone()),
         id="variance_check",
         **common,
     )
     scheduler.add_job(
         _guarded("email_outbox", lambda: run_outbox(database.session_factory, settings)),
-        IntervalTrigger(minutes=1, timezone=clock.SITE_TIME_ZONE),
+        IntervalTrigger(minutes=1, timezone=clock.site_zone()),
         id="email_outbox",
         **{**common, "misfire_grace_time": 60},
     )
     scheduler.add_job(
         _guarded("email_digest", lambda: run_digests(database.session_factory)),
-        CronTrigger(hour=settings.digest_hour, minute=settings.digest_minute, timezone=clock.SITE_TIME_ZONE),
+        CronTrigger(hour=settings.digest_hour, minute=settings.digest_minute, timezone=clock.site_zone()),
         id="email_digest",
         **common,
     )
     scheduler.add_job(
         _guarded("weekly_report", lambda: run_weekly_reports(database.session_factory)),
-        CronTrigger(day_of_week="mon", hour=7, minute=0, timezone=clock.SITE_TIME_ZONE),
+        CronTrigger(day_of_week="mon", hour=7, minute=0, timezone=clock.site_zone()),
         id="weekly_report",
         **common,
     )
     if settings.demo_mode:
         scheduler.add_job(
             _guarded("demo_reset", run_demo_reset),
-            CronTrigger(hour=3, minute=0, timezone=clock.SITE_TIME_ZONE),
+            CronTrigger(hour=3, minute=0, timezone=clock.site_zone()),
             id="demo_reset",
             **common,
         )

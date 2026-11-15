@@ -37,6 +37,12 @@ services:
       # Photos land in backend/var/media on your machine (git-ignored).
       SITESENSE_MEDIA_ROOT: /app/var/media
       SITESENSE_WEATHER_ENABLED: ${SITESENSE_WEATHER_ENABLED:-true}
+      # The company's country, time zone and currency (Sri Lanka's by default; see .env.example).
+      SITESENSE_COUNTRY: ${SITESENSE_COUNTRY:-LK}
+      SITESENSE_TIME_ZONE: ${SITESENSE_TIME_ZONE:-Asia/Colombo}
+      SITESENSE_CURRENCY: ${SITESENSE_CURRENCY:-LKR}
+      SITESENSE_NUMBER_LOCALE: ${SITESENSE_NUMBER_LOCALE:-en-LK}
+      SITESENSE_RISK_LKR_PER_UNIT: ${SITESENSE_RISK_LKR_PER_UNIT:-}
       # Local demo: the seeded demo accounts skip two-step sign-in (anyone can try the app); real
       # accounts you create still have to set it up. Turn off to try enforcement on the demo accounts.
       SITESENSE_DEMO_MODE: ${SITESENSE_DEMO_MODE:-true}

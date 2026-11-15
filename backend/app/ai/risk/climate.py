@@ -3,9 +3,16 @@
 ``rain_climate.json`` holds, for seven Sri Lankan towns across the wet, intermediate and dry zones,
 the share of days with heavy rain (10 mm or more, BR-06) in each calendar month, from real
 Open-Meteo history (2012 to 2025). It is written by ``ml/data_generator/climate.py`` from the same
-data the simulator uses, and an ML test checks the two agree. A site uses its nearest town.
+data the simulator uses, and an ML test checks the two agree.
 
-It is local data: nothing is fetched to compute the feature. The file is validated before use.
+Which climate a site uses (``for_site``):
+
+1. A site in Sri Lanka: the nearest of the seven towns, as the model was trained.
+2. A site elsewhere: its own climate, worked out the same way from its own coordinates' history
+   (``services/rain_climate.py`` fetches it once and stores it on the site).
+3. Otherwise (no coordinates, or the history not fetched yet): the seven towns' average, with a note.
+
+Scoring never fetches anything: it reads this file and what is stored on the site.
 """
 
 from __future__ import annotations
@@ -18,6 +25,7 @@ from functools import cache
 from pathlib import Path
 
 CLIMATE_FILE = Path(__file__).with_name("rain_climate.json")
+HEAVY_RAIN_MM = 10.0  # BR-06
 WORKING_DAYS = 6  # Monday to Saturday, as in the simulator the model was trained on
 MIN_DAYS_AHEAD = 28  # past the planned end, still look at the next four weeks
 EARTH_RADIUS_KM = 6371.0
@@ -71,7 +79,7 @@ def towns(path: Path = CLIMATE_FILE) -> tuple[Town, ...]:
 
 
 def national_average() -> Town:
-    """Every town's climate averaged: used when a site has no coordinates."""
+    """Every town's climate averaged: used when a site has no climate of its own."""
     all_towns = towns()
     shares = tuple(sum(t.heavy_day_share[m] for t in all_towns) / len(all_towns) for m in range(12))
     return Town("Sri Lanka average", 0.0, 0.0, shares)
@@ -105,3 +113,67 @@ def wet_days_ahead(town: Town, today: date, planned_end: date) -> float:
             total += town.heavy_day_share[day.month - 1]
         day += timedelta(days=1)
     return total
+
+
+# Sri Lanka's bounding box, which no other country's land reaches (India's nearest point,
+# Dhanushkodi, lies west of it).
+SRI_LANKA = (5.85, 9.9, 79.5, 81.95)  # latitude from, to; longitude from, to
+START, END = "2012-01-01", "2025-12-31"  # the history the towns' climates come from
+OWN_CLIMATE = "own"
+
+
+@dataclass(frozen=True, slots=True)
+class Choice:
+    town: Town
+    note: str | None = None
+
+
+def in_sri_lanka(latitude: float, longitude: float) -> bool:
+    lat_from, lat_to, lon_from, lon_to = SRI_LANKA
+    return lat_from <= latitude <= lat_to and lon_from <= longitude <= lon_to
+
+
+def needs_own(latitude: float | None, longitude: float | None) -> bool:
+    """Whether a site needs its own climate fetched: it has coordinates outside Sri Lanka."""
+    return latitude is not None and longitude is not None and not in_sri_lanka(latitude, longitude)
+
+
+def own(shares: list[float] | tuple[float, ...]) -> Town:
+    if len(shares) != 12 or not all(math.isfinite(v) and 0 <= v <= 1 for v in shares):
+        raise ClimateError("A site's climate needs 12 monthly shares between 0 and 1")
+    return Town(OWN_CLIMATE, 0.0, 0.0, tuple(float(v) for v in shares))
+
+
+def for_site(latitude: float | None, longitude: float | None, shares: list[float] | None) -> Choice:
+    """The climate the risk and supplier models use for a site (see the module docstring)."""
+    average = "the average of the seven Sri Lankan towns the model was trained on"
+    if latitude is None or longitude is None:
+        return Choice(national_average(), f"The site has no coordinates: rain ahead uses {average}.")
+    if in_sri_lanka(latitude, longitude):
+        return Choice(nearest(latitude, longitude).town)
+    if shares is not None:
+        try:
+            return Choice(own(shares))
+        except ClimateError:
+            pass
+    return Choice(
+        national_average(),
+        f"The site's rain history has not been fetched yet (it is, with the next weather refresh): "
+        f"rain ahead uses {average}.",
+    )
+
+
+def heavy_day_shares(days: list[date], rain_mm: list[float | None]) -> tuple[float, ...]:
+    """Share of days with heavy rain (10 mm or more) per calendar month, January first.
+
+    The same sums as ``heavy_rain_climate`` in ml/data_generator/simulate.py: a day with no value
+    counts as dry (as the training data's download does), and shares are rounded to 4 decimals.
+    """
+    heavy = [0] * 12
+    total = [0] * 12
+    for day, mm in zip(days, rain_mm, strict=True):
+        total[day.month - 1] += 1
+        heavy[day.month - 1] += int(mm is not None and mm >= HEAVY_RAIN_MM)
+    if not all(total):
+        raise ClimateError("The rain history does not cover every month")
+    return tuple(round(heavy[m] / total[m], 4) for m in range(12))

@@ -7,8 +7,9 @@ import { SectionHeading } from "../../components/ui/SectionHeading";
 import { Sheet } from "../../components/ui/Sheet";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { errorText } from "../../features/admin/adminUtils";
-import { formatAmount, formatCompactLKR, toNumber } from "../../lib/money";
+import { formatCompactMoney, formatMoney, toNumber } from "../../lib/money";
 import { timeAgo } from "../../lib/time";
+import { currencyCode } from "../../lib/locale";
 
 /** Cost & claims across the PM's or QS's projects: forecast against budget, claims, what waits for them. */
 export function CostPage() {
@@ -54,7 +55,7 @@ export function CostPage() {
       </section>
 
       <section aria-labelledby="projects-cost-heading" className="space-y-3">
-        <SectionHeading id="projects-cost-heading" annotation="LKR; contract value includes approved variations">
+        <SectionHeading id="projects-cost-heading" annotation={`${currencyCode()}; contract value includes approved variations`}>
           Projects
         </SectionHeading>
         <Sheet className="overflow-x-auto">
@@ -88,8 +89,8 @@ export function CostPage() {
                         </span>
                       ) : null}
                     </th>
-                    <td className="tabular hidden px-4 py-3 text-right whitespace-nowrap text-ink-soft md:table-cell" title={`LKR ${formatAmount(p.contract_value)}`}>
-                      {formatCompactLKR(p.contract_value)}
+                    <td className="tabular hidden px-4 py-3 text-right whitespace-nowrap text-ink-soft md:table-cell" title={formatMoney(p.contract_value)}>
+                      {formatCompactMoney(p.contract_value)}
                     </td>
                     {noBudget ? (
                       <td colSpan={3} className="px-4 py-3 text-right text-ink-faint">
@@ -97,18 +98,18 @@ export function CostPage() {
                       </td>
                     ) : (
                       <>
-                        <td className="tabular px-4 py-3 text-right whitespace-nowrap text-ink-soft">{formatCompactLKR(p.budget)}</td>
-                        <td className="tabular px-4 py-3 text-right whitespace-nowrap text-ink">{formatCompactLKR(p.forecast_final)}</td>
+                        <td className="tabular px-4 py-3 text-right whitespace-nowrap text-ink-soft">{formatCompactMoney(p.budget)}</td>
+                        <td className="tabular px-4 py-3 text-right whitespace-nowrap text-ink">{formatCompactMoney(p.forecast_final)}</td>
                         <td
                           className={`tabular px-4 py-3 text-right font-medium whitespace-nowrap ${variance < 0 ? "text-signal-high" : "text-ink"}`}
                         >
-                          {variance === 0 ? "On budget" : `${formatCompactLKR(Math.abs(variance))} ${variance < 0 ? "over" : "under"}`}
+                          {variance === 0 ? "On budget" : `${formatCompactMoney(Math.abs(variance))} ${variance < 0 ? "over" : "under"}`}
                         </td>
                       </>
                     )}
                     <td className="tabular hidden px-4 py-3 text-right whitespace-nowrap text-ink lg:table-cell">
                       <Link to={`/projects/${p.project_id}/claims`} className="hover:underline">
-                        {formatCompactLKR(p.claimed_to_date)}
+                        {formatCompactMoney(p.claimed_to_date)}
                       </Link>
                     </td>
                     <td className="hidden px-4 py-3 text-ink-soft xl:table-cell">

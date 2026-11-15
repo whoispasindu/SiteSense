@@ -3,13 +3,16 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from app.api.deps import CurrentUser, DbSession, Meta, require_permission
+from app.api.deps import AppSettings, CurrentUser, DbSession, Meta, require_permission
 from app.core.errors import ForbiddenError, NotFoundError
 from app.core.permissions import Permission, Role, has_permission
 from app.models import User
 from app.schemas.schedule import (
     DependencyIn,
     DependencyOut,
+    HolidayCountries,
+    HolidayImportIn,
+    HolidayImportOut,
     HolidayIn,
     HolidayList,
     HolidayOut,
@@ -120,6 +123,18 @@ def list_holidays(_admin: HolidayAdmin, db: DbSession) -> HolidayList:
 @router.post("/admin/holidays", response_model=HolidayOut, status_code=status.HTTP_201_CREATED)
 def add_holiday(body: HolidayIn, admin: HolidayAdmin, db: DbSession, meta: Meta) -> HolidayOut:
     return calendar_service.add_holiday(db, admin, body, meta=meta)
+
+
+@router.get("/admin/holidays/countries", response_model=HolidayCountries)
+def holiday_countries(_admin: HolidayAdmin, settings: AppSettings) -> HolidayCountries:
+    return calendar_service.holiday_countries(settings.country)
+
+
+@router.post("/admin/holidays/import", response_model=HolidayImportOut)
+def import_holidays(
+    body: HolidayImportIn, admin: HolidayAdmin, db: DbSession, meta: Meta
+) -> HolidayImportOut:
+    return calendar_service.import_holidays(db, admin, body, meta=meta)
 
 
 @router.delete("/admin/holidays/{holiday_id}", status_code=status.HTTP_204_NO_CONTENT)

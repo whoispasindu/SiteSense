@@ -13,9 +13,10 @@ import { SectionHeading } from "../../components/ui/SectionHeading";
 import { Sheet } from "../../components/ui/Sheet";
 import { errorText } from "../../features/admin/adminUtils";
 import { RuleChecks } from "../../features/materials/MaterialBits";
-import { formatAmount, formatQuantity } from "../../lib/money";
+import { formatAmount, formatMoney, formatQuantity } from "../../lib/money";
 import { addDaysIso, siteTodayIso } from "../../lib/time";
 import { useDebounced } from "../../lib/useDebounced";
+import { currencyCode } from "../../lib/locale";
 
 const QUANTITY = /^\d{1,11}(\.\d{1,3})?$/;
 const PRICE = /^\d{1,12}(\.\d{1,2})?$/;
@@ -77,7 +78,7 @@ function ItemPicker({
                     <span className="tabular block text-xs text-ink-faint">
                       {formatQuantity(o.remaining_quantity)} of {formatQuantity(o.boq_quantity)} {o.unit} left ·{" "}
                       {formatQuantity(o.requested_quantity)} requested so far
-                      {o.budget_rate !== undefined ? ` · budget LKR ${formatAmount(o.budget_rate)} / ${o.unit}` : ""}
+                      {o.budget_rate !== undefined ? ` · budget ${formatMoney(o.budget_rate)} / ${o.unit}` : ""}
                     </span>
                   </span>
                 </label>
@@ -213,7 +214,7 @@ export function RequestFormPage() {
             />
 {pricing ? (
             <TextField
-              label="Unit price (LKR)"
+              label={`Unit price (${currencyCode()})`}
               inputMode="decimal"
               value={price}
               error={errors.price}

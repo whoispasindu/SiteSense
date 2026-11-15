@@ -7,7 +7,8 @@ import { useAuth } from "../../auth/context";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { SelectField, TextAreaField, TextField } from "../../components/ui/Field";
-import { formatAmount, formatQuantity, toNumber } from "../../lib/money";
+import { formatMoney, formatQuantity, toNumber } from "../../lib/money";
+import { currencyCode } from "../../lib/locale";
 
 const MONEY_CHANGE = /^-?\d{1,13}(\.\d{1,2})?$/;
 const QUANTITY = /^\d{1,11}(\.\d{1,3})?$/;
@@ -159,7 +160,7 @@ export function VariationForm({ projectId, limit, initial, submitLabel, busy, er
           <legend className="px-1 text-sm font-semibold text-ink">Price (QS)</legend>
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField
-              label="Contract change, LKR"
+              label={`Contract change, ${currencyCode()}`}
               hint="What the client pays; minus for an omission."
               inputMode="decimal"
               value={contract}
@@ -168,7 +169,7 @@ export function VariationForm({ projectId, limit, initial, submitLabel, busy, er
               }}
             />
             <TextField
-              label="Cost budget change, LKR"
+              label={`Cost budget change, ${currencyCode()}`}
               hint="Internal: the section's budget line."
               inputMode="decimal"
               value={budget}
@@ -178,7 +179,7 @@ export function VariationForm({ projectId, limit, initial, submitLabel, busy, er
             />
           </div>
           <p className="text-xs text-ink-faint">
-            The project's limit is LKR {formatAmount(limit)}. A contract change above it, any time impact, or a variation
+            The project's limit is {formatMoney(limit)}. A contract change above it, any time impact, or a variation
             raised by a PM goes to the client; otherwise to a PM. Leave both empty to price it later.
           </p>
           {overLimit || dayCount > 0 ? (

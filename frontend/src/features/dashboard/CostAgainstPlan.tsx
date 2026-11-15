@@ -3,7 +3,8 @@ import { Link } from "react-router";
 import type { CostAgainstPlan as Cost, CostPoint } from "../../api/dashboard";
 import { SectionHeading } from "../../components/ui/SectionHeading";
 import { Sheet } from "../../components/ui/Sheet";
-import { formatCompactLKR, toNumber } from "../../lib/money";
+import { formatCompactMoney, toNumber } from "../../lib/money";
+import { currencyCode } from "../../lib/locale";
 
 function pct(value: number, max: number): string {
   return `${String(Math.max(0, Math.min(100, (value / max) * 100)))}%`;
@@ -35,7 +36,7 @@ function Ruler({ point, max }: { point: CostPoint; max: number }) {
         <Link to={`/projects/${point.project_id}`} className="min-w-0 truncate font-medium text-ink hover:underline">
           {point.name} <span className="font-mono text-xs font-normal text-ink-faint">{point.code}</span>
         </Link>
-        <span className="tabular text-xs text-ink-faint">budget {formatCompactLKR(budget)}</span>
+        <span className="tabular text-xs text-ink-faint">budget {formatCompactMoney(budget)}</span>
       </div>
       {/* The ruler: committed so far (solid), the risk model's likely final cost (hatched band),
           the forecast at current rates (diamond) and the budget (the tall tick). */}
@@ -55,10 +56,10 @@ function Ruler({ point, max }: { point: CostPoint; max: number }) {
         />
       </div>
       <p className="tabular mt-1.5 text-sm text-ink-soft">
-        Committed {formatCompactLKR(committed)} · at current rates {formatCompactLKR(final)}
+        Committed {formatCompactMoney(committed)} · at current rates {formatCompactMoney(final)}
         {over ? <span className="font-medium text-signal-high"> (over budget)</span> : null}
         {low !== null && high !== null ? (
-          <> · risk model, likely {formatCompactLKR(low)} to {formatCompactLKR(high)}</>
+          <> · risk model, likely {formatCompactMoney(low)} to {formatCompactMoney(high)}</>
         ) : (
           <span className="text-ink-faint"> · risk model range from the next scoring</span>
         )}
@@ -80,12 +81,12 @@ export function CostAgainstPlan({ cost }: { cost: Cost }) {
 
   return (
     <Sheet className="p-5">
-      <SectionHeading annotation="LKR, cost roles only">Cost against plan</SectionHeading>
+      <SectionHeading annotation={`${currencyCode()}, cost roles only`}>Cost against plan</SectionHeading>
       <dl className="grid grid-cols-2 gap-3 border-b border-rule pb-4 sm:grid-cols-4">
         {[
-          ["Budget", formatCompactLKR(t.budget)],
-          ["Committed", formatCompactLKR(t.committed)],
-          ["At current rates", formatCompactLKR(t.forecast_final)],
+          ["Budget", formatCompactMoney(t.budget)],
+          ["Committed", formatCompactMoney(t.committed)],
+          ["At current rates", formatCompactMoney(t.forecast_final)],
           ["Over budget", `${String(t.over_budget)} of ${String(cost.projects.length)}`],
         ].map(([label, value]) => (
           <div key={label}>

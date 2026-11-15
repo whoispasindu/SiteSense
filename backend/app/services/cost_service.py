@@ -16,7 +16,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core import clock
+from app.core import clock, company
 from app.core.logging import get_logger
 from app.core.permissions import Permission, Role, has_permission
 from app.core.scoping import scope_to_user_sites
@@ -125,7 +125,8 @@ def _alert(db: Session, project: Project, over: list[tuple[BudgetLine, rules.For
         percent = f"{(share * 100).quantize(Decimal('0.1'))}%" if forecast.variance_share is not None else ""
         body = (
             f"{line.section.code} {line.section.name} is forecast to finish at "
-            f"LKR {forecast.final_cost:,.0f} against a budget of LKR {forecast.budget:,.0f}"
+            f"{company.money(round(forecast.final_cost))} "
+            f"against a budget of {company.money(round(forecast.budget))}"
             + (f" ({percent} over)." if percent else ".")
         )
         items.extend(
@@ -227,7 +228,7 @@ def overview(db: Session, user: User) -> CostOverview:
         if open_claim is not None and can_approve_claims:
             waiting.append(
                 WaitingItem(kind="claim", id=open_claim.id, number=open_claim.number, project_id=project.id,
-                            project_code=project.code, title=f"Claim of LKR {open_claim.amount:,.2f}",
+                            project_code=project.code, title=f"Claim of {company.money(open_claim.amount)}",
                             status=open_claim.status, since=open_claim.submitted_at)
             )  # fmt: skip
         for v in variations:

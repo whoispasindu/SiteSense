@@ -17,6 +17,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from app.core import company
+
 Level = Literal["low", "medium", "high"]
 HIGH = 70
 MEDIUM = 40
@@ -100,7 +102,11 @@ def describe(feature: str, values: dict[str, float]) -> str:
     if feature == "planned_duration_days":
         return f"{v / 7:.0f} weeks"
     if feature == "contract_value_m":
-        return f"LKR {v:,.0f} M"
+        # The model reads LKR millions; people read their own currency.
+        c = company.current()
+        if c.currency == "LKR":
+            return f"LKR {v:,.0f} M"
+        return f"{c.currency} {v / float(c.lkr_per_unit):,.1f} M"
     if feature == "project_type":
         kind = next((k.removeprefix("type_") for k, x in values.items() if k.startswith("type_") and x), "")
         return kind.replace("_", " ")

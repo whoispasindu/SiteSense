@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { findNavItem } from "../components/layout/navigation";
 import { durationWeeks, formatDate, programmeProgress } from "../features/projects/dates";
-import { formatAmount, formatCompactLKR, formatQuantity, percent, toNumber } from "./money";
+import { configureLocale, DEFAULT_LOCALE } from "./locale";
+import { formatAmount, formatCompactMoney, formatMoney, formatQuantity, percent, toNumber } from "./money";
 
 describe("money", () => {
   it("formats exact amounts and quantities", () => {
@@ -13,10 +14,23 @@ describe("money", () => {
   });
 
   it("formats compact LKR for tiles", () => {
-    expect(formatCompactLKR("1113985000.00")).toBe("LKR 1.11 bn");
-    expect(formatCompactLKR("685000000")).toBe("LKR 685 M");
-    expect(formatCompactLKR("42500")).toBe("LKR 42.5 k");
-    expect(formatCompactLKR("950")).toBe("LKR 950");
+    expect(formatCompactMoney("1113985000.00")).toBe("LKR 1.11 bn");
+    expect(formatCompactMoney("685000000")).toBe("LKR 685 M");
+    expect(formatCompactMoney("42500")).toBe("LKR 42.5 k");
+    expect(formatCompactMoney("950")).toBe("LKR 950");
+  });
+
+  it("uses the company's currency and number format", () => {
+    try {
+      configureLocale({ ...DEFAULT_LOCALE, currency: "EUR", number_locale: "de-DE" });
+      expect(formatMoney("1250000.5")).toBe("EUR 1.250.000,50");
+      expect(formatCompactMoney("685000000")).toBe("EUR 685 M");
+      configureLocale({ ...DEFAULT_LOCALE, currency: "JPY", currency_decimals: 0, number_locale: "ja-JP" });
+      expect(formatMoney("1250000")).toBe("JPY 1,250,000");
+    } finally {
+      configureLocale(DEFAULT_LOCALE);
+    }
+    expect(formatMoney("1250000.5")).toBe("LKR 1,250,000.50");
   });
 
   it("is safe with bad input", () => {

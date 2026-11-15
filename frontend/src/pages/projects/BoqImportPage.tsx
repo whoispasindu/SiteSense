@@ -10,6 +10,7 @@ import { Sheet } from "../../components/ui/Sheet";
 import { errorText } from "../../features/admin/adminUtils";
 import { formatAmount } from "../../lib/money";
 import { useCurrentProject } from "./projectContext";
+import { currencyCode } from "../../lib/locale";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 
@@ -99,7 +100,7 @@ function ReportView({ report }: { report: ImportReport }) {
           </SectionHeading>
           <Sheet className="relative overflow-x-auto">
             <table className="w-full text-sm">
-              <caption className="sr-only">Sections found in the file, amounts in LKR</caption>
+              <caption className="sr-only">Sections found in the file, amounts in {currencyCode()}</caption>
               <thead className="border-b border-rule bg-paper-sunk/60 text-xs font-medium text-ink-faint">
                 <tr>
                   <th scope="col" className="px-4 py-2 text-left font-medium">Section</th>

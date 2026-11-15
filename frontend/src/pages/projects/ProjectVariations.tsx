@@ -9,18 +9,18 @@ import { SectionHeading } from "../../components/ui/SectionHeading";
 import { Sheet } from "../../components/ui/Sheet";
 import { errorText } from "../../features/admin/adminUtils";
 import { VariationStatusBadge } from "../../features/contract/ContractBits";
-import { daysText, signedLKR } from "../../features/contract/format";
+import { daysText, signedMoney } from "../../features/contract/format";
 import { VariationForm } from "../../features/contract/VariationForm";
 import { KpiTile } from "../../features/projects/ProjectBits";
-import { formatAmount, formatCompactLKR, toNumber } from "../../lib/money";
+import { formatCompactMoney, formatMoney, toNumber } from "../../lib/money";
 import { formatSiteDateTime } from "../../lib/time";
 import { useCurrentProject } from "./projectContext";
 
-/** "+ LKR 850 k", "− LKR 1.2 M" or "None". */
+/** "+ LKR 850 k", "− LKR 1.2 M" (in the company's currency) or "None". */
 function changeCompact(value: string): string {
   const n = toNumber(value);
   if (n === 0) return "None";
-  return `${n > 0 ? "+" : "−"} ${formatCompactLKR(Math.abs(n))}`;
+  return `${n > 0 ? "+" : "−"} ${formatCompactMoney(Math.abs(n))}`;
 }
 
 export function ProjectVariations() {
@@ -42,15 +42,15 @@ export function ProjectVariations() {
           icon="cost"
           label="Approved changes"
           value={changeCompact(data.approved_contract_change)}
-          title={`LKR ${formatAmount(data.approved_contract_change)}`}
+          title={formatMoney(data.approved_contract_change)}
           note={daysText(data.approved_time_impact_days)}
         />
         <KpiTile icon="schedule" label="Open" value={String(open)} note="To price, or waiting for a decision" />
         <KpiTile
           icon="client"
           label="Client approval limit"
-          value={formatCompactLKR(data.limit)}
-          title={`LKR ${formatAmount(data.limit)}`}
+          value={formatCompactMoney(data.limit)}
+          title={formatMoney(data.limit)}
           note="BR-09; set by the Company Admin"
         />
       </div>
@@ -85,7 +85,7 @@ export function ProjectVariations() {
                   </p>
                 </div>
                 <div className="tabular text-right text-sm">
-                  <p className="text-ink">{signedLKR(v.contract_change)}</p>
+                  <p className="text-ink">{signedMoney(v.contract_change)}</p>
                   <p className="text-ink-faint">{daysText(v.time_impact_days)}</p>
                 </div>
                 <VariationStatusBadge status={v.status} />

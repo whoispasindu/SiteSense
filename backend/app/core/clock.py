@@ -3,8 +3,12 @@
 from datetime import UTC, date, datetime
 from zoneinfo import ZoneInfo
 
-# SiteSense serves Sri Lankan contractors: "today" on site is the date in Colombo.
-SITE_TIME_ZONE = ZoneInfo("Asia/Colombo")
+from app.core import company
+
+
+def site_zone() -> ZoneInfo:
+    """The company's time zone (``SITESENSE_TIME_ZONE``): "today" on site is the date there."""
+    return company.current().time_zone
 
 
 def utcnow() -> datetime:
@@ -12,4 +16,4 @@ def utcnow() -> datetime:
 
 
 def site_today() -> date:
-    return utcnow().astimezone(SITE_TIME_ZONE).date()
+    return utcnow().astimezone(site_zone()).date()

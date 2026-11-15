@@ -1,15 +1,16 @@
-/** Site time: SiteSense targets Sri Lankan contractors, so clocks and dates use Colombo time. */
-export const SITE_TIME_ZONE = "Asia/Colombo";
+import { siteTimeZone } from "./locale";
+
+/** Site time: clocks and dates use the company's time zone (SITESENSE_TIME_ZONE, lib/locale.ts). */
 
 export function formatSiteClock(date: Date): string {
   const day = new Intl.DateTimeFormat("en-GB", {
-    timeZone: SITE_TIME_ZONE,
+    timeZone: siteTimeZone(),
     weekday: "short",
     day: "numeric",
     month: "short",
   }).format(date);
   const time = new Intl.DateTimeFormat("en-GB", {
-    timeZone: SITE_TIME_ZONE,
+    timeZone: siteTimeZone(),
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
@@ -18,22 +19,22 @@ export function formatSiteClock(date: Date): string {
 }
 
 export function formatSiteDate(date: Date): string {
-  return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: SITE_TIME_ZONE }).format(date);
+  return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: siteTimeZone() }).format(date);
 }
 
 export function greeting(date: Date): string {
   const hour = Number(
-    new Intl.DateTimeFormat("en-GB", { hour: "numeric", hourCycle: "h23", timeZone: SITE_TIME_ZONE }).format(date),
+    new Intl.DateTimeFormat("en-GB", { hour: "numeric", hourCycle: "h23", timeZone: siteTimeZone() }).format(date),
   );
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
 }
 
-/** Today's calendar date on site (Colombo), as YYYY-MM-DD. */
+/** Today's calendar date on site (the company's time zone), as YYYY-MM-DD. */
 export function siteTodayIso(now: Date = new Date()): string {
   // en-CA formats dates as YYYY-MM-DD.
-  return new Intl.DateTimeFormat("en-CA", { timeZone: SITE_TIME_ZONE }).format(now);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: siteTimeZone() }).format(now);
 }
 
 /** Calendar arithmetic on YYYY-MM-DD strings (no time zone involved). */
@@ -54,7 +55,7 @@ export function formatDayShort(iso: string): string {
 /** "14:05" in site time for a timestamp. */
 export function formatSiteTime(timestamp: string): string {
   return new Intl.DateTimeFormat("en-GB", {
-    timeZone: SITE_TIME_ZONE,
+    timeZone: siteTimeZone(),
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
@@ -75,7 +76,7 @@ export function timeAgo(timestamp: string, now: Date = new Date()): string {
 /** "11 Oct 2026, 09:15" in site time: for histories that span days. */
 export function formatSiteDateTime(timestamp: string): string {
   return new Intl.DateTimeFormat("en-GB", {
-    timeZone: SITE_TIME_ZONE,
+    timeZone: siteTimeZone(),
     day: "2-digit",
     month: "short",
     year: "numeric",
