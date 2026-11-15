@@ -54,3 +54,6 @@ ml/models/report-nlp/distilbert/
 *.onnx
 ml/models/report-nlp/onnx/
 backend/app/ai/nlp/models/report-issues-category/
+
+# Phase 14: real project data from the pilot company never goes into the repository
+uat-data/
