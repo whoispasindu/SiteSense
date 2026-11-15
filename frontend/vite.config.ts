@@ -1,8 +1,10 @@
 /// <reference types="vitest/config" />
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { defineConfig, loadEnv } from "vite";
+import { resolve } from "node:path";
+import { defineConfig, loadEnv, transformWithOxc, type Plugin } from "vite";
 
 const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf-8")) as {
   version: string;
@@ -17,13 +19,59 @@ const securityHeaders = {
   "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
 };
 
+// Files from public/ that belong to the app shell, stored by the service worker on install.
+const PUBLIC_SHELL = [
+  "/favicon.svg",
+  "/theme-init.js",
+  "/manifest.json",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/icons/icon-maskable-512.png",
+  "/icons/apple-touch-icon.png",
+];
+
+/**
+ * Builds /sw.js from src/pwa/sw.ts (ADR 0018): the types and `export`s stripped, and the list of
+ * files to store on install in front. Its version is a hash of everything it stores, so any
+ * release that changes the app changes sw.js, which is how browsers notice a new version.
+ */
+function serviceWorker(): Plugin {
+  let root = "";
+  return {
+    name: "sitesense-service-worker",
+    apply: "build",
+    enforce: "post",
+    configResolved(config) {
+      root = config.root;
+    },
+    async generateBundle(_options, bundle) {
+      const built = Object.keys(bundle)
+        .filter((name) => /^assets\/.+\.(js|css)$/.test(name))
+        .sort()
+        .map((name) => `/${name}`);
+      const files = ["/", ...built, ...PUBLIC_SHELL];
+      const source = readFileSync(resolve(root, "src/pwa/sw.ts"), "utf-8");
+      const hash = createHash("sha256").update(source);
+      for (const name of files) hash.update(name);
+      for (const name of PUBLIC_SHELL) hash.update(readFileSync(resolve(root, "public", `.${name}`)));
+      const index = Object.hasOwn(bundle, "index.html") ? bundle["index.html"] : undefined;
+      if (index?.type === "asset") hash.update(index.source);
+      const version = hash.digest("hex").slice(0, 12);
+      const { code } = await transformWithOxc(source, "sw.ts");
+      const script = `const PRECACHE = ${JSON.stringify({ version, files })};
+${code.replace(/^export /gm, "")}`;
+      this.emitFile({ type: "asset", fileName: "sw.js", source: script });
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   // loadEnv returns "" for unset keys in some setups, so fall back on any empty value.
   const apiTarget = env.VITE_API_PROXY_TARGET || "http://localhost:8000";
 
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), serviceWorker()],
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version),
     },
@@ -38,7 +86,12 @@ export default defineConfig(({ mode }) => {
         "/api": { target: apiTarget, changeOrigin: false, xfwd: true },
       },
     },
-    preview: { port: 4173, headers: securityHeaders },
+    // The built app (with its service worker), same-origin API as in development.
+    preview: {
+      port: 4173,
+      headers: securityHeaders,
+      proxy: { "/api": { target: apiTarget, changeOrigin: false, xfwd: true } },
+    },
     build: {
       sourcemap: false,
       target: "es2022",

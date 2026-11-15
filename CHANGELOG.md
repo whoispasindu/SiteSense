@@ -35,6 +35,10 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Installable app** (PWA, part A; [ADR 0018](docs/adr/0018-installable-app.md)): SiteSense installs
+  on phones and computers from the browser, opens from the device (also with no signal), and offers
+  "A new version is ready, Reload" after a release instead of reloading under you. An offline
+  notice says when there is no connection. Nothing from the API is ever stored on the device.
 - **Any country** ([ADR 0017](docs/adr/0017-any-country.md)):
   - The company's time zone, country, currency and number format are settings. "Today" on site,
     the scheduled jobs and the weather follow the time zone; every amount in the app, emails and

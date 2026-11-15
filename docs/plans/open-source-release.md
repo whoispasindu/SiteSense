@@ -1,7 +1,8 @@
 # Open-source release plan
 
-Status: decided (2026-11-15). Step 3 (any country) done on 2026-11-15
-([ADR 0017](../adr/0017-any-country.md)); the other steps not started. Follows Phase 14 (UAT and evaluation), so the first
+Status: decided (2026-11-15). Step 3 (any country) and step 5b (installable app) done on 2026-11-15
+([ADR 0017](../adr/0017-any-country.md), [ADR 0018](../adr/0018-installable-app.md)); the other
+steps not started. Follows Phase 14 (UAT and evaluation), so the first
 public release is v1.0. This page collects what is decided and what is still open, so the release
 work starts from it.
 
@@ -178,6 +179,17 @@ The proposal:
 - **Upgrades:** read the changelog's upgrade notes, back up, pull the new version, start. Say which
   releases get security fixes (for example the latest minor release only).
 - **Health:** the health endpoint, and what to watch in the logs.
+
+### Step 5b: Installable app (PWA, part A)
+
+Done on 2026-11-15 ([ADR 0018](../adr/0018-installable-app.md)). Installable on Android, iOS and
+desktop, opens from the device, updates when the person chooses, and stores nothing from the API.
+Self-hosting companies get it with no extra setup: it needs HTTPS, which the production setup
+already has.
+
+After v1.0, **part B**: offline daily reports (drafts and photos kept on the phone, sent when the
+signal returns, de-duplicated by the server, with a clear message when something changed meanwhile,
+such as a stop-work flag under BR-11).
 
 ### Step 6: Go public
 
