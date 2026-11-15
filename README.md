@@ -51,6 +51,9 @@ them, and clients see honest progress without internal costs.
 - A client portal with honest progress and no internal costs: the handover date the project manager
   publishes (with the reason), milestones, the photos they choose to share, approved claims and the
   retention held, and variation approval. Clients see only the projects they are linked to
+- An installable app on phones and computers (Android, iOS, desktop): it opens from the device and
+  updates when you choose. Nothing about your company is stored on the device
+  ([ADR 0018](docs/adr/0018-installable-app.md)); offline daily reports come after v1.0
 
 ## Run it locally
 
@@ -435,7 +438,8 @@ docs/           architecture, decision records, security reviews, model cards, p
 | After 14 | Open-source release for self-hosting, then a hosted cloud service ([plan](docs/plans/open-source-release.md)) | Planned |
 | Later | Public demo: a hosted instance with seeded data | Planned |
 
-After v1.0: an offline-first mobile app for site engineers, voice input in Sinhala, Tamil
+After v1.0: offline daily reports in the installable app (reports and photos kept on the phone and
+sent when the signal returns), voice input in Sinhala, Tamil
 and English, and SMS alerts for stop-work and high risk (alerts already go through one channel
 interface, so an SMS sender plugs in without changing the alert rules).
 

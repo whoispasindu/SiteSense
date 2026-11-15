@@ -12,6 +12,7 @@ here, newest first. The baseline design is in [ADR 0003](adr/0003-security-basel
 | Database | Least-privilege runtime role; separate migration owner; statement timeout | `infra/postgres/init/01-roles.sh`, `core/database.py` | CI "Least-privilege check" step |
 | Errors | One envelope; no stack traces, exception text or submitted values | `core/errors.py`, `RequestContextMiddleware` | `test_errors.py` |
 | Headers | CSP `default-src 'none'`, `frame-ancestors 'none'`, nosniff, DENY, no-referrer, COOP/CORP, `no-store`, HSTS in prod | `SecurityHeadersMiddleware`, `frontend/nginx.conf` | `test_middleware.py` |
+| Data on devices | The installable app's service worker stores only the app shell and fingerprinted files; it never stores or answers anything under `/api/`, and handles only same-origin GETs ([ADR 0018](adr/0018-installable-app.md)) | `frontend/src/pwa/sw.ts` | `src/pwa/sw.test.ts` (no API request answered or stored), `src/pwa/pwa.test.tsx` |
 | Request limits | Body size limit (declared and streamed), trusted hosts, CORS allow-list | `core/middleware.py`, `main.py` | `test_middleware.py` |
 | Logging | JSON logs, request IDs, sensitive keys redacted, no query strings, uvicorn access log off | `core/logging.py` | `test_logging.py` |
 | Log/header injection | Caller `X-Request-ID` accepted only if `[A-Za-z0-9._-]{8,64}` | `core/request_context.py` | `test_unsafe_incoming_request_id_is_replaced` |

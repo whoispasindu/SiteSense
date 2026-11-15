@@ -1,0 +1,24 @@
+{
+  "id": "/",
+  "name": "SiteSense",
+  "short_name": "SiteSense",
+  "description": "Delay and cost control for construction projects: daily reports, materials, cost and risk.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1b1a16",
+  "theme_color": "#1c1b18",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Daily reports", "short_name": "Reports", "url": "/reports" },
+    { "name": "Materials", "url": "/materials" }
+  ]
+}
