@@ -30,6 +30,12 @@ x-backend-env: &backend-env
   SITESENSE_SMTP_PASSWORD: ${SITESENSE_SMTP_PASSWORD:-}
   SITESENSE_EMAIL_FROM: ${SITESENSE_EMAIL_FROM:-SiteSense <no-reply@sitesense.example>}
   SITESENSE_LOG_LEVEL: ${SITESENSE_LOG_LEVEL:-INFO}
+  # The company's country, time zone and currency (Sri Lanka's by default; see .env.prod.example).
+  SITESENSE_COUNTRY: ${SITESENSE_COUNTRY:-LK}
+  SITESENSE_TIME_ZONE: ${SITESENSE_TIME_ZONE:-Asia/Colombo}
+  SITESENSE_CURRENCY: ${SITESENSE_CURRENCY:-LKR}
+  SITESENSE_NUMBER_LOCALE: ${SITESENSE_NUMBER_LOCALE:-en-LK}
+  SITESENSE_RISK_LKR_PER_UNIT: ${SITESENSE_RISK_LKR_PER_UNIT:-}
   # Request budgets (per minute): sign-in per IP; writes and heavy requests per user. The load test
   # raises them, because its 50 simulated people share one IP and six demo accounts.
   SITESENSE_LOGIN_RATE_PER_MINUTE: ${SITESENSE_LOGIN_RATE_PER_MINUTE:-10}

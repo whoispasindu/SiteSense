@@ -9,6 +9,7 @@ import { PageHeader } from "../../components/ui/PageHeader";
 import { Sheet } from "../../components/ui/Sheet";
 import { errorText } from "../../features/admin/adminUtils";
 import { formatAmount } from "../../lib/money";
+import { currencyCode } from "../../lib/locale";
 
 const AMOUNT = /^\d{1,13}(\.\d{1,2})?$/;
 
@@ -31,7 +32,7 @@ function LimitDialog({ project, onClose }: { project: ProjectLimit; onClose: () 
         (BR-09). The client sees the limit. Variations already sent on keep the limit they were routed with.
       </p>
       <TextField
-        label="Limit, LKR"
+        label={`Limit, ${currencyCode()}`}
         inputMode="decimal"
         required
         value={limit}
@@ -77,12 +78,12 @@ export function VariationLimitsPage() {
       {limits.data ? (
         <Sheet className="overflow-x-auto">
           <table className="w-full text-sm">
-            <caption className="sr-only">Variation limit by project, in LKR</caption>
+            <caption className="sr-only">Variation limit by project, in {currencyCode()}</caption>
             <thead className="border-b border-rule bg-paper-sunk/60 text-xs text-ink-faint">
               <tr>
                 <th scope="col" className="px-4 py-2.5 text-left font-medium">Project</th>
                 <th scope="col" className="hidden px-4 py-2.5 text-left font-medium sm:table-cell">Site</th>
-                <th scope="col" className="px-4 py-2.5 text-right font-medium">Limit, LKR</th>
+                <th scope="col" className="px-4 py-2.5 text-right font-medium">Limit, {currencyCode()}</th>
                 <th scope="col" className="px-4 py-2.5 text-right font-medium">
                   <span className="sr-only">Change</span>
                 </th>

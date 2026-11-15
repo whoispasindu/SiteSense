@@ -9,6 +9,7 @@ import { setAccessToken } from "../api/client";
 import { AuthProvider } from "../auth/AuthProvider";
 import { CURRENT_PHASE, PHASES } from "../lib/programme";
 import { routes } from "../routes";
+import { DEFAULT_LOCALE } from "../lib/locale";
 
 export function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -91,6 +92,7 @@ export function makeMe(role: Role = "site_engineer", overrides: Partial<Me> = {}
     mfa_enabled: false,
     mfa_setup_required: false,
     demo_mode: false,
+    company: DEFAULT_LOCALE,
     ...overrides,
   };
 }

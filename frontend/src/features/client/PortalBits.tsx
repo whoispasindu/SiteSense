@@ -7,11 +7,12 @@ import { Icon } from "../../components/ui/icons";
 import { SectionHeading } from "../../components/ui/SectionHeading";
 import { Sheet } from "../../components/ui/Sheet";
 import { StatusBadge } from "../../components/ui/StatusBadge";
-import { formatAmount, formatCompactLKR } from "../../lib/money";
+import { formatAmount, formatCompactMoney } from "../../lib/money";
 import { formatSiteDateTime } from "../../lib/time";
 import { errorText } from "../admin/adminUtils";
 import { formatDate } from "../projects/dates";
 import { againstContract, MILESTONE_LABELS, MILESTONE_TONES } from "./portal";
+import { currencyCode } from "../../lib/locale";
 
 /** The one handover date the client sees: published by the project manager, with the reason. */
 export function HandoverCard({ project }: { project: ClientProject }) {
@@ -181,28 +182,28 @@ export function Payments({ projectId }: { projectId: string }) {
 
   return (
     <Sheet className="p-5">
-      <SectionHeading annotation="LKR, approved by your project manager">Payments</SectionHeading>
+      <SectionHeading annotation={`${currencyCode()}, approved by your project manager`}>Payments</SectionHeading>
       <dl className="grid gap-4 border-b border-rule pb-5 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <dt className="text-xs text-ink-faint">Contract value</dt>
-          <dd className="tabular text-lg font-semibold text-ink">{formatCompactLKR(c.contract_value)}</dd>
+          <dd className="tabular text-lg font-semibold text-ink">{formatCompactMoney(c.contract_value)}</dd>
           <dd className="text-xs text-ink-faint">
             {varied
-              ? `${formatCompactLKR(c.original_contract_value)} plus ${formatCompactLKR(c.approved_variations)} of approved variations`
+              ? `${formatCompactMoney(c.original_contract_value)} plus ${formatCompactMoney(c.approved_variations)} of approved variations`
               : "No approved variations"}
           </dd>
         </div>
         <div>
           <dt className="text-xs text-ink-faint">Claimed to date</dt>
-          <dd className="tabular text-lg font-semibold text-ink">{formatCompactLKR(c.claimed_to_date)}</dd>
+          <dd className="tabular text-lg font-semibold text-ink">{formatCompactMoney(c.claimed_to_date)}</dd>
         </div>
         <div>
           <dt className="text-xs text-ink-faint">Paid to date</dt>
-          <dd className="tabular text-lg font-semibold text-ink">{formatCompactLKR(c.paid_to_date)}</dd>
+          <dd className="tabular text-lg font-semibold text-ink">{formatCompactMoney(c.paid_to_date)}</dd>
         </div>
         <div>
           <dt className="text-xs text-ink-faint">Retention held</dt>
-          <dd className="tabular text-lg font-semibold text-ink">{formatCompactLKR(c.retention_held)}</dd>
+          <dd className="tabular text-lg font-semibold text-ink">{formatCompactMoney(c.retention_held)}</dd>
           <dd className="text-xs text-ink-soft">Due back around {formatDate(c.retention_release.expected_on)}</dd>
           <dd className="text-xs text-ink-faint">{c.retention_note}</dd>
         </div>
@@ -212,7 +213,7 @@ export function Payments({ projectId }: { projectId: string }) {
       ) : (
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[44rem] text-sm">
-            <caption className="sr-only">Approved progress claims, newest first, in LKR</caption>
+            <caption className="sr-only">Approved progress claims, newest first, in {currencyCode()}</caption>
             <thead className="text-left text-xs text-ink-faint">
               <tr className="border-b border-rule">
                 <th scope="col" className="py-2 pr-3 font-medium">Claim</th>

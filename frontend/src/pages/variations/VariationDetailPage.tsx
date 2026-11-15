@@ -10,11 +10,12 @@ import { TextAreaField, TextField } from "../../components/ui/Field";
 import { Sheet } from "../../components/ui/Sheet";
 import { errorText } from "../../features/admin/adminUtils";
 import { VariationStatusBadge, VariationTimeline } from "../../features/contract/ContractBits";
-import { daysText, signedLKR } from "../../features/contract/format";
+import { daysText, signedMoney } from "../../features/contract/format";
 import { VariationForm } from "../../features/contract/VariationForm";
-import { formatAmount, formatQuantity } from "../../lib/money";
+import { formatMoney, formatQuantity } from "../../lib/money";
 import { formatSiteDateTime } from "../../lib/time";
 import { NotFoundPage } from "../NotFoundPage";
+import { currencyCode } from "../../lib/locale";
 
 const MONEY_CHANGE = /^-?\d{1,13}(\.\d{1,2})?$/;
 
@@ -31,10 +32,10 @@ function routingText(v: Variation): string {
   if (v.status === "awaiting_pricing") return "The quantity surveyor prices it next.";
   if (v.approver === "client") {
     if (v.time_impact_days > 0) return "Goes to the client: it has a time impact (BR-09).";
-    if (v.needs_client) return `Goes to the client: the change is above the limit of LKR ${formatAmount(v.limit_applied ?? v.limit)} (BR-09).`;
+    if (v.needs_client) return `Goes to the client: the change is above the limit of ${formatMoney(v.limit_applied ?? v.limit)} (BR-09).`;
     return "Goes to the client: it was raised by a project manager, who does not approve their own.";
   }
-  if (v.approver === "pm") return `A project manager approves it: within the limit of LKR ${formatAmount(v.limit_applied ?? v.limit)}, no time impact.`;
+  if (v.approver === "pm") return `A project manager approves it: within the limit of ${formatMoney(v.limit_applied ?? v.limit)}, no time impact.`;
   return "";
 }
 
@@ -53,8 +54,8 @@ function PriceForm({ step, busy }: { step: (s: VariationStep) => void; busy: boo
       }}
     >
       <div className="grid gap-3 sm:grid-cols-2">
-        <TextField label="Contract change, LKR" hint="Minus for an omission." inputMode="decimal" value={contract} onChange={(e) => { setContract(e.target.value); }} />
-        <TextField label="Cost budget change, LKR" hint="Internal." inputMode="decimal" value={budget} onChange={(e) => { setBudget(e.target.value); }} />
+        <TextField label={`Contract change, ${currencyCode()}`} hint="Minus for an omission." inputMode="decimal" value={contract} onChange={(e) => { setContract(e.target.value); }} />
+        <TextField label={`Cost budget change, ${currencyCode()}`} hint="Internal." inputMode="decimal" value={budget} onChange={(e) => { setBudget(e.target.value); }} />
       </div>
       <TextField label="Note (internal, optional)" maxLength={1000} value={comment} onChange={(e) => { setComment(e.target.value); }} />
       <div className="flex justify-end">
@@ -156,8 +157,8 @@ export function VariationDetailPage() {
                   {formatQuantity(v.quantity_change ?? "0")} on {v.boq_item}
                 </Fact>
               ) : null}
-              <Fact label="Contract change">{signedLKR(v.contract_change)}</Fact>
-              <Fact label="Cost budget change (internal)">{signedLKR(v.budget_change)}</Fact>
+              <Fact label="Contract change">{signedMoney(v.contract_change)}</Fact>
+              <Fact label="Cost budget change (internal)">{signedMoney(v.budget_change)}</Fact>
               <Fact label="Time impact">
                 {daysText(v.time_impact_days)}
                 {v.task ? ` · ${v.task}` : ""}

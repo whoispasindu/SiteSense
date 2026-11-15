@@ -8,6 +8,12 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Upgrading
 
+- **Any country.** Nothing changes for a Sri Lankan company: the new settings default to Sri Lanka.
+  A company elsewhere sets `SITESENSE_COUNTRY`, `SITESENSE_TIME_ZONE`, `SITESENSE_CURRENCY`,
+  `SITESENSE_NUMBER_LOCALE` and `SITESENSE_RISK_LKR_PER_UNIT` before the first project (see
+  `.env.example`). Migration 0019 adds each site's rain climate, and removes the seeded 2026 Sri
+  Lankan holidays when the country is not LK. A new dependency, `holidays`, needs the backend image
+  rebuilt (`docker compose up --build`).
 - **Two-step sign-in (Phase 13).** Company Admins, project managers, quantity surveyors and
   procurement officers are asked to set it up at their next sign-in, before anything else. Each
   needs an authenticator app. Set `SITESENSE_MFA_KEY` (32+ characters, different from the JWT
@@ -29,6 +35,15 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Any country** ([ADR 0017](docs/adr/0017-any-country.md)):
+  - The company's time zone, country, currency and number format are settings. "Today" on site,
+    the scheduled jobs and the weather follow the time zone; every amount in the app, emails and
+    the weekly PDF carries the currency code.
+  - **Import public holidays** by country and year on the Holidays page (then edit them).
+  - The risk model reads the contract value in rupees: other currencies are converted with
+    `SITESENSE_RISK_LKR_PER_UNIT`, and the driver is shown in the company's currency.
+  - Sites outside Sri Lanka get their own rain climate for the risk and supplier models, fetched
+    once from the Open-Meteo archive with the morning weather refresh.
 - Phase 13, hardening and deployment ([ADR 0016](docs/adr/0016-hardening-and-deployment.md)):
   - **Two-step sign-in** with an authenticator app (time-based codes) and ten single-use recovery
     codes. Required for Company Admins, project managers, quantity surveyors and procurement

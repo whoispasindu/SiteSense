@@ -26,7 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.ai import briefing as writer
-from app.core import clock
+from app.core import clock, company
 from app.core.logging import get_logger
 from app.core.permissions import ROLE_LABELS, Permission, Role, has_permission
 from app.models import EmailOutbox, User
@@ -121,7 +121,7 @@ def render(portfolio: Portfolio, facts: writer.Facts, role_label: str, generated
         _p("SiteSense weekly report", s["title"]),
         _p(
             f"Week of {monday:%d %B %Y} · as of {portfolio.as_of:%a %d %b %Y} · for the {role_label} · "
-            f"generated {generated.astimezone(clock.SITE_TIME_ZONE):%d %b %Y %H:%M} site time",
+            f"generated {generated.astimezone(clock.site_zone()):%d %b %Y %H:%M} site time",
             s["meta"],
         ),
         Spacer(1, 6),
@@ -161,8 +161,8 @@ def render(portfolio: Portfolio, facts: writer.Facts, role_label: str, generated
         "Progress (plan)",
         "Risk score (likely)",
         "Forecast delay (likely)",
-        "Budget LKR",
-        "Committed LKR",
+        f"Budget {company.current().currency}",
+        f"Committed {company.current().currency}",
         "Final at current rates",
         "Risk model final (likely)",
     ]
@@ -246,7 +246,7 @@ def queue_weekly(db: Session) -> int:
     now = clock.utcnow()
     today = clock.site_today()
     week_start = datetime.combine(
-        today - timedelta(days=today.weekday()), datetime.min.time(), clock.SITE_TIME_ZONE
+        today - timedelta(days=today.weekday()), datetime.min.time(), clock.site_zone()
     )
     queued = 0
     for user in db.scalars(select(User).where(User.is_active.is_(True)).order_by(User.email)).all():

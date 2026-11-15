@@ -1,5 +1,6 @@
 import type { ApprovalItem, IssueCategory, SiteWeather, SourceKind } from "../../api/dashboard";
 import type { Weather } from "../../api/reports";
+import { siteTimeZone } from "../../lib/locale";
 
 const SOURCE_WORDS: Record<SourceKind, [string, string]> = {
   risk: ["risk score", "risk scores"],
@@ -58,7 +59,7 @@ export function asWeather(site: SiteWeather): Weather {
 
 /** "07:42": a time of day at the site. */
 export function siteClock(timestamp: string): string {
-  return new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Colombo" }).format(
+  return new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: siteTimeZone() }).format(
     new Date(timestamp),
   );
 }

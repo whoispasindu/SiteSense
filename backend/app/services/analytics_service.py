@@ -49,7 +49,7 @@ from app.schemas.analytics import (
     Kpis,
     Portfolio,
     ProjectCostPoint,
-    RangeLKR,
+    RangeMoney,
     SiteWeather,
 )
 from app.schemas.report import WeatherDayOut
@@ -153,7 +153,7 @@ def _cost(db: Session, projects: list[Project], ranking: dict[uuid.UUID, RiskRan
             low, high = kpis.final_cost_range(
                 budget, risk.ranges.overrun_pct.low, risk.ranges.overrun_pct.high
             )
-            model_range = RangeLKR(low=low, high=high)
+            model_range = RangeMoney(low=low, high=high)
         points.append(
             ProjectCostPoint(
                 project_id=p.id,

@@ -31,7 +31,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.ai.nlp.tagger import tag_problems
-from app.core import clock
+from app.core import clock, company
 from app.core.config import get_settings
 from app.core.database import Database
 from app.core.permissions import Role
@@ -49,6 +49,7 @@ from app.core.security import (
     hash_password,
     validate_password,
 )
+from app.integrations.climate import OpenMeteoArchiveClient
 from app.integrations.storage import LocalStorage
 from app.integrations.weather import DisabledWeatherClient, OpenMeteoClient, WeatherClient
 from app.models import (
@@ -597,7 +598,7 @@ def _seed_supplier_history(db: Session) -> None:
             expected = today - timedelta(days=380 - i * (330 // orders))
             shift = 3 + i % 8 if i in late else -(i % 2)  # late by days, or on the day or the day before
             arrived = expected + timedelta(days=shift)
-            submitted = datetime.combine(expected - timedelta(days=21), time(9), clock.SITE_TIME_ZONE)
+            submitted = datetime.combine(expected - timedelta(days=21), time(9), clock.site_zone())
             request = MaterialRequest(
                 number=materials_service.next_number(db, "MR"), project_id=project.id,
                 boq_item_id=item.id, requested_by=engineer.id, quantity=Decimal("10"),
@@ -617,7 +618,7 @@ def _seed_supplier_history(db: Session) -> None:
             )  # fmt: skip
             db.add(line)
             db.flush()
-            received = datetime.combine(arrived, time(15), clock.SITE_TIME_ZONE)
+            received = datetime.combine(arrived, time(15), clock.site_zone())
             db.add(
                 Delivery(
                     line_id=line.id, quantity=Decimal("10"), delivered_on=arrived, received_by=buyer.id,
@@ -692,7 +693,7 @@ def _seed_price_rise(db: Session, project: Project, engineer: User, buyer: User)
         if db.scalar(select(MaterialRequest.id).where(MaterialRequest.boq_item_id == item.id)):
             continue
         arrived = today - timedelta(days=days_ago)
-        submitted = datetime.combine(arrived - timedelta(days=21), time(9), clock.SITE_TIME_ZONE)
+        submitted = datetime.combine(arrived - timedelta(days=21), time(9), clock.site_zone())
         qty, unit_price = Decimal(quantity), Decimal(price)
         request = MaterialRequest(
             number=materials_service.next_number(db, "MR"), project_id=project.id, boq_item_id=item.id,
@@ -715,7 +716,7 @@ def _seed_price_rise(db: Session, project: Project, engineer: User, buyer: User)
         db.add(
             Delivery(
                 line_id=line.id, quantity=qty, delivered_on=arrived, received_by=buyer.id,
-                created_at=datetime.combine(arrived, time(15), clock.SITE_TIME_ZONE),
+                created_at=datetime.combine(arrived, time(15), clock.site_zone()),
             )
         )  # fmt: skip
 
@@ -987,7 +988,11 @@ def send_reminders() -> int:
 def refresh_site_weather() -> int:
     settings = get_settings()
     database = Database(settings)
-    refreshed = refresh_weather(database.session_factory, OpenMeteoClient(settings.weather_timeout_seconds))
+    refreshed = refresh_weather(
+        database.session_factory,
+        OpenMeteoClient(settings.weather_timeout_seconds),
+        OpenMeteoArchiveClient(settings.climate_timeout_seconds),
+    )
     database.dispose()
     print(f"Refreshed the forecast for {refreshed} sites.")
     return 0
@@ -1048,6 +1053,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     strip.add_argument("--dry-run", action="store_true", help="count the files, change nothing")
     args = parser.parse_args(argv)
+    company.configure(get_settings())
 
     if args.command == "create-admin":
         return create_admin(args.email, args.name)

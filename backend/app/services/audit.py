@@ -83,6 +83,7 @@ class AuditAction:
     DEPENDENCY_REMOVED = "task.dependency_removed"
     HOLIDAY_ADDED = "holiday.added"
     HOLIDAY_REMOVED = "holiday.removed"
+    HOLIDAYS_IMPORTED = "holidays.imported"
     STOP_WORK_SCOPE_CHANGED = "report_action.stop_scope_changed"
     CRITICAL_PATH_OVERRIDE = "material_request.critical_path_set"
     # Phase 11: email choices and the weekly PDF (a cost export)

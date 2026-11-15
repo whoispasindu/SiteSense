@@ -11,11 +11,13 @@ from app.api.deps import (
     require_trusted_origin,
 )
 from app.core import clock
+from app.core.company import ZERO_DECIMAL_CURRENCIES
 from app.core.config import Settings
 from app.core.permissions import ROLE_LABELS, SITE_SCOPED_ROLES, Role, permissions_for
 from app.models import User
 from app.schemas.auth import (
     ChangePasswordRequest,
+    CompanyLocaleOut,
     LoginRequest,
     MeResponse,
     MfaChallengeResponse,
@@ -54,6 +56,13 @@ def me_response(user: User, settings: Settings) -> MeResponse:
         mfa_enabled=user.mfa_enabled,
         mfa_setup_required=mfa_service.setup_required(user, settings),
         demo_mode=settings.demo_mode,
+        company=CompanyLocaleOut(
+            time_zone=settings.time_zone,
+            country=settings.country,
+            currency=settings.currency,
+            currency_decimals=0 if settings.currency in ZERO_DECIMAL_CURRENCIES else 2,
+            number_locale=settings.number_locale,
+        ),
     )
 
 

@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.router import api_router
+from app.core import company
 from app.core.config import Settings, get_settings
 from app.core.database import Database
 from app.core.errors import register_error_handlers
@@ -31,6 +32,7 @@ MULTIPART_OVERHEAD = 256 * 1024
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level, json_logs=settings.environment != "development")
+    company.configure(settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:

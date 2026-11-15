@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { DEFAULT_LOCALE } from "../lib/locale";
 import { ApiError, apiRequest, setAccessToken } from "./client";
 
 export const ROLES = [
@@ -30,6 +31,14 @@ export const siteSummarySchema = z.object({
 });
 export type SiteSummary = z.infer<typeof siteSummarySchema>;
 
+export const companyLocaleSchema = z.object({
+  time_zone: z.string(),
+  country: z.string(),
+  currency: z.string(),
+  currency_decimals: z.number().int().min(0).max(3),
+  number_locale: z.string(),
+});
+
 export const meSchema = z.object({
   id: z.uuid(),
   email: z.string(),
@@ -44,6 +53,8 @@ export const meSchema = z.object({
   mfa_enabled: z.boolean().default(false),
   mfa_setup_required: z.boolean().default(false),
   demo_mode: z.boolean().default(false),
+  // The company's time zone and currency (server settings), for lib/locale.ts.
+  company: companyLocaleSchema.default(DEFAULT_LOCALE),
 });
 export type Me = z.infer<typeof meSchema>;
 

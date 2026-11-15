@@ -113,6 +113,8 @@ ENDPOINTS = [
     Endpoint("POST", "/api/v1/admin/holidays", ADMIN_ONLY,
              {"holiday_date": "2031-01-01", "name": "Matrix day"}),
     Endpoint("DELETE", "/api/v1/admin/holidays/{holiday_id}", ADMIN_ONLY),
+    Endpoint("GET", "/api/v1/admin/holidays/countries", ADMIN_ONLY),
+    Endpoint("POST", "/api/v1/admin/holidays/import", ADMIN_ONLY, {"country": "LK", "year": 2031}),
     Endpoint("GET", "/api/v1/reports/today", REPORT_READERS),
     Endpoint("GET", "/api/v1/projects/{project_id}/reports", REPORT_READERS),
     Endpoint("POST", "/api/v1/projects/{project_id}/reports", SE_ONLY,

@@ -26,6 +26,8 @@ NETWORK_CLIENTS = {
 # Module -> what it sends. Report text: never, unless redacted first and tested.
 ALLOWED = {
     "integrations/weather.py": "a site's stored coordinates to Open-Meteo; no report text",
+    # Rain history for sites outside Sri Lanka: the same as the forecast, to Open-Meteo's archive.
+    "integrations/climate.py": "a site's stored coordinates to Open-Meteo's archive; no report text",
     # Phase 11. Structured facts only (scores, ranges, counts, project codes and names, rule IDs);
     # tests/test_briefing_leaks.py captures the real request and fails on report text or a name.
     "integrations/llm.py": "the briefing facts to Claude; never report text, comments or people's names",

@@ -11,7 +11,7 @@ import { SectionHeading } from "../../components/ui/SectionHeading";
 import { Sheet } from "../../components/ui/Sheet";
 import { errorText } from "../../features/admin/adminUtils";
 import { formatDate } from "../../features/projects/dates";
-import { formatAmount, formatQuantity } from "../../lib/money";
+import { formatAmount, formatMoney, formatQuantity } from "../../lib/money";
 import { siteTodayIso } from "../../lib/time";
 import { NotFoundPage } from "../NotFoundPage";
 import { PoStatusBadge } from "./PurchaseOrdersPage";
@@ -114,7 +114,7 @@ export function PurchaseOrderDetailPage() {
         </div>
         {po.total !== undefined ? (
           <p className="tabular text-right text-2xl font-semibold text-ink">
-            <span className="block text-sm font-normal text-ink-faint">Total</span>LKR {formatAmount(po.total)}
+            <span className="block text-sm font-normal text-ink-faint">Total</span>{formatMoney(po.total)}
           </p>
         ) : null}
       </header>

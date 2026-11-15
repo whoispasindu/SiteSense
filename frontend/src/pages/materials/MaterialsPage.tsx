@@ -17,7 +17,7 @@ import { Sheet } from "../../components/ui/Sheet";
 import { errorText } from "../../features/admin/adminUtils";
 import { formatDate } from "../../features/projects/dates";
 import { RequestStatusBadge } from "../../features/materials/MaterialBits";
-import { formatCompactLKR, formatQuantity } from "../../lib/money";
+import { formatCompactMoney, formatQuantity } from "../../lib/money";
 
 /** The happy path, left to right, then the side exits. */
 const PIPELINE: RequestStatus[] = ["requested", "pm_approval", "approved", "ordered", "delivered"];
@@ -187,7 +187,7 @@ export function MaterialsPage() {
                   </td>
                   {r.amount !== undefined ? (
                     <td className="tabular px-4 py-3 text-right font-medium whitespace-nowrap text-ink">
-                      {r.amount === null ? <span className="text-xs font-normal text-ink-faint italic">Price pending</span> : formatCompactLKR(r.amount)}
+                      {r.amount === null ? <span className="text-xs font-normal text-ink-faint italic">Price pending</span> : formatCompactMoney(r.amount)}
                     </td>
                   ) : null}
                   <td className="tabular hidden px-4 py-3 whitespace-nowrap text-ink-soft lg:table-cell">{formatDate(r.needed_by)}</td>

@@ -8,6 +8,7 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -16,6 +17,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -64,10 +66,16 @@ class Site(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     latitude: Mapped[float | None] = mapped_column(nullable=True)
     longitude: Mapped[float | None] = mapped_column(nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
+    # The site's own rain climate for the risk model: the share of days with heavy rain (10 mm or
+    # more) in each calendar month, January first, from the Open-Meteo archive. Fetched once for sites
+    # far from the seven Sri Lankan towns the model was trained on; cleared when the coordinates change.
+    rain_climate: Mapped[list[float] | None] = mapped_column(ARRAY(Float), nullable=True)
+    rain_climate_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         CheckConstraint("latitude IS NULL OR latitude BETWEEN -90 AND 90", name="latitude_range"),
         CheckConstraint("longitude IS NULL OR longitude BETWEEN -180 AND 180", name="longitude_range"),
+        CheckConstraint("rain_climate IS NULL OR cardinality(rain_climate) = 12", name="rain_climate_months"),
     )
 
 

@@ -2,10 +2,11 @@ import { useBudget } from "../../api/materials";
 import { Alert } from "../../components/ui/Alert";
 import { SectionHeading } from "../../components/ui/SectionHeading";
 import { Sheet } from "../../components/ui/Sheet";
-import { formatAmount, formatCompactLKR, toNumber } from "../../lib/money";
+import { formatCompactMoney, formatMoney, toNumber } from "../../lib/money";
 import { errorText } from "../admin/adminUtils";
 import { formatDate } from "../projects/dates";
 import { KpiTile } from "../projects/ProjectBits";
+import { currencyCode } from "../../lib/locale";
 
 const LEGEND = [
   { label: "Spent (delivered)", className: "bg-signal-low" },
@@ -25,11 +26,11 @@ function VarianceText({ variance, pct }: { variance: string; pct: string | null 
   const share = pct === null ? "" : ` · ${String(Math.abs(toNumber(pct)))}%`;
   return n < 0 ? (
     <span className="text-signal-high">
-      {formatCompactLKR(Math.abs(n))} over{share}
+      {formatCompactMoney(Math.abs(n))} over{share}
     </span>
   ) : (
     <span className="text-signal-low">
-      {formatCompactLKR(n)} under{share}
+      {formatCompactMoney(n)} under{share}
     </span>
   );
 }
@@ -60,26 +61,26 @@ export function BudgetPanel({ projectId }: { projectId: string }) {
         Cost control
       </SectionHeading>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiTile icon="cost" label="Cost budget" value={formatCompactLKR(totals.budget)} title={`LKR ${formatAmount(totals.budget)}`} />
+        <KpiTile icon="cost" label="Cost budget" value={formatCompactMoney(totals.budget)} title={formatMoney(totals.budget)} />
         <KpiTile
           icon="reports"
           label="Committed"
-          value={formatCompactLKR(totals.committed)}
-          title={`LKR ${formatAmount(totals.committed)}`}
-          note={`Spent ${formatCompactLKR(totals.spent)} · on order ${formatCompactLKR(totals.on_order)}`}
+          value={formatCompactMoney(totals.committed)}
+          title={formatMoney(totals.committed)}
+          note={`Spent ${formatCompactMoney(totals.spent)} · on order ${formatCompactMoney(totals.on_order)}`}
         />
         <KpiTile
           icon="materials"
           label="Forecast final cost"
-          value={formatCompactLKR(totals.forecast_final)}
-          title={`LKR ${formatAmount(totals.forecast_final)}`}
+          value={formatCompactMoney(totals.forecast_final)}
+          title={formatMoney(totals.forecast_final)}
           note={basisText(totals.trend, totals.basis_pct)}
         />
         <KpiTile
           icon="risk"
           label={variance < 0 ? "Forecast overrun" : "Forecast saving"}
-          value={formatCompactLKR(Math.abs(variance))}
-          title={`LKR ${formatAmount(totals.variance)}`}
+          value={formatCompactMoney(Math.abs(variance))}
+          title={formatMoney(totals.variance)}
           tone={variance < 0 ? "down" : "ok"}
           note={overNote(overCount, variance)}
         />
@@ -88,7 +89,7 @@ export function BudgetPanel({ projectId }: { projectId: string }) {
       <Sheet className="relative overflow-x-auto">
         <table className="w-full text-sm">
           <caption className="sr-only">
-            Cost budget, spent, committed, forecast final cost and variance by BOQ section, in LKR
+            Cost budget, spent, committed, forecast final cost and variance by BOQ section, in {currencyCode()}
           </caption>
           <thead className="border-b border-rule bg-paper-sunk/60 text-xs font-medium whitespace-nowrap text-ink-faint">
             <tr>
@@ -131,15 +132,15 @@ export function BudgetPanel({ projectId }: { projectId: string }) {
                       />
                     </div>
                   </td>
-                  <td className="tabular px-4 py-3 text-right whitespace-nowrap text-ink-soft">{formatCompactLKR(line.budget)}</td>
+                  <td className="tabular px-4 py-3 text-right whitespace-nowrap text-ink-soft">{formatCompactMoney(line.budget)}</td>
                   <td className="tabular hidden px-4 py-3 text-right whitespace-nowrap text-ink md:table-cell">
-                    {formatCompactLKR(line.spent)}
+                    {formatCompactMoney(line.spent)}
                   </td>
                   <td className="tabular hidden px-4 py-3 text-right whitespace-nowrap text-ink sm:table-cell">
-                    {formatCompactLKR(line.committed)}
+                    {formatCompactMoney(line.committed)}
                   </td>
                   <td className="tabular px-4 py-3 text-right whitespace-nowrap text-ink" title={basisText(line.trend, line.basis_pct)}>
-                    {formatCompactLKR(line.forecast_final)}
+                    {formatCompactMoney(line.forecast_final)}
                     <span className="block text-xs text-ink-faint">
                       {line.trend === null ? "no trend yet" : `trend ${toNumber(line.trend).toFixed(2)}`}
                     </span>

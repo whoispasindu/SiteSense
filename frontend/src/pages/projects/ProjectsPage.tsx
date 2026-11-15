@@ -11,7 +11,7 @@ import { errorText } from "../../features/admin/adminUtils";
 import { formatDate } from "../../features/projects/dates";
 import { ProgrammeBar, ProjectStatusBadge } from "../../features/projects/ProjectBits";
 import { ProjectFormDialog } from "../../features/projects/ProjectFormDialog";
-import { formatCompactLKR, percent } from "../../lib/money";
+import { formatCompactMoney, percent } from "../../lib/money";
 
 export function ProjectsPage() {
   const { can, user } = useAuth();
@@ -118,7 +118,7 @@ export function ProjectsPage() {
                     </div>
                     <div>
                       {p.contract_value !== undefined ? (
-                        <p className="tabular text-lg font-semibold text-ink">{formatCompactLKR(p.contract_value)}</p>
+                        <p className="tabular text-lg font-semibold text-ink">{formatCompactMoney(p.contract_value)}</p>
                       ) : null}
                       <p className="mt-0.5 text-xs text-ink-faint">
                         {p.item_count === 0

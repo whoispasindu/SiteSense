@@ -12,14 +12,16 @@ takes its neutral value and a note says so, so the score is still produced but t
     late_deliveries_count  order lines delivered after, or still overdue past, their expected date
     avg_lateness_days      mean lateness of those lines
     rain_days_next_14      forecast days with heavy rain (BR-06: 10 mm or more) in the next 14 days
-    wet_days_ahead         heavy-rain working days expected from the site's climate (nearest of seven
-                           towns) from tomorrow to the planned end, at least the next 28 days (1.2)
+    wet_days_ahead         heavy-rain working days expected from the site's climate (in Sri Lanka the
+                           nearest of seven towns, elsewhere the site's own history; climate.for_site)
+                           from tomorrow to the planned end, at least the next 28 days (1.2)
     budget_variance_pct    committed cost against the budgeted value of the same work, % over
     crew_vs_plan_pct       average reported crew over the last 14 days against the planned crew, %
     missing_reports_14     working days (Mon to Sat) in the last 14 without a daily report (BR-07)
     issues_*_14            confirmed material-delay, safety and design issues in the last 14 days of
                            reports (Phase 7: tagged by the report classifier, confirmed by the author)
-    contract_value_m       LKR millions
+    contract_value_m       LKR millions: the contract value converted with SITESENSE_RISK_LKR_PER_UNIT
+                           when the company's currency is not LKR (the model was trained in LKR)
     type_*                 project type, one-hot
 """
 
@@ -34,6 +36,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.ai.risk import climate
+from app.core import company
 from app.models import (
     DailyReport,
     Delivery,
@@ -170,12 +173,10 @@ def _rain(db: Session, project: Project, on: date, notes: list[str]) -> float:
 
 def _wet_days_ahead(project: Project, on: date, notes: list[str]) -> float:
     site = project.site
-    if site.latitude is None or site.longitude is None:
-        notes.append("The site has no coordinates: rain ahead uses Sri Lanka's average climate.")
-        town = climate.national_average()
-    else:
-        town = climate.nearest(site.latitude, site.longitude).town
-    return climate.wet_days_ahead(town, on, project.planned_end)
+    choice = climate.for_site(site.latitude, site.longitude, site.rain_climate)
+    if choice.note:
+        notes.append(choice.note)
+    return climate.wet_days_ahead(choice.town, on, project.planned_end)
 
 
 def _cost(db: Session, project: Project) -> float:
@@ -231,6 +232,11 @@ def _issues(db: Session, project: Project, on: date) -> dict[str, float]:
     }
 
 
+def contract_value_m(value: Decimal) -> float:
+    """The contract value in millions of Sri Lankan rupees, the unit the model was trained on."""
+    return float(value * company.current().lkr_per_unit) / 1_000_000
+
+
 def build(db: Session, project: Project, on: date) -> FeatureSet:
     notes: list[str] = []
     planned_days = (project.planned_end - project.start_date).days + 1
@@ -256,7 +262,7 @@ def build(db: Session, project: Project, on: date) -> FeatureSet:
         "crew_vs_plan_pct": crew,
         "missing_reports_14": missing,
         **_issues(db, project, on),
-        "contract_value_m": float(project.contract_value) / 1_000_000,
+        "contract_value_m": contract_value_m(project.contract_value),
         **{f"type_{t}": float(project.project_type == t) for t in PROJECT_TYPES},
     }
     return FeatureSet({k: round(v, 4) for k, v in values.items()}, notes)

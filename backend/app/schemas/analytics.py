@@ -39,7 +39,7 @@ class CostTotalsOut(BaseModel):
     over_budget: int
 
 
-class RangeLKR(BaseModel):
+class RangeMoney(BaseModel):
     low: Decimal
     high: Decimal
 
@@ -51,7 +51,7 @@ class ProjectCostPoint(BaseModel):
     budget: Decimal
     committed: Decimal
     forecast_final: Decimal  # at current rates (the cost rules, Phase 8)
-    model_final_range: RangeLKR | None  # the risk model's likely final cost; None until scored with ranges
+    model_final_range: RangeMoney | None  # the risk model's likely final cost; None until scored with ranges
 
 
 class CostAgainstPlan(BaseModel):

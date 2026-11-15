@@ -1,7 +1,7 @@
 """The working calendar: which days a site works, and arithmetic in working days (Phase 9).
 
 A project works on its own working week (Monday to Saturday by default; ISO weekdays, 1 = Monday)
-and never on the company's holidays (Poya days and public holidays, kept by the Company Admin).
+and never on the company's holidays (public holidays and other days off, kept by the Company Admin).
 Durations, float and slip are counted in working days.
 
 Pure functions over plain values: no database, no clock.

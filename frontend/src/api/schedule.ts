@@ -256,3 +256,33 @@ export function useRemoveHoliday() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: holidayKeys.all }),
   });
 }
+
+const holidayCountriesSchema = z.object({ countries: z.array(z.string()), default: z.string() });
+const holidayImportSchema = z.object({
+  country: z.string(),
+  year: z.number().int(),
+  added: z.array(holidaySchema),
+  already_entered: z.number().int(),
+  message: z.string(),
+});
+export type HolidayImport = z.infer<typeof holidayImportSchema>;
+
+/** Countries SiteSense has public holidays for, and the company's own (the default). */
+export function useHolidayCountries() {
+  return useQuery({
+    queryKey: [...holidayKeys.all, "countries"],
+    queryFn: ({ signal }) =>
+      apiRequest("/admin/holidays/countries", holidayCountriesSchema, { signal }).then((r) => r.data),
+    staleTime: Infinity,
+  });
+}
+
+/** Adds a country's public holidays for a year; dates already entered are left as they are. */
+export function useImportHolidays() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { country: string; year: number }) =>
+      apiRequest("/admin/holidays/import", holidayImportSchema, { method: "POST", body }).then((r) => r.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: holidayKeys.all }),
+  });
+}

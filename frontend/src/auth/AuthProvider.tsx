@@ -9,6 +9,7 @@ import {
   type Me,
 } from "../api/auth";
 import { configureSession, refreshSession, setAccessToken } from "../api/client";
+import { configureLocale } from "../lib/locale";
 import { AuthContext, type AuthContextValue, type AuthStatus } from "./context";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -26,6 +27,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const setUser = useCallback((next: Me) => {
+    // Before the signed-in screens render: amounts and times use the company's currency and zone.
+    configureLocale(next.company);
     setUserState(next);
     setStatus("authenticated");
     setEndedBy(null);

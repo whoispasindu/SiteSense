@@ -8,6 +8,8 @@ import type { ProjectDetail } from "../api/projects";
 import type { ProjectRisk } from "../api/risk";
 import type { Network, Progress, Task, TaskTiming } from "../api/schedule";
 import { slipText } from "../features/schedule/network";
+import { DEFAULT_LOCALE } from "../lib/locale";
+import { siteTodayIso } from "../lib/time";
 import { errorResponse, jsonResponse, makeMe, mockApi, renderRoute, requestTo, sessionApi } from "../test/utils";
 
 const SITE = { id: "0b6c2f4e-1d3a-4e5f-8a9b-1c2d3e4f5a6b", code: "COL-07", name: "Havelock Residences" };
@@ -57,7 +59,7 @@ const NETWORK: Network = {
   ],
   dependencies: [{ id: DEP, predecessor_id: T1, successor_id: T2, lag_days: 0 }],
   stop_work: [{ action_id: ACT, report_id: RID, summary: "Helper fell", scope: "tasks", task_ids: [T1], since: "2026-10-08T03:00:00+00:00" }],
-  warnings: ["No holidays are entered for 2027: its Poya days and public holidays count as working days. The Company Admin can add them."],
+  warnings: ["No holidays are entered for 2027: its public holidays count as working days. The Company Admin can add them."],
 };  // fmt: skip
 
 const PROGRESS: Progress = {
@@ -251,6 +253,42 @@ describe("Holidays (Company Admin)", () => {
       const posted = fetchMock.mock.calls.find(([input, init]) => urlOf(input).endsWith("/admin/holidays") && init?.method === "POST");
       expect(body(posted?.[1])).toEqual({ holiday_date: "2027-01-03", name: "Duruthu Full Moon Poya Day" });
     });
+  });
+});
+
+describe("Holiday import (Company Admin)", () => {
+  it("imports the company's country's public holidays for next year by default", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockApi({
+      ...sessionApi(makeMe("admin", { company: { ...DEFAULT_LOCALE, country: "GB", currency: "GBP", number_locale: "en-GB" } })),
+      "/api/v1/admin/holidays": () => jsonResponse({ holidays: [], years: [], missing_next_year: true }),
+      "/api/v1/admin/holidays/countries": () => jsonResponse({ countries: ["GB", "LK", "US"], default: "GB" }),
+      "/api/v1/admin/holidays/import": () =>
+        jsonResponse({
+          country: "GB",
+          year: 2027,
+          added: [{ id: T1, holiday_date: "2027-12-25", name: "Christmas Day" }],
+          already_entered: 0,
+          message: "Added 1 public holidays for 2027. Check them, and add any other days your sites do not work.",
+        }),
+    });
+    renderRoute("/admin/holidays");
+
+    const form = await screen.findByRole("form", { name: "Import public holidays" });
+    const country = within(form).getByRole("combobox", { name: "Country" });
+    await waitFor(() => {
+      expect(country).toHaveValue("GB");
+    });
+    expect(within(country).getByRole("option", { name: "United Kingdom" })).toBeInTheDocument();
+    const year = within(form).getByRole("textbox", { name: "Year" });
+    const nextYear = Number(siteTodayIso().slice(0, 4)) + 1;
+    expect(year).toHaveValue(String(nextYear));
+    await user.clear(year);
+    await user.type(year, "2027");
+    await user.click(within(form).getByRole("button", { name: "Import public holidays" }));
+
+    expect(await screen.findByText(/Added 1 public holidays for 2027/)).toBeInTheDocument();
+    expect(body(requestTo(fetchMock, "/admin/holidays/import"))).toEqual({ country: "GB", year: 2027 });
   });
 });
 

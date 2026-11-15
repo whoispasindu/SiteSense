@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal
 
+from app.core import company
+
 PRICE_TOLERANCE = Decimal("0.05")  # BR-01: the QS may approve up to 5% over budget
 QUANTITY_TOLERANCE = Decimal("0.03")  # BR-02: up to 3% over the BOQ quantity
 CENTS = Decimal("0.01")
@@ -171,7 +173,7 @@ def check_section_budget(
     if after > line_budget:
         message = (
             f"Needs project manager approval: with this request the section's committed cost would be "
-            f"LKR {money(after):,} against a budget line of LKR {money(line_budget):,}."
+            f"{company.money(money(after))} against a budget line of {company.money(money(line_budget))}."
         )
         return RuleResult("BR-13", "warn", message, facts)
     return RuleResult("BR-13", "pass", "The section stays within its budget line.", facts)

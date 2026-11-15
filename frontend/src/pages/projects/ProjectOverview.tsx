@@ -10,8 +10,9 @@ import { durationWeeks, formatDate } from "../../features/projects/dates";
 import { KpiTile, ProgrammeBar } from "../../features/projects/ProjectBits";
 import { StopWorkBanner } from "../../features/reports/StopWorkBanner";
 import { ProjectRiskPanel } from "../../features/risk/ProjectRiskPanel";
-import { formatAmount, formatCompactLKR, percent, toNumber } from "../../lib/money";
+import { formatCompactMoney, formatMoney, percent, toNumber } from "../../lib/money";
 import { useCurrentProject } from "./projectContext";
+import { currencyCode } from "../../lib/locale";
 
 export function ProjectOverview() {
   const p = useCurrentProject();
@@ -57,22 +58,22 @@ export function ProjectOverview() {
 
         {priced ? (
         <div className="grid content-start gap-4 sm:grid-cols-2">
-          <KpiTile icon="cost" label="Contract value" value={formatCompactLKR(p.contract_value ?? 0)} title={`LKR ${formatAmount(p.contract_value ?? 0)}`} />
+          <KpiTile icon="cost" label="Contract value" value={formatCompactMoney(p.contract_value ?? 0)} title={formatMoney(p.contract_value ?? 0)} />
           <KpiTile
             icon="projects"
             label="BOQ total"
-            value={p.item_count ? formatCompactLKR(p.boq_total ?? 0) : "—"}
-            title={`LKR ${formatAmount(p.boq_total ?? 0)}`}
+            value={p.item_count ? formatCompactMoney(p.boq_total ?? 0) : "—"}
+            title={formatMoney(p.boq_total ?? 0)}
             note={p.item_count ? `${String(p.item_count)} items · ${coverage.toFixed(1)}% of contract value` : "No BOQ imported yet"}
           />
           <KpiTile
             icon="materials"
             label="Cost budget"
-            value={p.item_count ? formatCompactLKR(p.budget_total ?? 0) : "—"}
-            title={`LKR ${formatAmount(p.budget_total ?? 0)}`}
+            value={p.item_count ? formatCompactMoney(p.budget_total ?? 0) : "—"}
+            title={formatMoney(p.budget_total ?? 0)}
             note={
               costs.data
-                ? `Committed ${formatCompactLKR(costs.data.totals.committed)} · spent ${formatCompactLKR(costs.data.totals.spent)}`
+                ? `Committed ${formatCompactMoney(costs.data.totals.committed)} · spent ${formatCompactMoney(costs.data.totals.spent)}`
                 : "Cost to date is on the BOQ & budget tab"
             }
           />
@@ -134,7 +135,7 @@ export function ProjectOverview() {
         ) : (
           <Sheet className="relative overflow-x-auto">
             <table className="w-full text-sm">
-              <caption className="sr-only">BOQ value and cost budget by section, in LKR</caption>
+              <caption className="sr-only">BOQ value and cost budget by section, in {currencyCode()}</caption>
               <thead className="border-b border-rule bg-paper-sunk/60 text-xs text-ink-faint">
                 <tr>
                   <th scope="col" className="px-4 py-2.5 text-left font-medium">
@@ -170,8 +171,8 @@ export function ProjectOverview() {
                           />
                         </div>
                       </td>
-                      <td className="tabular px-4 py-3 text-right font-medium text-ink">{formatCompactLKR(s.amount ?? 0)}</td>
-                      <td className="tabular px-4 py-3 text-right text-ink-soft">{formatCompactLKR(s.budget_amount ?? 0)}</td>
+                      <td className="tabular px-4 py-3 text-right font-medium text-ink">{formatCompactMoney(s.amount ?? 0)}</td>
+                      <td className="tabular px-4 py-3 text-right text-ink-soft">{formatCompactMoney(s.budget_amount ?? 0)}</td>
                     </tr>
                   );
                 })}

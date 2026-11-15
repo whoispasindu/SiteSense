@@ -48,7 +48,7 @@ WEATHER_FIELDS = ("weather_summary", "temp_max_c", "temp_min_c", "rain_mm")
 
 
 def _site_day(moment: datetime) -> date:
-    return moment.astimezone(clock.SITE_TIME_ZONE).date()
+    return moment.astimezone(clock.site_zone()).date()
 
 
 def is_editable(report: DailyReport, user: User) -> bool:
@@ -399,7 +399,7 @@ def delete_photo(
 
 
 def deadline_for(day: date, hour: int) -> datetime:
-    return datetime.combine(day, time(hour=hour), tzinfo=clock.SITE_TIME_ZONE)
+    return datetime.combine(day, time(hour=hour), tzinfo=clock.site_zone())
 
 
 def today_status(db: Session, user: User, *, deadline_hour: int) -> ReportStatus:

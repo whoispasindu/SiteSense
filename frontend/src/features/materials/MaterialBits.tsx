@@ -1,7 +1,8 @@
 import { REQUEST_STATUS_LABELS, type RequestStatus, type RuleCheck } from "../../api/materials";
 import { Icon, type IconName } from "../../components/ui/icons";
 import { StatusBadge, type Tone } from "../../components/ui/StatusBadge";
-import { formatAmount } from "../../lib/money";
+import { formatAmount, formatMoney } from "../../lib/money";
+import { currencyCode } from "../../lib/locale";
 
 const STATUS_TONES: Record<RequestStatus, Tone> = {
   requested: "warn",
@@ -33,7 +34,7 @@ const RULE_NAMES: Record<string, string> = {
 };
 
 /** A price, or "Price pending" while the QS has not entered the quoted price yet. */
-export function PriceText({ value, prefix = "LKR " }: { value: string | null; prefix?: string }) {
+export function PriceText({ value, prefix = `${currencyCode()} ` }: { value: string | null; prefix?: string }) {
   if (value === null) return <span className="font-normal text-ink-faint italic">Price pending</span>;
   return (
     <>
@@ -97,7 +98,7 @@ export function RuleChecks({ check, compact = false }: { check: RuleCheck; compa
           {check.budget_rate !== undefined ? (
             <div>
               <dt className="text-ink-faint">Budgeted rate</dt>
-              <dd className="tabular font-medium text-ink">LKR {formatAmount(check.budget_rate)}</dd>
+              <dd className="tabular font-medium text-ink">{formatMoney(check.budget_rate)}</dd>
             </div>
           ) : null}
           <div>

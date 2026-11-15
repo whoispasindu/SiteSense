@@ -144,7 +144,7 @@ class TaskDependency(UUIDPrimaryKeyMixin, Base):
 
 
 class Holiday(UUIDPrimaryKeyMixin, Base):
-    """A company-wide day off (Poya days, public holidays). Kept by the Company Admin."""
+    """A company-wide day off (a public holiday, or a Poya day in Sri Lanka). Kept by the Company Admin."""
 
     __tablename__ = "holidays"
 
