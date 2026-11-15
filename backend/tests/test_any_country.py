@@ -87,7 +87,7 @@ def test_today_on_site_follows_the_company_time_zone(
     assert clock.site_today() == date(2026, 11, 15)
     company_settings(time_zone="America/Chicago")
     assert clock.site_today() == date(2026, 11, 14)
-    assert clock.site_zone().key == "America/Chicago"
+    assert str(clock.site_zone()) == "America/Chicago"
 
 
 def test_amounts_in_messages_use_the_companys_currency(

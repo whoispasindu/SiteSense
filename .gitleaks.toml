@@ -18,4 +18,7 @@ regexes = [
   # Fake one-time passwords used as fixtures in the frontend tests
   '''kQ7rd-2xPmA-9fT3c-Lw8nB''',
   '''Zz9yy-Xx8ww-Vv7uu-Tt6ss''',
+  # An IANA time-zone name in tests/test_any_country.py (first commit of PR #57): the generic
+  # API-key rule read `site_zone().key == "America/Chicago"` as a key. The test no longer uses .key.
+  '''America/Chicago''',
 ]
