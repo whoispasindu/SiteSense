@@ -1,0 +1,2 @@
+project_ref,project_type,district,contract_value,currency,planned_start,planned_end,actual_end,cost_budget,final_cost,approved_variations,extension_days,planned_crew,main_delay_causes,weather_lost_days
+P-001,residential,Colombo,685000000,LKR,2023-03-01,2024-08-31,2024-12-20,610000000,655000000,42000000,45,40,material_delay;weather,12

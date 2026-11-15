@@ -1,7 +1,8 @@
 # Phase 14 plan: testing, user acceptance and evaluation → v1.0
 
-Status: proposed (2026-11-15), for the project owner to decide (see the end). Follows the trial
-release `v0.2.0-rc.1`. Leads to **v1.0**, and then to step 6 of the
+Status: plan A decided (2026-11-15): a two-month pilot with a construction company run by a friend
+of the project owner, hosted on the company's own server, plus the company's historical project data.
+Some decisions remain (see the end). Follows the trial release `v0.2.0-rc.1`. Leads to **v1.0**, and then to step 6 of the
 [open-source release plan](open-source-release.md) (licence and going public).
 
 ## Goal
@@ -37,7 +38,7 @@ the test suite cannot answer:
 
 | Who | How many | Why |
 | --- | --- | --- |
-| A pilot contractor | 1 company, 1 or 2 active sites | Real projects, real reports, real approvals |
+| The pilot contractor | 1 company (decided), 1 or 2 active sites | Real projects, real reports, real approvals |
 | Project manager | 1 or 2 | Dashboard, approvals, risk and what-if, programme, claims |
 | Quantity surveyor | 1 | BOQ import, pricing (BR-01, BR-13), claims (BR-08), variations |
 | Site engineers | 2 to 4 | Daily reports with photos on phones, AI tags, material requests: the heaviest use |
@@ -47,16 +48,24 @@ the test suite cannot answer:
 | Installer | 1, not a SiteSense developer | Installs from the guide, does the restore drill |
 | Facilitator | the project owner | Runs sessions, records findings, collects consent |
 
-**If no pilot company is available in time**, the fallback is moderated sessions with 5 to 8
-construction professionals (two of each main role where possible) on the demo company. Usability,
-the test cases, accessibility and install still get done. The model evaluation then rests on
-synthetic data and the professionals' judgement only, and v1.0's README and model cards say so
-plainly.
+**A friend's company: honest feedback takes some design.** People are kind to a friend's product.
+So the plan leans on what people do rather than what they say:
+
+- the app's own records: reports filed, tags changed, approval times, screens never opened;
+- watching sessions without helping;
+- an anonymous usability survey;
+- interviews with the people doing the work (engineers, the QS), not only the owner.
+
+Every finding is logged, however small, and "it's fine" with no example counts as no answer.
+
+(The fallback, if the pilot falls through: moderated sessions with 5 to 8 construction professionals
+on the demo company. The model evaluation would then rest on synthetic data, and v1.0 would say so.)
 
 ## Where
 
-The pilot runs on **its own installation**, from the release bundle (`0.2.0-rc.N`), on a server the
-pilot controls or one provided for it. It holds real company data, so:
+The pilot runs on **its own installation, on the company's own server** (decided), from the release
+bundle (`0.2.0-rc.N`). Their IT person (or whoever will look after it) installs it from the guide,
+which is also the install test. It holds real company data, so:
 
 - **demo mode off**, two-step sign-in on, nightly `backup.py create` copied off the server;
 - **no pilot data leaves their server**: the evaluation runs there and only aggregate figures come
@@ -66,6 +75,18 @@ pilot controls or one provided for it. It holds real company data, so:
 
 Fixes found during the pilot ship as new release candidates (`rc.2`, `rc.3`…) and the pilot
 upgrades with the documented procedure. That procedure gets tested along the way.
+
+**Getting the images while the repository is private.** The release images are private until the
+repository is public (open-source plan, step 6), so the pilot's server cannot pull them anonymously.
+Two ways, for the owner to choose:
+
+- **Read access for the pilot (proposed):** invite the installer's GitHub account to the repository
+  with read access. They make a token with only `read:packages`, run `docker login ghcr.io` with it
+  on their server, then install from the bundle as the guide says. Nothing else changes, and access
+  can be removed after the pilot.
+- **Go public before the pilot:** do step 6 (AGPL licence, CLA, public repository) first. The
+  install then needs no account, and the images get signed. But the code goes public before real
+  users have tested it.
 
 ## Part 1: acceptance test cases, done by people
 
@@ -89,13 +110,15 @@ words and phones.
 | TC-11 | PM | Tick every recovery action in the what-if planner | Delay, cost and score recalculated, each with its range |
 | TC-12 | PM | A pour falls on a heavy-rain day | The task is flagged and the PM alerted (BR-06) |
 
-## Part 2: the pilot (3 to 4 weeks of real use)
+## Part 2: the pilot (two months of real use)
 
 - **Training:** one 45-minute session per role group, then a one-page guide per role
   (`docs/uat/role-guides/`). Watch what people miss: anything that needs explaining twice goes
   on the findings list.
 - **Daily use:** reports every working day; requests, orders and deliveries as they happen; at
-  least one progress claim and one variation through the full workflow.
+  least one progress claim and one variation through the full workflow. Two months also means at
+  least one monthly claim cycle, and enough reports (about 40 working days per site) for a real
+  measure of the report classifier.
 - **Measured** (from the app's own records, aggregates only):
   - reports filed on time (BR-07). The app records when a report is submitted, not when it was
     started, so the time to file one is timed in the observed sessions (a stopwatch on at least 10
@@ -135,8 +158,10 @@ real sentences (only with the pilot's written permission, redacted) become the n
 
 **Risk model.** A few weeks cannot show final delay or overrun, so:
 
-- **Historical check:** the pilot gives planned and actual end dates, and budget and final cost, for
-  their **finished projects** (as many as they can, ideally 10 or more). This tests the simulator's
+- **Historical check:** the pilot company gives planned and actual end dates, and budget and final
+  cost, for their **finished projects** (decided: the owner can get this data; what to ask for, and
+  how it is handled, is in [historical-data.md](../uat/historical-data.md)). As many as they can,
+  ideally 10 or more. This tests the simulator's
   central assumptions directly (the median project finishes about 10% late; how overruns spread)
   and decides whether to recalibrate it (`ml/data_generator/ASSUMPTIONS.md`).
 - **Face validity:** each week the PM ranks their projects by how worried they are, before looking
@@ -188,21 +213,29 @@ Small tools, so the evaluation needs no pilot data to leave their server:
 
 ## Rough timeline
 
+About 12 weeks, with two months of real use in the middle:
+
 | Week | What |
 | --- | --- |
-| 1 | Owner decisions (below); recruit the pilot; build the evaluation tools and `docs/uat/`; `rc.2` |
-| 2 | Install at the pilot (by the installer, from the guide); training; TC-01 to TC-12 with each role |
-| 3 to 5 | Real use; SUS after week 1; weekly check-ins and PM rankings; fixes as `rc.3`, `rc.4` |
-| 6 | Final SUS and interviews; evaluation run; restore drill; screen-reader session; write-up |
-| 7 | Fix what blocks the exit criteria; update the model cards and README; tag **v1.0.0** |
+| 1 | Remaining decisions (below); ask for the historical data; build the evaluation tools and `docs/uat/`; `rc.2` |
+| 2 | Access to the images; install at the pilot by their installer, from the guide; training; TC-01 to TC-12 with each role |
+| 3 to 10 | Two months of real use; SUS after week 1; weekly check-ins and PM rankings; fixes as `rc.3`, `rc.4`… The historical data is analysed meanwhile |
+| 11 | Final SUS and interviews; evaluation run; restore drill; screen-reader session; write-up |
+| 12 | Fix what blocks the exit criteria; update the model cards and README; tag **v1.0.0** |
 
-## To decide (project owner)
+## Decided by the project owner (2026-11-15)
 
-1. **The pilot company:** who, and how many sites. If none is available, the fallback sessions
-   above.
-2. **Where the pilot runs:** their server, or one you provide (and who pays for it).
-3. **Evaluation data:** aggregates only (proposed), or also redacted labelled sentences for
-   retraining, with their written permission.
-4. **The v1.0 bar for the models:** proposed is "measured and published honestly, with the app's
+1. **Plan A:** a pilot with a construction company run by a friend of the project owner.
+2. **It runs on the company's own server**, installed by them from the guide.
+3. **Two months** of real use.
+4. **Historical project data** from the company, for the model evaluation, handled as in
+   [historical-data.md](../uat/historical-data.md).
+
+## Still to decide
+
+1. **Access to the images while the repository is private:** read access for the pilot's installer
+   (proposed), or go public before the pilot (see "Where").
+2. **Evaluation data:** aggregates only (proposed), or also redacted, labelled report sentences kept
+   for retraining, with the company's written permission.
+3. **The v1.0 bar for the models:** proposed is "measured and published honestly, with the app's
    wording matched to the results", rather than a minimum score, since no real baseline exists yet.
-5. **Timeline:** the 7 weeks above, or another.
