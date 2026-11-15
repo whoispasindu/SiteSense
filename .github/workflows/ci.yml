@@ -60,11 +60,11 @@ jobs:
         run: ruff format --check .
       - name: Mypy (strict)
         run: mypy app tests
-      - name: Release scripts (setup, bundle, model fetch) - lint, format, types
+      - name: Release scripts (setup, backup, bundle, model fetch) - lint, format, types
         run: |
           ruff check --output-format=github ../scripts
           ruff format --check ../scripts
-          mypy ../scripts/setup.py ../scripts/make_bundle.py ../scripts/fetch_models.py
+          mypy ../scripts/setup.py ../scripts/make_bundle.py ../scripts/fetch_models.py ../scripts/backup.py
       - name: Migrations apply cleanly and match the models
         run: |
           alembic upgrade head

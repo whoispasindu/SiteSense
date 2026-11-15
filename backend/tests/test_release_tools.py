@@ -219,6 +219,7 @@ def test_the_bundle_runs_the_images_it_was_released_with(tmp_path: Path) -> None
         setup_mode = tar.getmember("sitesense-1.2.3/setup.py").mode
     assert {
         "sitesense-1.2.3/setup.py",
+        "sitesense-1.2.3/backup.py",
         "sitesense-1.2.3/README.md",
         "sitesense-1.2.3/.env.prod.example",
         "sitesense-1.2.3/infra/caddy/Caddyfile",

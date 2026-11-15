@@ -39,6 +39,11 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Backup and restore** ([ADR 0020](docs/adr/0020-backup-and-restore.md)): `backup.py create`
+  saves the database and the photos in one checked file while SiteSense runs, keeping the newest
+  14; `backup.py restore` checks the file, refuses one from a newer release, replaces all data and
+  starts SiteSense again. Tested end to end by deleting an installation and restoring it. The
+  self-hosting guide adds server sizing from the load test, health checks and a support policy.
 - **Self-hosting** ([ADR 0019](docs/adr/0019-release-images-and-setup.md),
   [docs/self-hosting.md](docs/self-hosting.md)):
   - A version tag publishes signed images for amd64 and arm64 servers
