@@ -1,8 +1,13 @@
-# Production stack, runnable on your machine:
+# Production stack: the released images, on a server or on your machine (docs/self-hosting.md).
 #
+#   python scripts/setup.py            # writes .env.prod with strong secrets, starts it, creates the admin
+#   or by hand:
 #   cp .env.prod.example .env.prod     # then fill in every secret (see the comments in the file)
-#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 #   open https://localhost             # Caddy's local certificate: accept the warning once
+#
+# To build the images from this checkout instead of pulling them, add the build override:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.build.yml --env-file .env.prod up -d --build
 #
 # What differs from docker-compose.yml (development):
 # - production images: no bind mounts, no reload, read-only code owned by root, unprivileged users
@@ -26,6 +31,8 @@ x-backend-env: &backend-env
   SITESENSE_WEATHER_ENABLED: ${SITESENSE_WEATHER_ENABLED:-true}
   SITESENSE_ANTHROPIC_API_KEY: ${SITESENSE_ANTHROPIC_API_KEY:-}
   SITESENSE_SMTP_HOST: ${SITESENSE_SMTP_HOST:-}
+  SITESENSE_SMTP_PORT: ${SITESENSE_SMTP_PORT:-587}
+  SITESENSE_SMTP_SECURITY: ${SITESENSE_SMTP_SECURITY:-starttls}
   SITESENSE_SMTP_USERNAME: ${SITESENSE_SMTP_USERNAME:-}
   SITESENSE_SMTP_PASSWORD: ${SITESENSE_SMTP_PASSWORD:-}
   SITESENSE_EMAIL_FROM: ${SITESENSE_EMAIL_FROM:-SiteSense <no-reply@sitesense.example>}
@@ -64,10 +71,7 @@ services:
   # Runs the migrations as the schema owner, then exits. The API never holds the owner password,
   # except in demo mode, where the nightly reset needs it (see the scheduler below).
   migrate:
-    build:
-      context: ./backend
-      target: prod
-    image: sitesense-backend:prod
+    image: &backend-image ${SITESENSE_IMAGE_PREFIX:-ghcr.io/whoispasindu/sitesense}-backend:${SITESENSE_VERSION:-latest}
     command: ["alembic", "upgrade", "head"]
     environment:
       <<: *backend-env
@@ -78,7 +82,7 @@ services:
     restart: "no"
 
   backend:
-    image: sitesense-backend:prod
+    image: *backend-image
     restart: unless-stopped
     environment:
       <<: *backend-env
@@ -106,7 +110,7 @@ services:
   # The scheduled jobs (reminders, weather, risk scoring, emails, and in demo mode the nightly
   # reset), one copy, in their own process.
   scheduler:
-    image: sitesense-backend:prod
+    image: *backend-image
     restart: unless-stopped
     command: ["python", "-m", "app.cli", "run-scheduler"]
     environment:
@@ -123,9 +127,7 @@ services:
         condition: service_completed_successfully
 
   frontend:
-    build:
-      context: ./frontend
-      target: prod
+    image: ${SITESENSE_IMAGE_PREFIX:-ghcr.io/whoispasindu/sitesense}-frontend:${SITESENSE_VERSION:-latest}
     restart: unless-stopped
     read_only: true
     tmpfs:
@@ -136,9 +138,13 @@ services:
     restart: unless-stopped
     environment:
       SITESENSE_DOMAIN: ${SITESENSE_DOMAIN:-localhost}
+      # "internal": Caddy's own certificate (localhost). On a server: an email address, and Caddy
+      # gets a Let's Encrypt certificate for SITESENSE_DOMAIN by itself.
+      SITESENSE_TLS: ${SITESENSE_TLS:-internal}
     ports:
-      - "127.0.0.1:443:443"
-      - "127.0.0.1:80:80"
+      # 127.0.0.1: this machine only. On a server: 0.0.0.0, so the internet reaches ports 80 and 443.
+      - "${SITESENSE_BIND:-127.0.0.1}:443:443"
+      - "${SITESENSE_BIND:-127.0.0.1}:80:80"
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

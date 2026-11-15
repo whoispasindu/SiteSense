@@ -1,8 +1,9 @@
 # Open-source release plan
 
-Status: decided (2026-11-15). Step 3 (any country) and step 5b (installable app) done on 2026-11-15
-([ADR 0017](../adr/0017-any-country.md), [ADR 0018](../adr/0018-installable-app.md)); the other
-steps not started. Follows Phase 14 (UAT and evaluation), so the first
+Status: decided (2026-11-15). Done on 2026-11-15: steps 1, 2 and 4 (release images, models in the
+image, one-step setup; [ADR 0019](../adr/0019-release-images-and-setup.md)), step 3 (any country;
+[ADR 0017](../adr/0017-any-country.md)) and step 5b (installable app;
+[ADR 0018](../adr/0018-installable-app.md)). Steps 5 and 6 to do. Follows Phase 14 (UAT and evaluation), so the first
 public release is v1.0. This page collects what is decided and what is still open, so the release
 work starts from it.
 
@@ -76,6 +77,9 @@ Gaps for self-hosting:
 
 ### Step 1: Release images
 
+Done on 2026-11-15 ([ADR 0019](../adr/0019-release-images-and-setup.md)): `.github/workflows/release.yml`
+on a version tag, and a deployment bundle on the GitHub Release. The original plan:
+
 - Build and publish the backend and frontend images to GitHub Container Registry on every release
   tag (`ghcr.io/<owner>/sitesense-backend:1.0.0` and `-frontend`), for `linux/amd64` and
   `linux/arm64`.
@@ -86,6 +90,8 @@ Gaps for self-hosting:
   beyond the compose file, the Caddyfile and the env file.
 
 ### Step 2: Models without the GitHub CLI
+
+Done on 2026-11-15: in the release image, and `fetch_models.py --via https`. The original plan:
 
 - Put the DistilBERT model files in the backend image at build time, checked against the SHA-256 in
   the committed manifest. Keep the TF-IDF fallback.
@@ -156,6 +162,10 @@ The proposal:
   Poya wording anywhere, and its risk forecasts use its own sites' rain.
 
 ### Step 4: Install in one step
+
+Done on 2026-11-15: `scripts/setup.py` (standard-library Python, also scriptable) and
+[docs/self-hosting.md](../self-hosting.md), which also covers upgrades, signed images and backups in
+outline. The original plan:
 
 - A setup script (`scripts/setup.sh`, plus a PowerShell version or a Python one) that:
   - writes `.env.prod` from `.env.prod.example` with strong random values for every secret, and a

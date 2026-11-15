@@ -39,7 +39,7 @@ Mid-run, the API used about 2.4 CPU cores and 2.1 GB of memory, PostgreSQL about
 
 ```bash
 cp .env.prod.example .env.prod          # fill in the secrets
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+docker compose -f docker-compose.prod.yml -f docker-compose.build.yml --env-file .env.prod up -d --build
 docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm backend python -m app.cli seed-dev
 pip install -r loadtest/requirements.txt
 locust -f loadtest/locustfile.py --host https://localhost --headless -u 50 -r 5 -t 5m \

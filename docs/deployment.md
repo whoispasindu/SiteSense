@@ -26,10 +26,10 @@ Open `.env.prod` and replace every `change-me` value. Generate each secret separ
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-Then start it, load the demo company, and open the app:
+Then start it (building the images from this checkout), load the demo company, and open the app:
 
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+docker compose -f docker-compose.prod.yml -f docker-compose.build.yml --env-file .env.prod up -d --build
 ```
 
 ```bash
@@ -49,6 +49,9 @@ Stop it with `docker compose -f docker-compose.prod.yml down` (add `-v` to delet
 
 ### For a real company
 
+Use the setup script and the released images instead: [self-hosting.md](self-hosting.md). It does
+everything below for you. By hand:
+
 - Set `SITESENSE_DEMO_MODE=false` and leave `SITESENSE_DEMO_RESET_DATABASE_URL` empty, so no running
   process holds the schema owner's password.
 - Do not run `seed-dev`. Create the first Company Admin instead. It prints a one-time password,
@@ -58,8 +61,8 @@ Stop it with `docker compose -f docker-compose.prod.yml down` (add `-v` to delet
   docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm backend python -m app.cli create-admin --email you@company.lk --name "Your Name"
   ```
 
-- On a server, set `SITESENSE_DOMAIN` to your domain and remove `tls internal` from
-  `infra/caddy/Caddyfile`. Caddy then gets a Let's Encrypt certificate by itself (ports 80 and 443
+- On a server, set `SITESENSE_DOMAIN` to your domain, `SITESENSE_TLS` to an email address and
+  `SITESENSE_BIND=0.0.0.0`. Caddy then gets a Let's Encrypt certificate by itself (ports 80 and 443
   must be open, and the domain must point at the server).
 - Back up the `pgdata` and `media` volumes. Photos live in `media`, not in the database.
 
