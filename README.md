@@ -446,7 +446,7 @@ docs/           architecture, decision records, security reviews, model cards, p
 | 11 | Dashboard, alerts and AI briefing | Done |
 | 12 | Client portal | Done |
 | 13 | Hardening and deployment | In review |
-| 14 | Testing, UAT and evaluation → **v1.0** | Planned |
+| 14 | Testing, UAT and evaluation → **v1.0** ([plan](docs/plans/phase-14-uat.md)) | Planned |
 | After 14 | Open-source release for self-hosting, then a hosted cloud service ([plan](docs/plans/open-source-release.md)) | Planned |
 | Later | Public demo: a hosted instance with seeded data | Planned |
 
