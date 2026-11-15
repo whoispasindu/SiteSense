@@ -8,6 +8,10 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Upgrading
 
+- **The production compose file pulls released images** instead of building them. To keep building
+  from your checkout, add `-f docker-compose.build.yml`. On a server, `SITESENSE_TLS` (an email
+  address) and `SITESENSE_BIND=0.0.0.0` replace editing the Caddyfile and the port bindings. Ports
+  80 and 443 were published on `127.0.0.1` only, so a server was not reachable from outside.
 - **Any country.** Nothing changes for a Sri Lankan company: the new settings default to Sri Lanka.
   A company elsewhere sets `SITESENSE_COUNTRY`, `SITESENSE_TIME_ZONE`, `SITESENSE_CURRENCY`,
   `SITESENSE_NUMBER_LOCALE` and `SITESENSE_RISK_LKR_PER_UNIT` before the first project (see
@@ -35,6 +39,16 @@ uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Self-hosting** ([ADR 0019](docs/adr/0019-release-images-and-setup.md),
+  [docs/self-hosting.md](docs/self-hosting.md)):
+  - A version tag publishes signed images for amd64 and arm64 servers
+    (`ghcr.io/whoispasindu/sitesense-backend` and `-frontend`, with an SBOM and build provenance)
+    and a GitHub Release with a deployment bundle.
+  - `setup.py` installs SiteSense in one step: it asks a few questions, writes the settings with
+    strong secrets (never overwriting existing ones), starts everything, and creates the first
+    Company Admin. `--non-interactive` for scripts.
+  - The backend image includes the report classifier's transformer model. `fetch_models.py` can
+    download over plain HTTPS (`--via https`), with no GitHub CLI.
 - **Installable app** (PWA, part A; [ADR 0018](docs/adr/0018-installable-app.md)): SiteSense installs
   on phones and computers from the browser, opens from the device (also with no signal), and offers
   "A new version is ready, Reload" after a release instead of reloading under you. An offline

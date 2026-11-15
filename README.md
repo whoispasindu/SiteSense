@@ -367,18 +367,28 @@ how local development and the demo run.
 
 ## Production
 
-`docker-compose.prod.yml` runs the production setup on your own machine: HTTPS through Caddy on one
-origin, 4 API workers, background jobs in their own process, the database hidden, read-only
-containers. It refuses weak settings.
+To run SiteSense for a company, on a server or your own machine, follow
+**[docs/self-hosting.md](docs/self-hosting.md)**: download a release bundle and run its setup script.
+It writes the settings with strong secrets, pulls the signed release images, starts everything
+behind HTTPS (Caddy, with Let's Encrypt on a real domain) and creates the first Company Admin:
 
 ```bash
-cp .env.prod.example .env.prod
+python3 setup.py
 ```
 
-Fill in every secret in `.env.prod` (the file says how), then:
+The production setup (`docker-compose.prod.yml`) runs 4 API workers, background jobs in their own
+process, the database hidden and read-only containers, and refuses weak settings. From this
+repository, the same script can build the images from your checkout instead:
 
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+python scripts/setup.py --build
+```
+
+To try the production setup with the demo data instead, write the settings by hand from
+`.env.prod.example` (demo mode on), then build, start and seed it:
+
+```bash
+docker compose -f docker-compose.prod.yml -f docker-compose.build.yml --env-file .env.prod up -d --build
 ```
 
 ```bash
@@ -386,6 +396,8 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm backend 
 ```
 
 Open <https://localhost> (accept the local certificate once) and sign in with a demo account.
+Releases are made by pushing a version tag (`v1.0.0`): CI publishes the images and the bundle
+([ADR 0019](docs/adr/0019-release-images-and-setup.md)).
 
 To host it (the API on Render or Railway, the web app on Vercel, managed PostgreSQL, and what the
 free tiers allow), follow [docs/deployment.md](docs/deployment.md). There is no public demo yet.

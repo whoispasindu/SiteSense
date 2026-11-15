@@ -1,0 +1,21 @@
+# Build the production images from this checkout instead of pulling the released ones:
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.build.yml --env-file .env.prod up -d --build
+#
+# Run python scripts/fetch_models.py first, so the backend image includes the report classifier's
+# transformer (otherwise it uses the TF-IDF model, and says so in its log).
+services:
+  migrate:
+    build:
+      context: ./backend
+      target: prod
+    image: sitesense-backend:local
+  backend:
+    image: sitesense-backend:local
+  scheduler:
+    image: sitesense-backend:local
+  frontend:
+    build:
+      context: ./frontend
+      target: prod
+    image: sitesense-frontend:local
