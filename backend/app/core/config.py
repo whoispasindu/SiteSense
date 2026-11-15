@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "SiteSense API"
-    version: str = "0.1.0"
+    version: str = "0.2.0-rc.1"
     environment: Environment = "development"
     debug: bool = False
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"

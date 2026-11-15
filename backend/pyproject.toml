@@ -1,6 +1,6 @@
 [project]
 name = "sitesense-backend"
-version = "0.1.0"
+version = "0.2.0-rc.1"
 description = "SiteSense API: AI-powered delay and cost control for construction projects"
 requires-python = ">=3.13"
 license = "MIT"
