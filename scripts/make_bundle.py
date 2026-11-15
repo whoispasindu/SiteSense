@@ -7,7 +7,7 @@ Writes dist/sitesense-<version>.tar.gz and its .sha256. Inside, in a folder site
 - docker-compose.prod.yml, with the image prefix and version defaulting to this release, so the
   bundle runs exactly the images it was released with;
 - infra/caddy/Caddyfile and infra/postgres/init/01-roles.sh, which the compose file mounts;
-- .env.prod.example, setup.py (with a VERSION file beside it), README.md (docs/self-hosting.md),
+- .env.prod.example, setup.py (with a VERSION file beside it), backup.py, README.md (docs/self-hosting.md),
   CHANGELOG.md and LICENSE.
 """
 
@@ -29,6 +29,7 @@ FILES = {
     "infra/postgres/init/01-roles.sh": "infra/postgres/init/01-roles.sh",
     ".env.prod.example": ".env.prod.example",
     "scripts/setup.py": "setup.py",
+    "scripts/backup.py": "backup.py",
     "docs/self-hosting.md": "README.md",
     "CHANGELOG.md": "CHANGELOG.md",
     "LICENSE": "LICENSE",
@@ -55,7 +56,7 @@ def contents(version: str, owner: str) -> dict[str, tuple[bytes, int]]:
         data = (ROOT / source).read_bytes()
         if target == "docker-compose.prod.yml":
             data = pin(data.decode("utf-8"), version, owner).encode("utf-8")
-        mode = 0o755 if target.endswith((".sh", "setup.py")) else 0o644
+        mode = 0o755 if target.endswith((".sh", "setup.py", "backup.py")) else 0o644
         out[target] = (data, mode)
     out["VERSION"] = (f"{version}\n".encode(), 0o644)
     return out

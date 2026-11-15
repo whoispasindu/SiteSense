@@ -64,7 +64,9 @@ everything below for you. By hand:
 - On a server, set `SITESENSE_DOMAIN` to your domain, `SITESENSE_TLS` to an email address and
   `SITESENSE_BIND=0.0.0.0`. Caddy then gets a Let's Encrypt certificate by itself (ports 80 and 443
   must be open, and the domain must point at the server).
-- Back up the `pgdata` and `media` volumes. Photos live in `media`, not in the database.
+- Back up the database and the photos every night with `backup.py create`, and copy the file off
+  the server ([self-hosting.md](self-hosting.md#back-up)). Photos live in the `media` volume, not
+  in the database.
 
 ## 2. Hosted: API on Render or Railway, web app on Vercel, managed PostgreSQL
 

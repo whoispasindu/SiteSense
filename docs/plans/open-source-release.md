@@ -2,8 +2,9 @@
 
 Status: decided (2026-11-15). Done on 2026-11-15: steps 1, 2 and 4 (release images, models in the
 image, one-step setup; [ADR 0019](../adr/0019-release-images-and-setup.md)), step 3 (any country;
-[ADR 0017](../adr/0017-any-country.md)) and step 5b (installable app;
-[ADR 0018](../adr/0018-installable-app.md)). Steps 5 and 6 to do. Follows Phase 14 (UAT and evaluation), so the first
+[ADR 0017](../adr/0017-any-country.md)), step 5 (backups, restore, sizing;
+[ADR 0020](../adr/0020-backup-and-restore.md)) and step 5b (installable app;
+[ADR 0018](../adr/0018-installable-app.md)). Step 6 (go public) to do, after Phase 14. Follows Phase 14 (UAT and evaluation), so the first
 public release is v1.0. This page collects what is decided and what is still open, so the release
 work starts from it.
 
@@ -179,6 +180,11 @@ outline. The original plan:
 - Done when the quick start in the README is about five commands.
 
 ### Step 5: Run it safely
+
+Done on 2026-11-15 ([ADR 0020](../adr/0020-backup-and-restore.md)): `backup.py` (create and restore,
+tested end to end), and [docs/self-hosting.md](../self-hosting.md) covers sizing from the load test,
+health checks, upgrades and the support policy (security fixes in the latest minor release). The
+original plan:
 
 - **Backup and restore guide** in `docs/self-hosting.md`:
   - a nightly `pg_dump` and a copy of the photos volume, kept off the server;
