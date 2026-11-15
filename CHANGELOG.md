@@ -6,6 +6,13 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0-rc.1] - 2026-11-15
+
+A trial release of everything under Unreleased above (any country, the installable app, release
+images, the setup script, backup and restore), to check the release process end to end before
+user acceptance testing (Phase 14). Not for real company data. While the repository is private,
+the images are private and unsigned.
+
 ### Upgrading
 
 - **The production compose file pulls released images** instead of building them. To keep building

@@ -39,7 +39,8 @@ Every action is pinned to a commit SHA, as in CI. Jobs get only the permissions 
 job only). The release itself is made with the runner's `gh`, not another third-party action.
 
 While the repository is private, so are its packages; they become public with the repository
-(release plan, step 6).
+(release plan, step 6). Signing also waits until then: keyless signing writes the signer's identity,
+including the repository's name, to Sigstore's public transparency log.
 
 ### Models in the image
 
