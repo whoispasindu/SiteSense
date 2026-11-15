@@ -1,7 +1,12 @@
 {
   "name": "sitesense-frontend",
   "private": true,
-  "version": "0.2.0-rc.1",
+  "version": "1.0.0",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/whoispasindu/SiteSense"
+  },
   "type": "module",
   "engines": {
     "node": ">=22"

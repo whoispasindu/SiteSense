@@ -1,9 +1,9 @@
-# Phase 14 plan: testing, user acceptance and evaluation → v1.0
+# Phase 14 plan: the pilot, user acceptance and evaluation (after v1.0)
 
-Status: plan A decided (2026-11-15): a two-month pilot with a construction company run by a friend
-of the project owner, hosted on the company's own server, plus the company's historical project data.
-Some decisions remain (see the end). Follows the trial release `v0.2.0-rc.1`. Leads to **v1.0**, and then to step 6 of the
-[open-source release plan](open-source-release.md) (licence and going public).
+Status: decided (2026-11-15). **v1.0 is released first**, as open source; then a two-month pilot
+with a construction company run by a friend of the project owner, on the company's own server,
+installed from the public release, plus the company's historical project data. Findings ship as
+1.0.x patch releases and a 1.1 at the end. Some decisions remain (see the end).
 
 ## Goal
 
@@ -16,7 +16,7 @@ the test suite cannot answer:
    every model card says its scores are not yet evidence about real sites.
 3. **Can a company install and run it by itself**, from the guide alone, and recover from a backup?
 
-**Done when** (the v1.0 exit criteria, all with a written record in `docs/uat/`):
+**Done when** (all with a written record in `docs/uat/`):
 
 - Every acceptance test case (TC-01 to TC-12, below) passes when **done by a person in the role**,
   in the app, on the pilot installation.
@@ -59,12 +59,13 @@ So the plan leans on what people do rather than what they say:
 Every finding is logged, however small, and "it's fine" with no example counts as no answer.
 
 (The fallback, if the pilot falls through: moderated sessions with 5 to 8 construction professionals
-on the demo company. The model evaluation would then rest on synthetic data, and v1.0 would say so.)
+on the demo company. The model evaluation would then rest on synthetic data, and the README would
+say so.)
 
 ## Where
 
 The pilot runs on **its own installation, on the company's own server** (decided), from the release
-bundle (`0.2.0-rc.N`). Their IT person (or whoever will look after it) installs it from the guide,
+bundle (`1.0.x`, public, with signed images). Their IT person (or whoever will look after it) installs it from the guide,
 which is also the install test. It holds real company data, so:
 
 - **demo mode off**, two-step sign-in on, nightly `backup.py create` copied off the server;
@@ -73,20 +74,11 @@ which is also the install test. It holds real company data, so:
 - a written **consent and data agreement** with the pilot: what is recorded, who sees it, that they
   can stop at any time, and that their data is theirs.
 
-Fixes found during the pilot ship as new release candidates (`rc.2`, `rc.3`…) and the pilot
+Fixes found during the pilot ship as patch releases (`1.0.1`, `1.0.2`…) and the pilot
 upgrades with the documented procedure. That procedure gets tested along the way.
 
-**Getting the images while the repository is private.** The release images are private until the
-repository is public (open-source plan, step 6), so the pilot's server cannot pull them anonymously.
-Two ways, for the owner to choose:
-
-- **Read access for the pilot (proposed):** invite the installer's GitHub account to the repository
-  with read access. They make a token with only `read:packages`, run `docker login ghcr.io` with it
-  on their server, then install from the bundle as the guide says. Nothing else changes, and access
-  can be removed after the pilot.
-- **Go public before the pilot:** do step 6 (AGPL licence, CLA, public repository) first. The
-  install then needs no account, and the images get signed. But the code goes public before real
-  users have tested it.
+The repository is public from v1.0, so the pilot's server pulls the release images like any other
+installation: no GitHub account needed.
 
 ## Part 1: acceptance test cases, done by people
 
@@ -178,7 +170,7 @@ any BR-12 suggestion during the pilot was right.
 the PM (a thumbs up or down), and every claim checked against the records once a week. The briefing
 must never state something the facts it was given do not support.
 
-## Part 4: the rest of v1.0's checks
+## Part 4: the other checks
 
 - **Accessibility:** the screen-reader session (NVDA and TalkBack) on the daily report and the
   client portal, recorded in [accessibility.md](../accessibility.md). Phase 13 deferred it here.
@@ -217,11 +209,11 @@ About 12 weeks, with two months of real use in the middle:
 
 | Week | What |
 | --- | --- |
-| 1 | Remaining decisions (below); ask for the historical data; build the evaluation tools and `docs/uat/`; `rc.2` |
+| 1 | Remaining decisions (below); ask for the historical data; build the evaluation tools and `docs/uat/`; `1.0.1` |
 | 2 | Access to the images; install at the pilot by their installer, from the guide; training; TC-01 to TC-12 with each role |
-| 3 to 10 | Two months of real use; SUS after week 1; weekly check-ins and PM rankings; fixes as `rc.3`, `rc.4`… The historical data is analysed meanwhile |
+| 3 to 10 | Two months of real use; SUS after week 1; weekly check-ins and PM rankings; fixes as `1.0.2`, `1.0.3`… The historical data is analysed meanwhile |
 | 11 | Final SUS and interviews; evaluation run; restore drill; screen-reader session; write-up |
-| 12 | Fix what blocks the exit criteria; update the model cards and README; tag **v1.0.0** |
+| 12 | Fix what the findings need; update the model cards and README; tag **v1.1.0** |
 
 ## Decided by the project owner (2026-11-15)
 
@@ -230,12 +222,12 @@ About 12 weeks, with two months of real use in the middle:
 3. **Two months** of real use.
 4. **Historical project data** from the company, for the model evaluation, handled as in
    [historical-data.md](../uat/historical-data.md).
+5. **v1.0 first, then the pilot:** release v1.0 as open source and make the repository public, so the
+   pilot installs the public release.
 
 ## Still to decide
 
-1. **Access to the images while the repository is private:** read access for the pilot's installer
-   (proposed), or go public before the pilot (see "Where").
-2. **Evaluation data:** aggregates only (proposed), or also redacted, labelled report sentences kept
+1. **Evaluation data:** aggregates only (proposed), or also redacted, labelled report sentences kept
    for retraining, with the company's written permission.
-3. **The v1.0 bar for the models:** proposed is "measured and published honestly, with the app's
+2. **The bar for the models:** proposed is "measured and published honestly, with the app's
    wording matched to the results", rather than a minimum score, since no real baseline exists yet.

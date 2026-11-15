@@ -8,16 +8,16 @@ SiteSense tells a construction company which site will slip before it does, and 
 
 [![CI](https://github.com/whoispasindu/SiteSense/actions/workflows/ci.yml/badge.svg)](https://github.com/whoispasindu/SiteSense/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/whoispasindu/SiteSense/actions/workflows/codeql.yml/badge.svg)](https://github.com/whoispasindu/SiteSense/actions/workflows/codeql.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-ffc21a.svg)](LICENSE)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-ffc21a.svg)](LICENSE)
 
 </div>
 
 ![The project manager's dashboard ranks projects by risk; the project page shows the forecast and what moved it](docs/media/pm-risk-dashboard.gif)
 
-> **Status: Phases 0 to 12 done, 13 (hardening and deployment) in review, of 14.** Every module is
-> built: projects and budgets, schedules, daily reports, materials, cost control, the risk models
-> and what-if planner, the dashboard and AI briefing, and the client portal. Phase 14 (user
-> acceptance testing and evaluation) leads to v1.0 (see [Roadmap](#roadmap)). The risk
+> **Status: v1.0, open source.** Every module is built: projects and budgets, schedules, daily
+> reports, materials, cost control, the risk models and what-if planner, the dashboard and AI
+> briefing, the client portal, and the installable app. Companies can [run it themselves](docs/self-hosting.md).
+> Next: a two-month pilot with a construction company (Phase 14, see [Roadmap](#roadmap)). The risk
 > model is trained on simulated projects (see the [model card](docs/model-card-risk.md)). The report
 > issue classifier (Phase 7) is trained on synthetic sentences and tested on sentences
 > written by the project, not real site reports, so its scores are not yet evidence about real sites
@@ -445,9 +445,10 @@ docs/           architecture, decision records, security reviews, model cards, p
 | 10 | Risk model v2, what-if planner and supplier model | Done |
 | 11 | Dashboard, alerts and AI briefing | Done |
 | 12 | Client portal | Done |
-| 13 | Hardening and deployment | In review |
-| 14 | Testing, UAT and evaluation → **v1.0** ([plan](docs/plans/phase-14-uat.md)) | Planned |
-| After 14 | Open-source release for self-hosting, then a hosted cloud service ([plan](docs/plans/open-source-release.md)) | Planned |
+| 13 | Hardening and deployment | Done |
+| 13b | Open-source release: any country, installable app, release images, setup, backups ([plan](docs/plans/open-source-release.md)) → **v1.0** | Done |
+| 14 | Pilot with a construction company, user acceptance and model evaluation on real data ([plan](docs/plans/phase-14-uat.md)) | Next |
+| Later | A hosted cloud service, built from the same releases | Planned |
 | Later | Public demo: a hosted instance with seeded data | Planned |
 
 After v1.0: offline daily reports in the installable app (reports and photos kept on the phone and
@@ -462,5 +463,10 @@ problems privately as described in [SECURITY.md](SECURITY.md).
 
 ## Licence
 
-[MIT](LICENSE). Fonts: IBM Plex Sans and IBM Plex Mono (SIL Open Font License), self-hosted through
-Fontsource.
+SiteSense is free software under the [GNU Affero General Public License v3.0](LICENSE)
+(AGPL-3.0-only). You may run, study, change and share it. If you offer a changed version to others
+over a network, you must offer them its source code too: the app links to its source for that
+reason, and `VITE_SOURCE_URL` points the link at your own. Contributions are made under the
+[Contributor Licence Agreement](CLA.md).
+
+Fonts: IBM Plex Sans and IBM Plex Mono (SIL Open Font License), self-hosted through Fontsource.

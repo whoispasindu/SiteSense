@@ -339,7 +339,7 @@ describe("DashboardPage", () => {
 
     const status = await screen.findByRole("group", { name: "API" });
     expect(await within(status).findByText("Online")).toBeInTheDocument();
-    expect(await within(status).findByText(/v0.2.0-rc.1/)).toBeInTheDocument();
+    expect(await within(status).findByText(/v1\.0\.0/)).toBeInTheDocument();
     const db = screen.getByRole("group", { name: "Database" });
     expect(await within(db).findByText("Ready")).toBeInTheDocument();
     expect(await screen.findByText("All systems are working.")).toBeInTheDocument();

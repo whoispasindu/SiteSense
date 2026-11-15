@@ -69,6 +69,15 @@ function ApiStatus() {
   );
 }
 
+/** AGPL-3.0 section 13: where the source of this running version is. */
+export function SourceLink({ className = "" }: { className?: string }) {
+  return (
+    <a href={__SOURCE_URL__} target="_blank" rel="noreferrer" className={`underline-offset-2 hover:underline ${className}`}>
+      Source code (AGPL-3.0)
+    </a>
+  );
+}
+
 export function SidebarContent({ onNavigate }: SidebarProps) {
   const { can } = useAuth();
   const groups = navForPermissions(can);
@@ -102,8 +111,9 @@ export function SidebarContent({ onNavigate }: SidebarProps) {
         ))}
       </nav>
 
-      <div className="border-t border-asphalt-line px-5 py-4">
+      <div className="space-y-2 border-t border-asphalt-line px-5 py-4">
         <ApiStatus />
+        <SourceLink className="block text-xs text-asphalt-muted" />
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { CraneDrawing } from "../../components/ui/CraneDrawing";
+import { SourceLink } from "../../components/layout/Sidebar";
 import { LogoMark } from "../../components/ui/Logo";
 
 const GATE_NOTES = [
@@ -54,7 +55,12 @@ export function GateLayout({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <main className="flex items-center justify-center px-4 py-10 sm:px-8 lg:py-16">{children}</main>
+      <main className="flex flex-col items-center justify-center gap-6 px-4 py-10 sm:px-8 lg:py-16">
+        {children}
+        <p className="text-xs text-ink-faint">
+          SiteSense v{__APP_VERSION__} · <SourceLink />
+        </p>
+      </main>
     </div>
   );
 }

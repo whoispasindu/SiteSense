@@ -6,12 +6,23 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.2.0-rc.1] - 2026-11-15
+## [1.0.0] - 2026-11-15
 
-A trial release of everything under Unreleased above (any country, the installable app, release
-images, the setup script, backup and restore), to check the release process end to end before
-user acceptance testing (Phase 14). Not for real company data. While the repository is private,
-the images are private and unsigned.
+The first stable release, and the first as open source. Everything from Phase 0 to Phase 13, plus
+running SiteSense in any country, the installable app, release images with a one-step setup, and
+backup and restore. A pilot with a construction company follows (Phase 14), to test SiteSense and
+its AI models on real sites and real data; the models are still trained on simulated projects, as
+their model cards say.
+
+### Licence
+
+- **SiteSense is now licensed under the GNU AGPL-3.0** (it was MIT while the repository was
+  private). Companies can run it for themselves freely. Anyone who offers a changed SiteSense to
+  others over a network must publish their changes. Contributions are made under the
+  [Contributor Licence Agreement](CLA.md), which a bot asks for on each new contributor's first
+  pull request.
+- The app links to its source code on the sign-in page and in the sidebar (AGPL-3.0 section 13).
+  A company running a changed version sets `VITE_SOURCE_URL` when building the web app.
 
 ### Upgrading
 
@@ -274,6 +285,12 @@ the images are private and unsigned.
   cannot duplicate follow-ups.
 - The transformer training dependencies are pinned and audited in CI.
 - A test lists every module that can call out of the server; a new one fails until reviewed.
+
+## [0.2.0-rc.1] - 2026-11-15
+
+A trial release of what became 1.0.0, to check the release process end to end (images for both
+platforms, the model in the backend image, the GitHub Release and its bundle). Not for real company
+data; its images are private and unsigned.
 
 ## [0.1.0] - 2026-10-10
 

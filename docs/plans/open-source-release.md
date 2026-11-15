@@ -4,8 +4,9 @@ Status: decided (2026-11-15). Done on 2026-11-15: steps 1, 2 and 4 (release imag
 image, one-step setup; [ADR 0019](../adr/0019-release-images-and-setup.md)), step 3 (any country;
 [ADR 0017](../adr/0017-any-country.md)), step 5 (backups, restore, sizing;
 [ADR 0020](../adr/0020-backup-and-restore.md)) and step 5b (installable app;
-[ADR 0018](../adr/0018-installable-app.md)). Step 6 (go public) to do, after Phase 14. Follows Phase 14 (UAT and evaluation), so the first
-public release is v1.0. This page collects what is decided and what is still open, so the release
+[ADR 0018](../adr/0018-installable-app.md)). Step 6 (go public) done in the code with release
+1.0.0; making the repository public and tagging are the owner's (step 6 below). The pilot
+(Phase 14) follows v1.0, by the owner's decision. This page collects what is decided and what is still open, so the release
 work starts from it.
 
 ## Goal
@@ -208,6 +209,25 @@ signal returns, de-duplicated by the server, with a clear message when something
 such as a stop-work flag under BR-11).
 
 ### Step 6: Go public
+
+Done in the code on 2026-11-15 (release 1.0.0): AGPL-3.0 `LICENSE` and the licence named in the
+README, `backend/pyproject.toml` and `frontend/package.json`; [CLA.md](../../CLA.md) and the CLA bot
+(`.github/workflows/cla.yml`); a source-code link in the app (AGPL section 13); the full history
+scanned with Gitleaks; the hosted option moved under "other ways to host"; `SECURITY.md` updated.
+`ml/` has no package metadata to name a licence in; the repository's `LICENSE` covers it.
+
+**For the project owner, in this order**, so the 1.0.0 images are public and signed:
+
+1. Merge the release pull request.
+2. Read through the issues, pull requests and releases that become public (2 open issues, the open
+   Dependabot pull requests, releases 0.1.0 and 0.2.0-rc.1).
+3. **Make the repository public** (Settings → General → Danger zone → Change visibility).
+4. Turn on **private vulnerability reporting** (Settings → Security) and, if wanted, Discussions.
+5. Push the `v1.0.0` tag. The release workflow signs the images now that the repository is public.
+6. **Make the two packages public** (`sitesense-backend`, `sitesense-frontend`: the package page →
+   Package settings → Change visibility), so anyone can pull them without signing in.
+
+The original plan:
 
 - Replace `LICENSE` with AGPL-3.0, update the README badge and licence section, set
   `license = "AGPL-3.0-only"` in `backend/pyproject.toml`, and add the same field to
