@@ -104,7 +104,9 @@ python3 setup.py --non-interactive --domain sitesense.example.com \
 ## Check the images (optional)
 
 Every release image is signed by this repository's release workflow (Sigstore, keyless) and carries
-an SBOM. To check one before you run it, with [cosign](https://docs.sigstore.dev/cosign/system_config/installation/):
+an SBOM. To check one before you run it, with [cosign](https://docs.sigstore.dev/cosign/system_config/installation/)
+**3.0 or later** (cosign 2.x cannot read the newer signature format the releases use, and reports
+"no signatures found"):
 
 ```bash
 cosign verify ghcr.io/whoispasindu/sitesense-backend:1.0.0 \

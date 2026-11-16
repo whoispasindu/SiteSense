@@ -28,7 +28,9 @@ A version tag (`v1.0.0`) runs the release workflow:
    for `linux/amd64` and `linux/arm64`, tagged `1.0.0`, `1.0` and `latest` (a pre-release gets only
    its own tag). Each carries an **SBOM** and **build provenance** (BuildKit attestations) and is
    **signed with Sigstore**, keyless, with the workflow's own identity. Anyone can check where an
-   image came from with `cosign verify` (docs/self-hosting.md).
+   image came from with `cosign verify` (docs/self-hosting.md). The workflow signs with cosign 3,
+   which stores signatures in Sigstore's newer bundle format, so checking needs cosign 3.0 or later
+   (checked on the 1.0.0 images with cosign 3.1.4; cosign 2.4.1 reports "no signatures found").
 3. **A GitHub Release** with the notes from `CHANGELOG.md` and the **deployment bundle**
    (`scripts/make_bundle.py`): the production compose file with its defaults pinned to this
    version's images, the Caddy and database files it mounts, the settings example, the setup script

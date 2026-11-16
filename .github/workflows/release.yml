@@ -143,7 +143,7 @@ jobs:
             if [ "$PRIVATE" = "true" ]; then
               echo "Not signed: images are signed once the repository is public (ADR 0019)."
             else
-              echo "Signed with Sigstore by this repository's release workflow. To check one:"
+              echo "Signed with Sigstore by this repository's release workflow. To check one, with cosign 3.0 or later:"
               echo
               echo '```bash'
               echo "cosign verify ghcr.io/${GITHUB_REPOSITORY_OWNER}/sitesense-backend:${VERSION} \\"
