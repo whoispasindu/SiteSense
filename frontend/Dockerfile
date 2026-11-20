@@ -1,6 +1,6 @@
 # The Node stages run on the build machine's own platform: the built files are the same for every
 # platform, so a multi-platform release does not build them again under emulation.
-FROM --platform=$BUILDPLATFORM node:24-alpine AS deps
+FROM --platform=$BUILDPLATFORM node:26-alpine AS deps
 WORKDIR /app
 # Everything runs as the unprivileged "node" user, which also owns node_modules so Vite can
 # write its cache inside the container.
