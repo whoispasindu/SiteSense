@@ -47,6 +47,8 @@ Report vulnerabilities privately; see [SECURITY.md](SECURITY.md).
 
 SiteSense is licensed under the [AGPL-3.0](LICENSE). Before your first pull request is merged, a bot
 asks you to sign the [Contributor Licence Agreement](CLA.md) by leaving a comment; it takes a
-minute and covers all your later contributions. You keep the copyright in your work. The CLA lets
+minute and covers all your later contributions. Everyone who wrote a commit in the pull request
+signs, so commit with an email address that is on your GitHub account; comment `recheck` to run the
+check again. You keep the copyright in your work. The CLA lets
 the project also offer SiteSense as a hosted service, while every published version stays open
 source under the AGPL.

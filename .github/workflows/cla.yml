@@ -1,36 +1,91 @@
 name: CLA
 
 # Asks each new contributor to sign the Contributor Licence Agreement (CLA.md) by commenting on
-# their pull request, and records signatures on the cla-signatures branch. It never checks out or
-# runs the pull request's code, which is what makes pull_request_target safe here.
+# their pull request, and records signatures in signatures/cla.json on the cla-signatures branch.
+# The logic is .github/scripts/cla.cjs (tested by cla.test.cjs in CI), run with GitHub's own
+# github-script action.
+#
+# Why pull_request_target and issue_comment are safe here: both run this workflow and script from
+# the base branch, never from the pull request. Nothing checks out, installs or runs the pull
+# request's code; the script reads it only through the API, and comment text and commit details are
+# compared with fixed values, never run or put into a shell. Each job holds only the permissions it
+# needs.
 on:
-  issue_comment:
+  issue_comment: # zizmor: ignore[dangerous-triggers] compares the comment with fixed text only, see above
     types: [created]
-  pull_request_target:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] reads the pull request through the API only, see above
     types: [opened, closed, synchronize]
 
-permissions:
-  actions: write
-  contents: write # the signatures file on the cla-signatures branch
-  pull-requests: write
-  statuses: write
+permissions: {}
 
 jobs:
   cla:
+    # Keep this name: it is the check contributors see on their pull request.
     name: Contributor Licence Agreement
     if: >-
-      github.event_name == 'pull_request_target' ||
-      (github.event.issue.pull_request &&
+      (github.event_name == 'pull_request_target' && github.event.action != 'closed') ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
         (github.event.comment.body == 'recheck' ||
-         github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA'))
+         contains(github.event.comment.body, 'hereby sign the CLA')))
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: write # the signatures file on the cla-signatures branch
+      pull-requests: write # the bot's comment
+    concurrency:
+      group: cla-${{ github.event.pull_request.number || github.event.issue.number }}
+      cancel-in-progress: false
     steps:
-      - uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08 # v2.6.1
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+      # The base branch's commit (github.sha for both events), never the pull request's head.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          path-to-signatures: signatures/cla.json
-          path-to-document: https://github.com/${{ github.repository }}/blob/main/CLA.md
-          branch: cla-signatures
-          allowlist: whoispasindu,dependabot[bot],github-actions[bot]
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const cla = require('./.github/scripts/cla.cjs')
+            await cla.checkPullRequest({ github, context, core })
+
+  # A signing or recheck comment runs the check above outside the pull request. Once everyone has
+  # signed, re-run the pull request's own failed run so the check on its head commit turns green.
+  rerun:
+    name: Re-run the pull request's CLA check
+    needs: cla
+    if: github.event_name == 'issue_comment'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write # re-run the workflow run
+      contents: read # the script, from the base branch
+      pull-requests: read # the pull request's head commit
+    concurrency:
+      group: cla-rerun-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const cla = require('./.github/scripts/cla.cjs')
+            await cla.rerunPullRequestCheck({ github, context, core })
+
+  # Lock the conversation once the pull request is closed, so signing comments stay as they were.
+  lock:
+    name: Lock the closed pull request
+    if: github.event_name == 'pull_request_target' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write # lock the conversation
+    concurrency:
+      group: cla-lock-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            await github.rest.issues.lock({ ...context.repo, issue_number: context.issue.number })

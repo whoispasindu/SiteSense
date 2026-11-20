@@ -5,9 +5,10 @@ for your contributions, so that SiteSense can stay open source under the AGPL-3.
 offered as a hosted service or under other licence terms by the project owner. You keep the
 copyright in your contributions.
 
-**Sign it** by commenting on your first pull request, as the CLA bot asks:
-"I have read the CLA Document and I hereby sign the CLA". The bot records your GitHub user name and
-the date. You sign once; it covers all your contributions.
+**Sign it** by commenting on your first pull request, as the CLA bot asks, with exactly this
+sentence: "I have read the CLA Document and I hereby sign the CLA". The bot records your GitHub
+user name and account ID, the pull request and the date. You sign once; it covers all your
+contributions.
 
 ## The agreement
 
