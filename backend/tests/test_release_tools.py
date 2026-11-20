@@ -188,6 +188,17 @@ def test_compose_and_setup_agree_on_every_setting() -> None:
     assert written - read_by_compose == set()
 
 
+def test_caddy_never_passes_on_a_clients_forwarded_for() -> None:
+    """The API trusts X-Forwarded-For from Caddy (FORWARDED_ALLOW_IPS), so Caddy must set it itself.
+
+    A ``trusted_proxies`` range makes Caddy keep the header a client in that range sent: anyone on
+    the office network could then pick the IP the sign-in limits and the audit log see.
+    """
+    lines = (REPO / "infra" / "caddy" / "Caddyfile").read_text(encoding="utf-8").splitlines()
+    directives = [line.split("#", 1)[0] for line in lines]
+    assert not any("trusted_proxies" in d or "X-Forwarded-For" in d for d in directives)
+
+
 def test_the_compose_commands(tmp_path: Path) -> None:
     pulled = setup.Compose(tmp_path, tmp_path / ".env.prod")
     assert pulled.up()[-3:] == ["up", "-d", "--wait"]

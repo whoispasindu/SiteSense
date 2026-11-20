@@ -1,20 +1,25 @@
 version: 2
+# Every version update waits 7 days after its release (cooldown), so a hijacked package that is
+# caught and pulled within days never reaches a pull request. Security updates are not delayed.
 updates:
   - package-ecosystem: pip
     directory: /backend
     schedule: { interval: weekly }
+    cooldown: { default-days: 7 }
     groups:
       python-minor:
         update-types: [minor, patch]
   - package-ecosystem: pip
     directory: /ml
     schedule: { interval: weekly }
+    cooldown: { default-days: 7 }
     groups:
       ml-minor:
         update-types: [minor, patch]
   - package-ecosystem: npm
     directory: /frontend
     schedule: { interval: weekly }
+    cooldown: { default-days: 7 }
     ignore:
       # eslint-plugin-jsx-a11y does not support ESLint 10 yet; remove once it does.
       - dependency-name: "eslint"
@@ -27,9 +32,11 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    cooldown: { default-days: 7 }
   - package-ecosystem: docker
     directories: [/backend, /frontend]
     schedule: { interval: weekly }
+    cooldown: { default-days: 7 }
     ignore:
       # Stay on Node LTS (even majors) only.
       - dependency-name: "node"
@@ -40,3 +47,4 @@ updates:
   - package-ecosystem: docker-compose
     directory: /
     schedule: { interval: weekly }
+    cooldown: { default-days: 7 }

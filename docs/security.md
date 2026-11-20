@@ -46,7 +46,98 @@ here, newest first. The baseline design is in [ADR 0003](adr/0003-security-basel
 | Risk and supplier models | Plain JSON only (`sitesense-risk-v2`, `sitesense-supplier-v1`, the rain climate), each validated on load (kinds, sizes, finite numbers, node counts, range inputs, constants); golden rows prove the pure-Python scorers match training, including SHAP values; CI retrains both models and the climate table and checks they reproduce; the what-if planner stores and changes nothing and only the PM uses it; sign constraints mean no recovery action can worsen a forecast; the BR-12 override is PM-only, strict-boolean and audited | `ai/risk/model.py`, `ai/risk/climate.py`, `ai/supplier/model.py`, `services/risk_service.py: what_if`, `services/supplier_service.py`, `ml/check_model.py` | `test_risk_model.py`, `test_risk_whatif.py`, `test_supplier_api.py`, `ml/tests`, role matrix |
 | AI briefing (LLM) | The model receives only allow-listed facts (`extra="forbid"` models of numbers, enumerated words, project codes and names, rule IDs), built per reader with their own visibility; a fixed instruction; JSON-schema output with codes limited to the reader's projects; answers validated and source counts made by the server; optional key held as `SecretStr` and never logged; one retry, 20 s timeout, rule-based fallback; at most one new answer per reader every 15 minutes | `ai/briefing`, `integrations/llm.py`, `services/briefing_service.py` | `test_briefing_leaks.py` (real SDK request captured for every role), `test_briefing.py`, `test_outbound_calls.py` |
 | Email | Bodies built from the alert's title, a fixed sentence and links only, never its text; subject stripped of line breaks; TLS required in production and an https app link; transactional outbox, five attempts, errors recorded by type only; per-user choices audited; stop-work always sent; the weekly PDF only to cost roles; without SMTP, logged not sent | `services/alerts.py`, `services/channels.py`, `integrations/email.py`, `services/weekly_report.py` | `test_alerts_email.py`, `test_config.py` |
-| Supply chain | Pinned deps, Dependabot (pip, npm, actions, docker), pip-audit, npm audit, dependency review, CodeQL `security-extended`, actions pinned to SHAs, `permissions: contents: read`, `persist-credentials: false` | `.github/` | CI |
+| Supply chain | Pinned deps, Dependabot (pip, npm, actions, docker) with a 7-day cooldown, pip-audit, npm audit, dependency review, CodeQL `security-extended`, actions pinned to SHAs, `permissions: contents: read`, `persist-credentials: false` | `.github/` | CI |
+| Client IP | Caddy trusts no forwarded headers and sets `X-Forwarded-For` from the connecting address; the API trusts only that header (only Caddy reaches it) | `infra/caddy/Caddyfile`, `docker-compose.prod.yml` | `test_caddy_never_passes_on_a_clients_forwarded_for`, attack run (below) |
+
+## Release 1.0 security scan: 2026-11-20
+
+A full scan of the released 1.0.0, after the repository went public: every dependency and image,
+the code, the git history, and attacks on a running installation. Two findings were fixed in 1.0.1;
+the rest are recorded below with the reason they stay.
+
+### What was run
+
+| Check | Tool | Result on 1.0.0 |
+| --- | --- | --- |
+| GitHub alerts | Dependabot, secret scanning, CodeQL | No Dependabot or secret-scanning alerts; one CodeQL note (below) |
+| Python dependencies | pip-audit: backend runtime and dev, ML pipeline | No known vulnerabilities |
+| Web app dependencies | npm audit | 0 vulnerabilities |
+| Images | Trivy 0.58: the two release images, Caddy, PostgreSQL | Fixable critical and high findings in every image except the database (table below) |
+| Secrets | Gitleaks over the full history (all branches); Trivy in every image | None |
+| Code | Semgrep (security-audit, OWASP Top 10, Python, TypeScript, React, Dockerfile, GitHub Actions, secrets), Bandit | No vulnerability; one hardening point (Dependabot cooldown), the rest false positives (below) |
+| Workflows | zizmor | The contributor-agreement workflow (below) |
+| Dockerfiles | hadolint, Trivy config | Clean (health checks live in the compose file) |
+| Code review by hand | sign-in, tokens, two-step sign-in, refresh rotation, site scoping, uploads, BOQ import, client view, AI briefing, `next` redirect, backup and setup scripts | One finding: the client IP (below) |
+| Running installation | 1.0.0 release images in production mode (`setup.py` settings, demo accounts for each role, plus a real Project Manager with two-step sign-in): 180 scripted attacks, testssl.sh, OWASP ZAP baseline | One finding: the client IP (below). ZAP: no failures; two missing headers on the static files (fixed), the rest informational |
+
+The attacks covered: headers and information disclosure (API docs, dotfiles, errors); host
+header, CORS and cross-site requests; forged and tampered tokens (`alg: none`, changed role, weak
+keys, expired); refresh rotation, reuse and sign-out; the same answer for known and unknown emails;
+lockout; enrolment, code replay, recovery codes and admin reset for two-step sign-in; every admin
+endpoint for every other role; site scoping on every project endpoint; extra fields when creating
+users; the client view (internal endpoints refused, no internal cost field); no rate or amount for
+site engineers; SQL and template injection; stored script payloads; oversized and deeply nested
+bodies; disguised, SVG, GIF, decompression-bomb and oversized photos (EXIF removed, served as JPEG
+with `nosniff`); BOQ zip bombs, macro workbooks and XML entity expansion. TLS: 1.2 and 1.3 only,
+forward secrecy, none of the known TLS attacks.
+
+### Findings fixed in 1.0.1
+
+1. **Medium: anyone on a private network could choose the client IP the API saw.** The Caddyfile
+   trusted forwarded headers from every private address (`trusted_proxies static
+   private_ranges`), and the API trusts what Caddy forwards. A request from an office network or a
+   VPN could therefore set its own `X-Forwarded-For`. Shown on the running installation: 60
+   sign-in attempts from one machine, each with a different header, were never rate-limited, and
+   the audit log recorded the made-up address. The per-account lockout still held (5 attempts per
+   account), so this allowed guessing one password across many accounts, not many on one. Fixed:
+   Caddy trusts no forwarded header and sets it from the connecting address; a test keeps it so.
+   On the fixed version, the same 60 attempts were refused from the 11th, and the audit log
+   recorded the real address.
+2. **High: known vulnerabilities in the base images**, with fixes available:
+
+   | Image | 1.0.0 (critical / high) | 1.0.1 | Change |
+   | --- | --- | --- | --- |
+   | Web app (nginx) | 1 / 56 | 0 / 0 | nginx 1.31 (was 1.29), plus Alpine's latest security updates at build time |
+   | API (Python) | 2 / 48 | 0 / 47, none with a fix yet | Debian 13 "trixie" (was 12 "bookworm"), Debian's latest security updates at build time, pip removed from the final image |
+   | Caddy | 6 / 101 | 0 / 3 | Caddy 2.11 (was 2.10) |
+
+3. **Low: the web app's static files lacked HSTS** (and Cross-Origin-Resource-Policy), because
+   their nginx location sets headers of its own (OWASP ZAP). Browsers take HSTS from the page, so
+   this mattered little; both headers are now on every file.
+
+All 180 attacks were run again on 1.0.1 (the new images and Caddyfile), with the same results apart
+from the fixed findings.
+
+### Not changed, and why
+
+- **PostgreSQL image: 1 critical and 26 high, all in `gosu`**, the small Go program the image uses
+  once at start to drop root. The findings are in Go's standard library (network and certificate
+  code) that `gosu` never runs, and the database is unreachable from outside the stack. Upstream
+  rebuilds pick up the fix; `docker compose pull` gets it.
+- **The API image's 47 remaining high findings** are Debian packages with no fix released yet
+  (util-linux, SQLite, ncurses, systemd libraries). The API does not run those tools, uses
+  PostgreSQL rather than SQLite, and runs as an unprivileged user on a read-only file system. Each
+  release rebuild picks up fixes as Debian publishes them.
+- **CodeQL: `create-admin` prints the one-time password.** By design: it is the only way to hand the
+  first admin their password, it is printed to the operator's own terminal and never logged, and it
+  must be changed at first sign-in.
+- **The contributor-agreement workflow** uses `pull_request_target` and `issue_comment`, and its
+  action (`contributor-assistant/github-action`, pinned to a commit) is archived. It never checks
+  out or runs a contributor's code and holds only the permissions it needs, so the trigger is safe.
+  An archived action gets no fixes, so it should be replaced.
+- **A locked account answers differently** (HTTP 423) from an unknown email, so someone who
+  triggers a lockout learns that the account exists. Locking needs 5 failed attempts, which are
+  audited. Telling a real user why they cannot sign in is worth more.
+- **A two-step challenge stays valid for its 5 minutes** even after it was used. It is only proof
+  that the password was right: any further sign-in with it still needs a fresh code or an unused
+  recovery code, and wrong codes count towards the lockout.
+- **Responses are compressed** (testssl.sh flags BREACH). That attack needs a victim's browser to
+  send attacker-chosen requests with their credentials; the access token is never in a cookie, and
+  the refresh cookie is `SameSite=Strict` and read only by the sign-in endpoints.
+- **False positives:** Bandit's `0.0.0.0` in `setup.py` (the server's bind address, on purpose);
+  Semgrep's `xml.sax.saxutils.escape` (escaping output, not parsing XML), `add_header` repeated in
+  `nginx.conf` (on purpose: nginx does not inherit headers into a location that sets its own), and
+  `urllib` in the ML data generator (a fixed https address).
 
 ## Phase 13 review: 2026-10-16
 

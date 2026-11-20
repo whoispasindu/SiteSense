@@ -5,12 +5,15 @@
 # browser warns once until you trust it. On a real server, set SITESENSE_DOMAIN to your domain and
 # SITESENSE_TLS to an email address: Caddy gets a Let's Encrypt certificate by itself (the domain must
 # point at the server, and ports 80 and 443 must be reachable: SITESENSE_BIND=0.0.0.0).
+#
+# Caddy trusts no forwarded headers: it always replaces X-Forwarded-For with the address that
+# connected to it, so nobody can choose the IP that sign-in limits and the audit log see. Only if
+# another proxy or load balancer sits in front of Caddy, trust that one address in the global block:
+#   servers {
+#   	trusted_proxies static 10.0.0.5/32
+#   }
 {
 	admin off
-	servers {
-		# Only Caddy talks to the API, so it is the one place that sets X-Forwarded-For.
-		trusted_proxies static private_ranges
-	}
 }
 
 {$SITESENSE_DOMAIN:localhost} {

@@ -6,6 +6,34 @@ uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-20
+
+Security fixes from a full scan of 1.0.0: dependencies, images, code, git history, and attacks on a
+running installation ([security.md](docs/security.md#release-10-security-scan-2026-11-20)).
+
+### Security
+
+- **Caddy no longer trusts a client's `X-Forwarded-For`.** Caddy kept the header when it came from
+  a private address (an office network, a VPN), so someone there could choose the IP the API saw:
+  the per-IP sign-in limits did not hold, and the audit log could record a made-up address. Caddy
+  now always sets the header from the address that connected to it. The per-account lockout was
+  never affected.
+- **Newer base images**, with the security fixes released since 1.0.0: Caddy 2.11 (was 2.10),
+  nginx 1.31 for the web app (was 1.29), and Debian 13 "trixie" for the API (was 12 "bookworm").
+  Both images now also install their distribution's latest security updates when they are built,
+  and the API image no longer contains pip.
+- The web app's static files now carry HSTS and Cross-Origin-Resource-Policy too.
+- Dependabot waits 7 days before proposing a new version (security updates are not delayed).
+
+### Upgrading
+
+- Download the 1.0.1 bundle: it brings the new Caddy configuration (`infra/caddy/Caddyfile`) and
+  Caddy image. Copy your `.env.prod` into it, set `SITESENSE_VERSION=1.0.1`, then
+  `dc pull && dc up -d --wait` as usual. Keeping your 1.0.0 folder and only changing the version
+  would leave the old Caddy configuration in place.
+- If another proxy or load balancer sits in front of Caddy, add its address as a trusted proxy (the
+  Caddyfile shows how); otherwise every request seems to come from it.
+
 ## [1.0.0] - 2026-11-15
 
 The first stable release, and the first as open source. Everything from Phase 0 to Phase 13, plus

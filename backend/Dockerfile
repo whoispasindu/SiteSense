@@ -1,4 +1,4 @@
-FROM python:3.13-slim-bookworm AS base
+FROM python:3.13-slim-trixie AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -8,6 +8,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 ENV ORT_DISABLE_TELEMETRY=1
 
 WORKDIR /app
+
+# Debian's security fixes released after the base image was built.
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/*
 
 # Unprivileged runtime user: a compromised process cannot modify the image or the code.
 RUN groupadd --system --gid 10001 app && useradd --system --uid 10001 --gid app --no-create-home app
@@ -31,6 +34,8 @@ COPY --chown=root:root alembic ./alembic
 COPY --chown=root:root alembic.ini .
 # Site photos: the only writable path. Mount a persistent volume here in production.
 RUN mkdir -p /data/media && chown app:app /data/media
+# pip only installs the dependencies: the running API never needs it (nor the libraries it bundles).
+RUN pip uninstall -y pip
 ENV SITESENSE_MEDIA_ROOT=/data/media
 USER app
 EXPOSE 8000

@@ -89,7 +89,8 @@ services:
       SITESENSE_SCHEDULER_ENABLED: "false"
       # Uvicorn worker processes. Each has its own rate-limit counters (see docs/deployment.md).
       WEB_CONCURRENCY: ${WEB_CONCURRENCY:-4}
-      # Only Caddy can reach the API (no published port), so its X-Forwarded-For is trusted.
+      # Only Caddy can reach the API (no published port), so its X-Forwarded-For is trusted. Caddy
+      # sets that header itself from the connecting address and ignores any a client sends.
       FORWARDED_ALLOW_IPS: "*"
     volumes:
       - media:/data/media
@@ -134,7 +135,7 @@ services:
       - /tmp
 
   proxy:
-    image: caddy:2.10-alpine
+    image: caddy:2.11-alpine
     restart: unless-stopped
     environment:
       SITESENSE_DOMAIN: ${SITESENSE_DOMAIN:-localhost}
