@@ -1,35 +1,35 @@
 # Runtime dependencies (pinned; Dependabot proposes upgrades).
-fastapi==0.143.0
+fastapi==0.165.0
 uvicorn[standard]==0.54.0
-pydantic==2.14.0
-pydantic-settings==2.15.0
-SQLAlchemy==2.1.4
-alembic==1.20.0
-psycopg[binary]==3.3.6
+pydantic==2.14.4
+pydantic-settings==2.16.3
+SQLAlchemy==2.1.9
+alembic==1.20.1
+psycopg[binary]==3.3.9
 structlog==26.1.0
 argon2-cffi==25.1.0
 PyJWT==2.15.1
-email-validator==2.3.0
+email-validator==2.4.0
 openpyxl==3.1.5
 # openpyxl parses workbook XML through defusedxml when it is installed (XXE / entity bombs).
 defusedxml==0.7.1
-python-multipart==0.0.32
+python-multipart==0.0.34
 # Site photos: decode, verify, strip metadata and re-encode (also bounds decompression bombs).
 pillow==13.0.0
 # In-process scheduled jobs (missing-report reminders, weather refresh).
 APScheduler==3.11.3
 # Report issue classifier (Phase 7): the DistilBERT category model runs as ONNX; its files are
 # fetched from a GitHub Release and checked against a SHA-256 manifest (scripts/fetch_models.py).
-onnxruntime==1.31.0
+onnxruntime==1.32.0
 tokenizers==0.23.3
 # Daily briefing (Phase 11): the official Anthropic SDK. Optional at run time: with no API key the
 # rule-based briefing is used. Only structured facts are ever sent (see app/ai/briefing).
 anthropic==1.13.0
 # Weekly PDF report (Phase 11). BSD licence; draws with its own canvas, no browser or system fonts.
-reportlab==5.0.1
+reportlab==5.1.0
 # Two-step sign-in (Phase 13): AES-GCM for the TOTP secrets at rest, and QR codes for enrolment.
 # (The TOTP algorithm itself is ours, RFC 6238, tested against the RFC's vectors.)
-cryptography==50.0.1
+cryptography==50.0.2
 segno==1.6.6
 # Public holidays by country and year, for the admin's holiday import (MIT licence, offline data).
-holidays==0.108
+holidays==0.109
